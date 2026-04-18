@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Copia local del frontend Mordecai (referencia); no incluir en el remoto
+mordecai-frontend/

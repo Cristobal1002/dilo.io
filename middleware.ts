@@ -1,0 +1,23 @@
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+
+const isPublicRoute = createRouteMatcher([
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/f/(.*)', // flows públicos — el usuario final no necesita login
+  '/api/f/(.*)', // API de flows públicos
+  '/discovery(.*)', // UI de referencia (mismo estilo que Mordecai discovery)
+  '/api/v1/public/discovery(.*)', // stub de sesión para la demo /discovery
+])
+
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect()
+  }
+})
+
+export const config = {
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
+}

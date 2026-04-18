@@ -1,0 +1,63 @@
+import { NextRequest } from 'next/server'
+import { z } from 'zod'
+import { eq, and } from 'drizzle-orm'
+import { db } from '@/db'
+import { flows } from '@/db/schema'
+import { withApiHandler } from '@/lib/with-api-handler'
+import { apiSuccess } from '@/lib/api-response'
+import { ValidationError, NotFoundError } from '@/lib/errors'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('flows/[flowId]')
+
+const UpdateSchema = z
+  .object({
+    status: z.enum(['draft', 'published', 'archived']).optional(),
+    name: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).optional().nullable(),
+  })
+  .refine(
+    (data) =>
+      data.status !== undefined || data.name !== undefined || data.description !== undefined,
+    { message: 'Debe proporcionar al menos un campo para actualizar' },
+  )
+
+export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) => {
+  const { org } = auth
+  const { flowId } = params
+
+  const body = await req.json()
+  const parsed = UpdateSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new ValidationError('Datos de actualización inválidos', parsed.error.flatten().fieldErrors)
+  }
+
+  const updateData: Record<string, unknown> = { updatedAt: new Date() }
+
+  if (parsed.data.name) {
+    updateData.name = parsed.data.name
+  }
+
+  if (parsed.data.description !== undefined) {
+    updateData.description = parsed.data.description ?? null
+  }
+
+  if (parsed.data.status) {
+    updateData.status = parsed.data.status
+    if (parsed.data.status === 'published') {
+      updateData.publishedAt = new Date()
+    }
+  }
+
+  const [updated] = await db
+    .update(flows)
+    .set(updateData)
+    .where(and(eq(flows.id, flowId), eq(flows.organizationId, org.id)))
+    .returning()
+
+  if (!updated) throw new NotFoundError('Flow')
+
+  log.info({ flowId, orgId: org.id, changes: Object.keys(updateData) }, 'Flow updated')
+
+  return apiSuccess({ flow: updated })
+}, { requireAuth: true })

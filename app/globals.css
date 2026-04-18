@@ -1,26 +1,440 @@
 @import "tailwindcss";
 
+@variant dark (.dark &);
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F8F9FB;
+  --foreground: #1A1A1A;
+  --mordecai-purple: #9C77F5;
+  --mordecai-green: #00d4b0;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --border-subtle: #E5E7EB;
+  /* Pay portal: light gradient (white-label parametrizable via inline style override) */
+  --pay-bg-start: #FDFBFF;
+  --pay-bg-mid: #F8F6FC;
+  --pay-bg-end: #F5F3FA;
+  --surface: #ffffff;
+  --sidenav: #f8f9fb;
+}
+
+.dark {
+  --background: #0f1117;
+  --foreground: #f8f9fb;
+  --surface: #1a1d29;
+  --sidenav: #1a1d29;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-mordecai-purple: var(--mordecai-purple);
+  --color-mordecai-green: var(--mordecai-green);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border-subtle: var(--border-subtle);
+  --color-dilo-50: #f3eeff;
+  --color-dilo-500: var(--mordecai-purple);
+  --color-dilo-600: #7b5bd4;
+  --color-mint-500: var(--mordecai-green);
+  --color-muted-foreground: var(--text-secondary);
+  --color-border: var(--border-subtle);
+  --color-muted: var(--text-secondary);
+  --color-surface: var(--surface);
+  --color-sidenav: var(--sidenav);
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #065f46;
+  --color-success-muted: #047857;
+  --font-sans: var(--font-dilo-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+button:not(:disabled):not([aria-disabled='true']),
+[role='button']:not([aria-disabled='true']),
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled='true'],
+.cursor-on-hold {
+  cursor: not-allowed;
+}
+
+/* Ocultar scrollbar manteniendo scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* react-international-phone dark theme */
+.mordecai-phone-input-wrapper {
+  --react-international-phone-height: 42px;
+  --react-international-phone-background-color: #252936;
+  --react-international-phone-text-color: #f8f9fb;
+  --react-international-phone-font-size: 14px;
+  --react-international-phone-border-radius: 8px;
+  --react-international-phone-border-color: #2a2f3f;
+  --react-international-phone-disabled-background-color: #1a1d29;
+  --react-international-phone-disabled-text-color: #6b7280;
+  /* Dropdown dark theme - avoid white background when searching/filtering */
+  --react-international-phone-dropdown-item-background-color: #1a1d29;
+  --react-international-phone-dropdown-item-text-color: #f8f9fb;
+  --react-international-phone-dropdown-item-dial-code-color: #9ca3af;
+  --react-international-phone-selected-dropdown-item-background-color: #2a2f3f;
+  --react-international-phone-selected-dropdown-item-text-color: #f8f9fb;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-input-container {
+  background-color: #252936;
+  border: 1px solid #2a2f3f;
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector {
+  overflow: visible;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5;
+  box-shadow: 0 0 0 2px rgba(156, 119, 245, 0.2);
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-input-container input {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+  border: none !important;
+  padding: 0.625rem 1rem;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-input-container input::placeholder {
+  color: #6b7280;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-button {
+  background-color: #252936 !important;
+  border: none !important;
+  border-right: 1px solid #2a2f3f !important;
+  color: #f8f9fb !important;
+  padding: 0 0.75rem;
+}
+
+/* Dropdown: fondo oscuro para que el texto claro se vea */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown {
+  background-color: #1a1d29 !important;
+  border: 1px solid #2a2f3f !important;
+  border-radius: 8px !important;
+  z-index: 99999 !important;
+  overflow-y: auto !important;
+  max-height: 240px !important;
+  min-height: 120px !important;
+  color: #f8f9fb !important;
+}
+
+/* List items: texto claro sobre fondo oscuro */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item {
+  color: #f8f9fb !important;
+  background-color: transparent !important;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item:hover,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item--focused,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #2a2f3f !important;
+  color: #f8f9fb !important;
+}
+
+/* Nombre del país y código: siempre visibles */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #f8f9fb !important;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #9ca3af !important;
+}
+
+/* Divider entre países preferidos y el resto */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__preferred-list-divider {
+  background-color: #2a2f3f !important;
+}
+
+/* Cualquier input dentro del dropdown (por si tiene búsqueda) */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+  border-color: #2a2f3f !important;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Error state for phone input */
+.mordecai-phone-input-wrapper.mordecai-phone-input-error .react-international-phone-input-container {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* Checkbox - white checkmark in light & dark, green accent */
+input[type="checkbox"].mordecai-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  background: white;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+.dark input[type="checkbox"].mordecai-checkbox {
+  border-color: #2a2f3f;
+  background: #252936;
+}
+input[type="checkbox"].mordecai-checkbox:checked {
+  background: #00d4b0;
+  border-color: #00d4b0;
+}
+input[type="checkbox"].mordecai-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 0.3125rem;
+  top: 0.125rem;
+  width: 0.25rem;
+  height: 0.5rem;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+input[type="checkbox"].mordecai-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 212, 176, 0.2);
+}
+
+/* ============================================
+   PAY PORTAL (white-label) - pago-amigable design
+   ONLY affects /p/* routes. Dashboard untouched.
+   ============================================ */
+.pay-portal-root {
+  --pay-bg: 230 25% 97%;
+  --pay-bg-start: #FDFBFF;
+  --pay-bg-mid: #F8F6FC;
+  --pay-bg-end: #F5F3FA;
+  --pay-foreground: 230 25% 12%;
+  --pay-card: 0 0% 100%;
+  --pay-card-foreground: 230 25% 12%;
+  --pay-primary: 252 56% 57%;
+  --pay-primary-foreground: 0 0% 100%;
+  --pay-muted: 230 15% 93%;
+  --pay-muted-foreground: 230 10% 50%;
+  --pay-accent: 252 30% 95%;
+  --pay-destructive: 0 72% 51%;
+  --pay-success: 152 60% 42%;
+  --pay-warning: 38 92% 50%;
+  --pay-border: 230 15% 90%;
+  --pay-radius: 0.75rem;
+  font-family: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
+}
+
+/* Fondo degradado claro pago-amigable (white-label: override --pay-bg-* via inline style) */
+.pay-portal-bg {
+  background: linear-gradient(160deg, var(--pay-bg-start) 0%, var(--pay-bg-mid) 40%, var(--pay-bg-end) 100%);
+}
+
+/* Tarjetas pago-amigable: bg-card, rounded-xl, border, shadow-sm */
+.pay-portal-card {
+  background: hsl(var(--pay-card));
+  color: hsl(var(--pay-card-foreground));
+  border-radius: var(--pay-radius);
+  border: 1px solid hsl(var(--pay-border));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Header style pago-amigable */
+.pay-portal-root header {
+  background: hsl(var(--pay-card));
+  border-color: hsl(var(--pay-border));
+}
+
+/* --- Landing pública (/automations, /automatizaciones) --- */
+@media (prefers-reduced-motion: no-preference) {
+  .land-reveal {
+    opacity: 0;
+    transform: translateY(1.125rem);
+    transition:
+      opacity 0.68s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .land-reveal.land-visible {
+    opacity: 1;
+    transform: translateY(0);
+    will-change: auto;
+  }
+
+  /* Solo transform: no pisa opacity de Tailwind en el hero */
+  .land-bg-drift {
+    animation: land-bg-drift-move 22s ease-in-out infinite alternate;
+    transform-origin: 50% 20%;
+  }
+  @keyframes land-bg-drift-move {
+    0% {
+      transform: scale(1) translate(0, 0);
+    }
+    100% {
+      transform: scale(1.08) translate(2%, -1.5%);
+    }
+  }
+
+  .land-badge-pop {
+    opacity: 0;
+    transform: translateY(0.4rem) scale(0.97);
+  }
+  .land-reveal.land-visible .land-badge-pop {
+    animation: land-badge-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(1) {
+    animation-delay: 0.04s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(2) {
+    animation-delay: 0.09s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(3) {
+    animation-delay: 0.14s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(4) {
+    animation-delay: 0.19s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(5) {
+    animation-delay: 0.24s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(6) {
+    animation-delay: 0.29s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(7) {
+    animation-delay: 0.34s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(8) {
+    animation-delay: 0.39s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(9) {
+    animation-delay: 0.44s;
+  }
+  .land-reveal.land-visible .land-badge-pop:nth-child(10) {
+    animation-delay: 0.49s;
+  }
+  @keyframes land-badge-in {
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .land-li-pop {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+  .land-reveal.land-visible .land-li-pop {
+    animation: land-li-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes land-li-in {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .land-arrow-nudge {
+    display: inline-block;
+    animation: land-arrow 2.4s ease-in-out infinite;
+  }
+  @keyframes land-arrow {
+    0%,
+    100% {
+      transform: translateX(0);
+      opacity: 0.72;
+    }
+    50% {
+      transform: translateX(4px);
+      opacity: 1;
+    }
+  }
+
+  .land-card-hover-rise {
+    transition:
+      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.35s ease,
+      border-color 0.25s ease;
+  }
+  .land-card-hover-rise:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 14px 44px -14px rgba(156, 119, 245, 0.22);
+  }
+
+  .land-cta-breathe {
+    animation: land-cta-breathe 6s ease-in-out infinite;
+  }
+  @keyframes land-cta-breathe {
+    0%,
+    100% {
+      box-shadow: 0 24px 80px -20px rgba(123, 91, 212, 0.52);
+    }
+    50% {
+      box-shadow: 0 30px 100px -14px rgba(123, 91, 212, 0.68);
+    }
+  }
+
+  .land-step-card {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  .land-reveal.land-visible .land-step-card {
+    animation: land-step-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes land-step-up {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .land-reveal,
+  .land-reveal.land-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .land-bg-drift {
+    animation: none !important;
+    transform: none !important;
+  }
+  .land-badge-pop,
+  .land-li-pop,
+  .land-step-card {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .land-arrow-nudge {
+    animation: none !important;
+  }
+  .land-cta-breathe {
+    animation: none !important;
+  }
 }
