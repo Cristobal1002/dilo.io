@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { ChevronRightIcon } from '@heroicons/react/24/outline'
+import { cn } from '@/lib/utils'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { desc, eq } from 'drizzle-orm'
@@ -32,14 +34,14 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/dashboard/flows/new"
-          className="inline-flex justify-center items-center rounded-xl px-4 py-2.5 text-sm font-semibold text-white bg-linear-to-br from-dilo-500 to-dilo-600 shadow-md shadow-dilo-500/25 hover:opacity-95 transition-opacity"
+          className="inline-flex items-center justify-center rounded-full bg-linear-to-br from-dilo-500 to-dilo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-dilo-500/20 transition-opacity hover:opacity-95"
         >
           + Nuevo Flow
         </Link>
       </div>
 
       {flowList.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-border bg-dilo-50/40 p-14 md:p-16 text-center">
+        <div className="rounded-2xl border border-dashed border-[#E0E4EB] bg-[#FAFBFC] p-14 text-center dark:border-[#2A2F3F] dark:bg-[#161821] md:p-16">
           <div className="text-5xl mb-4" aria-hidden>
             💬
           </div>
@@ -49,28 +51,53 @@ export default async function DashboardPage() {
           </p>
           <Link
             href="/dashboard/flows/new"
-            className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold text-white bg-linear-to-br from-dilo-500 to-dilo-600 shadow-md shadow-dilo-500/25 hover:opacity-95 transition-opacity"
+            className="inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white bg-linear-to-br from-dilo-500 to-dilo-600 shadow-sm shadow-dilo-500/20 transition-opacity hover:opacity-95"
           >
             Crear mi primer flow
           </Link>
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {flowList.map((flow) => (
             <li key={flow.id}>
               <Link
                 href={`/dashboard/flows/${flow.id}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E5E7EB] dark:border-[#2A2F3F] bg-white dark:bg-[#1A1D29] px-4 py-4 shadow-sm hover:border-[#9C77F5]/40 hover:bg-[#9C77F5]/5 transition-colors"
+                className="group flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-4 py-4 transition-colors duration-200 hover:border-[#9C77F5]/22 hover:bg-[#F8F6FF] dark:border-[#2A2F3F] dark:bg-[#161821] dark:hover:border-[#9C77F5]/25 dark:hover:bg-[#1c1f2a]"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground truncate">{flow.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={cn(
+                        'inline-block h-2 w-2 shrink-0 rounded-full',
+                        flow.status === 'published'
+                          ? 'bg-emerald-400'
+                          : flow.status === 'archived'
+                            ? 'bg-amber-400'
+                            : 'bg-gray-300 dark:bg-gray-500',
+                      )}
+                      title={
+                        flow.status === 'published'
+                          ? 'Publicado'
+                          : flow.status === 'archived'
+                            ? 'Archivado'
+                            : 'Borrador'
+                      }
+                      aria-hidden
+                    />
+                    <p className="truncate font-semibold tracking-tight text-foreground">{flow.name}</p>
+                  </div>
+                  <p className="mt-1 pl-4 text-xs leading-relaxed text-muted-foreground">
                     {flow.status === 'published' ? 'Publicado' : flow.status === 'archived' ? 'Archivado' : 'Borrador'}
                     {' · '}
                     Actualizado {formatDate(flow.updatedAt)}
                   </p>
                 </div>
-                <span className="text-sm font-medium text-[#9C77F5] shrink-0">Abrir editor →</span>
+                <span className="sr-only">Abrir editor</span>
+                <ChevronRightIcon
+                  className="h-4 w-4 shrink-0 text-[#C8CED9] transition-colors group-hover:text-[#94A3B8] dark:text-[#5c6578] dark:group-hover:text-[#94A3B8]"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
               </Link>
             </li>
           ))}

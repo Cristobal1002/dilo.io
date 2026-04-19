@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-
-function cn(...a: (string | false | undefined | null)[]) {
-  return a.filter(Boolean).join(' ')
-}
+import { cn } from '@/lib/utils'
 
 export type SpinnerSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 

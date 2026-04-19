@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  ArrowDownTrayIcon,
   ChatBubbleLeftRightIcon,
+  ChevronLeftIcon,
   ClockIcon,
   ComputerDesktopIcon,
   DevicePhoneMobileIcon,
+  LinkIcon,
   MoonIcon,
   PencilSquareIcon,
   PuzzlePieceIcon,
@@ -18,6 +21,9 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { SavingSpinner } from '@/components/spinners'
+import { cn } from '@/lib/utils'
+import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
+import { readApiResult } from '@/lib/read-api-result'
 import FlowEditor from './flow-editor'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -77,10 +83,6 @@ const TOOLS: { id: ToolId; label: string; Icon: typeof SparklesIcon }[] = [
   { id: 'integrations', label: 'Integrations', Icon: PuzzlePieceIcon },
 ]
 
-function cn(...a: (string | false | undefined)[]) {
-  return a.filter(Boolean).join(' ')
-}
-
 function parseTool(raw: string | null): ToolId | null {
   if (!raw || !TOOL_IDS.has(raw as ToolId)) return null
   return raw as ToolId
@@ -104,7 +106,7 @@ function DevicePreviewToggle({
 
   return (
     <div
-      className="inline-flex items-center gap-px rounded-full bg-[#ECEEF2] p-px dark:bg-white/[0.06]"
+      className="inline-flex items-center gap-px rounded-full bg-[#ECEEF2] p-px dark:bg-white/6"
       role="group"
       aria-label="Dispositivo de vista previa"
     >
@@ -131,10 +133,8 @@ function DevicePreviewToggle({
 }
 
 /** Blanco alineado con el `main` del shell; solo el mock del chat lleva relieve. */
-const workspaceSurface = 'bg-white dark:bg-[#1A1D29]'
-const workspaceDivider = 'border-[#E5E7EB] dark:border-[#2A2F3F]'
-
-const THEME_EVENT = 'mordecai-theme-change'
+const workspaceSurface = 'bg-surface'
+const workspaceDivider = 'border-border'
 
 function estimateDurationRange(stepCount: number): { min: number; max: number } {
   if (stepCount <= 0) return { min: 3, max: 8 }
@@ -169,7 +169,7 @@ function PresentationThemeToggle() {
     const next = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark', next)
     localStorage.setItem('theme', next ? 'dark' : 'light')
-    window.dispatchEvent(new CustomEvent(THEME_EVENT))
+    window.dispatchEvent(new CustomEvent(DILO_THEME_CHANGE_EVENT))
     setIsDark(next)
   }
 
@@ -202,6 +202,7 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
   const [nameDraft, setNameDraft] = useState(flow.name)
   const [descDraft, setDescDraft] = useState(flow.description ?? '')
   const [saving, setSaving] = useState(false)
+  const [patchError, setPatchError] = useState<string | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descAreaRef = useRef<HTMLTextAreaElement>(null)
   const skipTitleBlur = useRef(false)
@@ -239,14 +240,22 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
       return
     }
     setSaving(true)
+    setPatchError(null)
     try {
-      await fetch(`/api/flows/${flow.id}`, {
+      const res = await fetch(`/api/flows/${flow.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: t }),
       })
+      const result = await readApiResult(res)
+      if (!result.ok) {
+        setPatchError(result.message)
+        return
+      }
       setEditTitle(false)
       router.refresh()
+    } catch {
+      setPatchError('No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }
@@ -264,25 +273,35 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
       return
     }
     setSaving(true)
+    setPatchError(null)
     try {
-      await fetch(`/api/flows/${flow.id}`, {
+      const res = await fetch(`/api/flows/${flow.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: nextNorm }),
       })
+      const result = await readApiResult(res)
+      if (!result.ok) {
+        setPatchError(result.message)
+        return
+      }
       setEditDesc(false)
       router.refresh()
+    } catch {
+      setPatchError('No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }
   }, [descDraft, flow.description, flow.id, router])
 
   const startTitleEdit = () => {
+    setPatchError(null)
     setNameDraft(flow.name)
     setEditTitle(true)
   }
 
   const startDescEdit = () => {
+    setPatchError(null)
     setDescDraft(flow.description ?? '')
     setEditDesc(true)
   }
@@ -293,8 +312,8 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
     'group relative mt-4 w-full max-w-md rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-[#9C77F5]/8 dark:hover:bg-[#9C77F5]/12'
 
   return (
-    <div className="relative min-h-[min(62dvh,520px)] w-full bg-[#F4F5F7] px-4 pb-8 pt-5 dark:bg-[#0c0d12]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[#E5E7EB] dark:bg-[#2A2F3F]" aria-hidden />
+    <div className="relative min-h-[min(62dvh,520px)] w-full overflow-hidden rounded-b-2xl bg-[#F4F5F7] px-4 pb-8 pt-5 dark:bg-[#0c0d12]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-border" aria-hidden />
       <div className="flex justify-end">
         <div className="pointer-events-auto">
           <PresentationThemeToggle />
@@ -403,6 +422,11 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
           </div>
         )}
 
+        {patchError ? (
+          <p className="mt-2 max-w-md text-center text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+            {patchError}
+          </p>
+        ) : null}
         {saving ? (
           <SavingSpinner className="mt-2 justify-center text-xs" size="xs" />
         ) : (
@@ -427,7 +451,7 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
         <button
           type="button"
           disabled
-          className="mt-8 w-full max-w-sm cursor-default rounded-full bg-linear-to-r from-[#9C77F5] to-[#7B5BD4] py-3.5 text-sm font-semibold text-white shadow-md shadow-[#9C77F5]/25 opacity-95"
+          className="mt-8 w-full max-w-sm cursor-default rounded-full bg-linear-to-r from-dilo-500 to-dilo-600 py-3.5 text-sm font-semibold text-white opacity-95 shadow-none"
         >
           Empezar ahora
         </button>
@@ -472,10 +496,10 @@ export default function FlowWorkspace({
 
   const sectionTabClass = (id: PreviewSection) =>
     cn(
-      'rounded-full border px-3 py-1 text-xs transition-colors',
+      'rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-200',
       previewSection === id
-        ? 'border-[#9C77F5]/45 bg-[#9C77F5]/14 font-semibold text-[#552b9e] ring-1 ring-[#9C77F5]/25 dark:border-[#9C77F5]/50 dark:bg-[#9C77F5]/22 dark:text-[#E9D5FF] dark:ring-[#9C77F5]/35'
-        : 'border-[#9C77F5]/25 bg-[#9C77F5]/8 font-medium text-[#6B4DD4] hover:border-[#9C77F5]/35 hover:bg-[#9C77F5]/11 dark:border-[#9C77F5]/30 dark:bg-[#9C77F5]/12 dark:text-[#D4C4FC] dark:hover:bg-[#9C77F5]/16',
+        ? 'border-[#9C77F5]/28 bg-[#9C77F5]/10 font-medium text-[#5B3FC9] dark:border-[#9C77F5]/35 dark:bg-[#9C77F5]/14 dark:text-[#E9D5FF]'
+        : 'border-transparent bg-transparent font-medium text-[#64748B] hover:bg-black/[0.04] hover:text-[#475569] dark:text-[#94A3B8] dark:hover:bg-white/[0.05] dark:hover:text-[#CBD5E1]',
     )
 
   /** Altura mínima alineada con el header del shell; puede crecer si hay descripción. */
@@ -489,7 +513,7 @@ export default function FlowWorkspace({
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         className={cn(
-          'flex min-h-0 flex-1 overflow-hidden rounded-t-none rounded-br-xl rounded-bl-none border-b border-[#E5E7EB] dark:border-[#2A2F3F] shadow-sm',
+          'flex min-h-0 flex-1 overflow-hidden rounded-t-none rounded-br-xl rounded-bl-none border-b border-[#E8EAEF] dark:border-[#2A2F3F]',
           workspaceSurface,
         )}
       >
@@ -510,9 +534,9 @@ export default function FlowWorkspace({
               </div>
               <Link
                 href={flowBasePath}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-[#6B7280] transition-colors hover:bg-black/4 hover:text-[#9C77F5] dark:text-[#9CA3AF] dark:hover:bg-white/6"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-[#64748B] transition-colors hover:border-[#E8EAEF] hover:bg-[#FAFBFC] hover:text-[#475569] dark:text-[#94A3B8] dark:hover:border-[#2A2F3F] dark:hover:bg-[#161821] dark:hover:text-[#CBD5E1]"
               >
-                <XMarkIcon className="h-4 w-4 opacity-70" aria-hidden />
+                <XMarkIcon className="h-3.5 w-3.5 opacity-70" strokeWidth={1.75} aria-hidden />
                 Cerrar
               </Link>
             </div>
@@ -548,27 +572,31 @@ export default function FlowWorkspace({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Pregunta, variable, tipo…"
-                    className="w-full rounded-xl border border-[#E5E7EB] dark:border-[#2A2F3F] bg-white dark:bg-[#252936] px-3 py-2.5 text-sm text-[#1A1A1A] dark:text-[#F8F9FB] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#9C77F5]/25"
+                    className="w-full rounded-2xl border border-[#E8EAEF] bg-white px-3.5 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#94A3B8] transition-shadow focus:border-[#9C77F5]/35 focus:outline-none focus:ring-2 focus:ring-[#9C77F5]/12 dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#F8F9FB] dark:placeholder:text-[#64748B]"
                   />
                   <p className="text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
                     El lienzo muestra la conversación; aquí navegas la estructura (preguntas y tipos).
                   </p>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {filteredSteps.map((s) => (
                       <li key={s.id}>
                         <button
                           type="button"
                           onClick={() => scrollToStep(s.id)}
-                          className="w-full text-left rounded-xl border border-transparent bg-white/70 dark:bg-[#252936]/60 px-3 py-2.5 shadow-sm ring-1 ring-black/4 dark:ring-white/6 hover:ring-[#9C77F5]/25 hover:bg-white dark:hover:bg-[#2a3040] transition-all"
+                          className="w-full rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 text-left transition-colors duration-200 hover:border-[#9C77F5]/22 hover:bg-[#F8F6FF] dark:border-[#2A2F3F] dark:bg-[#161821] dark:hover:border-[#9C77F5]/28 dark:hover:bg-[#1c1f2a]"
                         >
-                          <span className="text-xs font-semibold text-[#9C77F5]">#{s.order}</span>
-                          <span className="block text-[#1A1A1A] dark:text-[#F8F9FB] font-medium line-clamp-2 mt-0.5 text-sm">
+                          <span className="text-[11px] font-semibold tracking-wide text-[#9C77F5]/90">
+                            #{s.order}
+                          </span>
+                          <span className="mt-0.5 block line-clamp-2 text-sm font-medium leading-snug text-[#1A1A1A] dark:text-[#F8F9FB]">
                             {s.question}
                           </span>
-                          <span className="text-[10px] text-[#9CA3AF] font-mono">{s.variableName}</span>
-                          <span className="ml-2 text-[10px] rounded-full bg-[#F3F4F6] dark:bg-[#1f2433] px-2 py-0.5">
-                            {TYPE_LABELS[s.type] ?? s.type}
-                          </span>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-[10px] text-[#94A3B8]">{s.variableName}</span>
+                            <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-medium text-[#64748B] dark:bg-[#252936] dark:text-[#94A3B8]">
+                              {TYPE_LABELS[s.type] ?? s.type}
+                            </span>
+                          </div>
                         </button>
                       </li>
                     ))}
@@ -581,20 +609,55 @@ export default function FlowWorkspace({
                   <p className="text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
                     Colores de marca, tipografía y mensaje de bienvenida se configurarán aquí (próximamente).
                   </p>
-                  <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] rounded-xl bg-white/60 dark:bg-[#252936]/50 px-3 py-3 ring-1 ring-black/4 dark:ring-white/6">
+                  <p className="rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 text-xs leading-relaxed text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]">
                     El preview inferior hereda tema claro / oscuro del sistema.
                   </p>
                 </div>
               )}
               {activeTool === 'integrations' && (
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Webhooks y exportación</p>
-                  <p className="text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
-                    Conecta URLs de webhook al completar una sesión (según roadmap del producto).
-                  </p>
-                  <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] rounded-xl bg-white/60 dark:bg-[#252936]/50 px-3 py-3 ring-1 ring-black/4 dark:ring-white/6">
-                    Aún no hay integraciones configuradas.
-                  </p>
+                <div className="space-y-5">
+                  <div>
+                    <h3 className="text-[15px] font-semibold tracking-tight text-[#0f172a] dark:text-[#f8fafc]">
+                      Integraciones
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[#64748b] dark:text-[#94a3b8]">
+                      Conecta webhooks y exportación cuando alguien complete una conversación en tu flow público.
+                    </p>
+                  </div>
+                  <ul className="space-y-2.5">
+                    <li>
+                      <div className="flex items-center gap-3 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 dark:border-[#2A2F3F] dark:bg-[#161821]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+                          <LinkIcon className="h-4 w-4 text-[#94A3B8]" strokeWidth={1.5} aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">Webhook al completar</p>
+                          <p className="text-xs leading-snug text-[#64748b] dark:text-[#94a3b8]">
+                            POST JSON cuando termine una sesión
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                          Próximamente
+                        </span>
+                      </div>
+                    </li>
+                    <li>
+                      <div className="flex items-center gap-3 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 dark:border-[#2A2F3F] dark:bg-[#161821]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+                          <ArrowDownTrayIcon className="h-4 w-4 text-[#94A3B8]" strokeWidth={1.5} aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">Exportar respuestas</p>
+                          <p className="text-xs leading-snug text-[#64748b] dark:text-[#94a3b8]">
+                            CSV o sincronización con tu stack
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                          Próximamente
+                        </span>
+                      </div>
+                    </li>
+                  </ul>
                 </div>
               )}
             </div>
@@ -612,33 +675,44 @@ export default function FlowWorkspace({
               </p>
             </div>
             <div className="shrink-0 self-center">
-              <FlowEditor
-                flowId={flow.id}
-                status={flow.status}
-                name={flow.name}
-                description={flow.description}
-              />
+              <FlowEditor flowId={flow.id} status={flow.status} />
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-white p-4 scrollbar-hide dark:bg-[#1A1D29]">
+          <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-background p-5 pb-6 scrollbar-hide">
+            <div
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              aria-hidden
+            >
+              <div className="absolute left-1/2 top-[32%] h-[min(380px,52vh)] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-dilo-500/14 blur-3xl dark:bg-dilo-500/10" />
+              <div className="absolute bottom-[12%] right-[6%] h-52 w-64 rounded-full bg-mint-500/12 blur-3xl dark:bg-mint-500/8" />
+              <div className="absolute top-[22%] left-[4%] h-44 w-52 rounded-full bg-dilo-500/10 blur-3xl dark:bg-dilo-500/7" />
+            </div>
             <div
               className={cn(
-                'w-full transition-[max-width] duration-300 ease-out',
+                'relative z-10 w-full overflow-hidden transition-[max-width] duration-300 ease-out',
                 device === 'mobile' &&
-                  'max-w-[390px] rounded-4xl border-10 border-[#1a1a1a] shadow-2xl overflow-hidden bg-white dark:bg-[#1A1D29]',
-                device === 'desktop' && 'max-w-2xl rounded-xl border border-[#E5E7EB] dark:border-[#2A2F3F] shadow-lg bg-white dark:bg-[#1A1D29]',
+                  'max-w-[390px] rounded-4xl border-[6px] border-[#1a1a1a] bg-surface shadow-none dark:border-[#0a0a0a]',
+                device === 'desktop' &&
+                  'max-w-2xl rounded-2xl border border-border bg-surface shadow-none',
               )}
             >
-              <div className="h-1.5 w-full bg-[#E5E7EB] dark:bg-[#2A2F3F] rounded-t-[0.65rem] overflow-hidden">
-                <div
-                  className="h-full w-1/3 bg-linear-to-r from-[#9C77F5] to-[#00d4b0] rounded-full"
-                  aria-hidden
-                />
+              <div
+                className={cn(
+                  'shrink-0 overflow-hidden bg-border',
+                  device === 'mobile' && 'rounded-t-[1.625rem]',
+                  device === 'desktop' && 'rounded-t-2xl',
+                )}
+              >
+                <div className="h-1 w-full overflow-hidden" aria-hidden>
+                  <div className="h-full w-1/3 rounded-full bg-linear-to-r from-dilo-500 to-mint-500" />
+                </div>
               </div>
               <div
                 className={cn(
-                  'max-h-[min(76dvh,720px)] overflow-y-auto scrollbar-hide',
+                  'max-h-[min(76dvh,720px)] overflow-x-hidden overflow-y-auto scrollbar-hide',
+                  device === 'mobile' && 'rounded-b-[1.625rem]',
+                  device === 'desktop' && 'rounded-b-2xl',
                   previewSection === 'presentation' ? 'p-0' : 'space-y-4 p-5',
                 )}
               >
@@ -646,6 +720,7 @@ export default function FlowWorkspace({
                   <FlowPresentationPreview flow={flow} stepCount={steps.length} />
                 ) : (
                   <>
+                    <FlowMainPreviewProgressChrome totalSteps={steps.length} />
                     <PreviewBubble role="assistant">
                       <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">¡Hola! 👋</p>
                       <p className="mt-2 text-sm leading-relaxed opacity-90">
@@ -713,9 +788,9 @@ export default function FlowWorkspace({
                 href={publicFlowUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto text-xs font-semibold text-[#9C77F5] hover:underline"
+                className="ml-auto text-xs font-medium text-[#64748B] underline-offset-4 transition-colors hover:text-[#475569] dark:text-[#94A3B8] dark:hover:text-[#CBD5E1] underline decoration-[#CBD5E1]/70"
               >
-                Abrir público →
+                Abrir vista pública
               </a>
             ) : null}
           </div>
@@ -725,11 +800,71 @@ export default function FlowWorkspace({
   )
 }
 
+/**
+ * Ejemplo estático del header de avance en la conversación (alineado con discovery).
+ */
+function FlowMainPreviewProgressChrome({ totalSteps }: { totalSteps: number }) {
+  const hasSteps = totalSteps > 0
+  const denom = Math.max(1, totalSteps)
+  const current = hasSteps ? 1 : 0
+  const pct = hasSteps ? Math.min(100, Math.round((current / denom) * 100)) : 0
+
+  return (
+    <div
+      className="mb-4 w-full border-b border-border bg-linear-to-b from-white/95 to-white/[0.88] px-3 pb-3 pt-2 backdrop-blur-md dark:from-[#1A1D29]/98 dark:to-[#1A1D29]/88"
+      role="region"
+      aria-label="Ejemplo de barra de avance en la conversación"
+    >
+      <div className="mx-auto max-w-[680px]">
+        <div className="mb-2 flex min-h-[52px] items-center gap-2.5">
+          <button
+            type="button"
+            disabled
+            tabIndex={-1}
+            className="flex h-10 w-10 shrink-0 cursor-default items-center justify-center rounded-lg border border-dilo-500/25 bg-white/85 text-dilo-600 opacity-95 dark:border-[#3d3558] dark:bg-[#252936] dark:text-[#D4C4FC]"
+            title="Volver (solo en la versión pública)"
+            aria-hidden
+          >
+            <ChevronLeftIcon className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center justify-center sm:justify-start">
+            <span className="bg-linear-to-r from-dilo-500 via-[#8B5CF6] to-mint-500 bg-clip-text text-[1.35rem] font-extrabold leading-none tracking-tight text-transparent sm:text-[1.5rem]">
+              Dilo
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="flex items-baseline gap-0.5 tabular-nums">
+              <span className="bg-linear-to-r from-dilo-500 to-mint-500 bg-clip-text text-[1.35rem] font-extrabold text-transparent">
+                {pct}
+              </span>
+              <span className="text-[11px] font-semibold text-muted-foreground">%</span>
+            </div>
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-white/85 text-muted-foreground dark:bg-[#252936]">
+              <MoonIcon className="h-4 w-4" strokeWidth={1.75} />
+            </span>
+          </div>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-dilo-500/15 shadow-[inset_0_1px_2px_rgba(15,11,26,0.06)] dark:bg-dilo-500/20 dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.35)]">
+          <div
+            className="h-full rounded-full bg-linear-to-r from-dilo-500 to-mint-500 shadow-[0_0_14px_rgba(156,119,245,0.35)] transition-[width] duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="mt-2 text-center text-[11px] font-semibold tracking-wide text-muted-foreground">
+          {hasSteps
+            ? `${current} de ${totalSteps} · seguimos cuando quieras`
+            : 'Sin pasos aún · aquí verás el avance del visitante'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function PreviewBubble({ role, children }: { role: 'assistant' | 'user'; children: React.ReactNode }) {
   if (role === 'assistant') {
     return (
       <div className="flex justify-start">
-        <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-[#E5E7EB] dark:border-[#2A2F3F] bg-[#FAFAFA] dark:bg-[#252936] px-4 py-3 shadow-sm text-[#1A1A1A] dark:text-[#F8F9FB]">
+        <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-[#E8EAEF] bg-[#FAFBFC] px-4 py-3 text-[#1A1A1A] dark:border-[#2A2F3F] dark:bg-[#1c1f2a] dark:text-[#F8F9FB]">
           {children}
         </div>
       </div>
@@ -737,7 +872,7 @@ function PreviewBubble({ role, children }: { role: 'assistant' | 'user'; childre
   }
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] text-white px-4 py-3 shadow-md text-left">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-4 py-3 text-left text-white shadow-sm shadow-[#9C77F5]/18">
         {children}
       </div>
     </div>

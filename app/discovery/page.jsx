@@ -18,8 +18,10 @@ import {
   PhotoIcon,
   DocumentIcon,
 } from '@heroicons/react/24/outline';
+import { discoveryPublicSessionPath } from '@/lib/discovery-stub';
+import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event';
 
-// ─── Brand (alineado con globals: --mordecai-purple / --mordecai-green) ───────
+// ─── Brand (alineado con tokens Dilo en globals.css) ─────────────────────────
 const P = '#9C77F5';
 const P_DARK = '#7B5BD4';
 const P_LIGHT = '#F3EEFF';
@@ -27,16 +29,14 @@ const P_XLIGHT = '#FAF7FF';
 const MINT = '#00d4b0';
 
 const THEME_STORAGE_KEY = 'theme';
-const THEME_EVENT = 'mordecai-theme-change';
 const DISCOVERY_SESSION_KEY = 'dilo-discovery-client-session-id';
-const DISCOVERY_API = '/api/v1/public/discovery';
 
 async function putDiscoverySession(clientSessionId, body) {
   const headers = { 'Content-Type': 'application/json' };
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISCOVERY_INGEST_SECRET) {
     headers['x-mordecai-discovery-secret'] = process.env.NEXT_PUBLIC_DISCOVERY_INGEST_SECRET;
   }
-  const res = await fetch(`${DISCOVERY_API}/sessions/${clientSessionId}`, {
+  const res = await fetch(discoveryPublicSessionPath(clientSessionId), {
     method: 'PUT',
     headers,
     body: JSON.stringify(body),
@@ -60,11 +60,11 @@ const subscribeToTheme = (callback) => {
   const handler = () => callback();
   media.addEventListener('change', handler);
   window.addEventListener('storage', handler);
-  window.addEventListener(THEME_EVENT, handler);
+  window.addEventListener(DILO_THEME_CHANGE_EVENT, handler);
   return () => {
     media.removeEventListener('change', handler);
     window.removeEventListener('storage', handler);
-    window.removeEventListener(THEME_EVENT, handler);
+    window.removeEventListener(DILO_THEME_CHANGE_EVENT, handler);
   };
 };
 
@@ -646,7 +646,7 @@ function Bubble({ msg, onEditAnswer, allowEdit }) {
   );
 }
 
-function WelcomeScreen({ onStart, draftAvailable, onResume, onDiscardDraft }) {
+function WelcomeScreen({ onStart }) {
   const { t, isDark } = useDiscoveryUi();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', textAlign: 'center', padding: '28px 20px' }}>
@@ -731,44 +731,8 @@ function WelcomeScreen({ onStart, draftAvailable, onResume, onDiscardDraft }) {
             e.currentTarget.style.boxShadow = `0 8px 28px ${P}55`;
           }}
         >
-          {draftAvailable ? 'Empezar de nuevo' : 'Empezar ahora'}
+          Empezar ahora
         </button>
-        {draftAvailable ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-            <button
-              type="button"
-              onClick={onResume}
-              style={{
-                background: 'transparent',
-                color: P,
-                border: `2px solid ${P}`,
-                borderRadius: 999,
-                padding: '12px 28px',
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Continuar donde lo dejé
-            </button>
-            <button
-              type="button"
-              onClick={onDiscardDraft}
-              style={{
-                background: 'transparent',
-                color: t.inkMuted,
-                border: `1px solid ${isDark ? '#2A2F3F' : '#E5E7EB'}`,
-                borderRadius: 999,
-                padding: '12px 20px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Descartar borrador
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -1352,68 +1316,16 @@ export default function DiscoveryPage() {
   const [feedbackComment, setFeedbackComment] = useState('');
   const [editingStepKey, setEditingStepKey] = useState(null);
   const [clientSessionId, setClientSessionId] = useState(null);
-  const [draftAvailable, setDraftAvailable] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [filesSubmitting, setFilesSubmitting] = useState(false);
   const [filesError, setFilesError] = useState('');
   const scrollRef = useRef(null);
   const leadRef = useRef(lead);
   const pendingFilesRef = useRef([]);
-  leadRef.current = lead;
-  pendingFilesRef.current = pendingFiles;
-
   useEffect(() => {
-    setPendingFiles([]);
-    setFilesError('');
-    setFilesSubmitting(false);
-  }, [stepIdx]);
-
-  useEffect(() => {
-    try {
-      const s = sessionStorage.getItem(DISCOVERY_SESSION_KEY);
-      if (s) setClientSessionId(s);
-    } catch (_) {}
-  }, []);
-
-  useEffect(() => {
-    if (started) return;
-    let cancel = false;
-    (async () => {
-      try {
-        const id = typeof window !== 'undefined' ? sessionStorage.getItem(DISCOVERY_SESSION_KEY) : null;
-        if (!id) {
-          if (!cancel) setDraftAvailable(false);
-          return;
-        }
-        const r = await fetch(`${DISCOVERY_API}/sessions/${id}`);
-        if (!r.ok) {
-          if (!cancel) setDraftAvailable(false);
-          return;
-        }
-        const j = await r.json();
-        if (!j.success || !j.data || cancel) return;
-        if (j.data.completedAt) {
-          try {
-            sessionStorage.removeItem(DISCOVERY_SESSION_KEY);
-          } catch (_) {}
-          if (!cancel) {
-            setDraftAvailable(false);
-            setClientSessionId(null);
-          }
-          return;
-        }
-        const ans = j.data.answers || {};
-        const idx = Number(j.data.currentStepIndex);
-        const hasProgress = Object.keys(ans).length > 0 || (Number.isFinite(idx) && idx >= 0);
-        if (!cancel) setDraftAvailable(!!hasProgress);
-      } catch {
-        if (!cancel) setDraftAvailable(false);
-      }
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [started]);
+    leadRef.current = lead;
+    pendingFilesRef.current = pendingFiles;
+  }, [lead, pendingFiles]);
 
   useEffect(() => {
     if (!clientSessionId || !started) return;
@@ -1453,6 +1365,9 @@ export default function DiscoveryPage() {
     }
     setIsTyping(true);
     setTimeout(() => {
+      setPendingFiles([]);
+      setFilesError('');
+      setFilesSubmitting(false);
       setIsTyping(false);
       setStepIdx(idx);
       setInputValue('');
@@ -1471,7 +1386,7 @@ export default function DiscoveryPage() {
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       sessionStorage.setItem(DISCOVERY_SESSION_KEY, id);
-    } catch (_) {}
+    } catch {}
     setClientSessionId(id);
     setLead({});
     setMessages([]);
@@ -1483,42 +1398,6 @@ export default function DiscoveryPage() {
     setStarted(true);
     goToStep(0, {});
   }, [goToStep]);
-
-  const handleResume = useCallback(async () => {
-    const id = typeof window !== 'undefined' ? sessionStorage.getItem(DISCOVERY_SESSION_KEY) : null;
-    if (!id) return;
-    const r = await fetch(`${DISCOVERY_API}/sessions/${id}`);
-    if (!r.ok) return;
-    const j = await r.json();
-    if (!j.success || !j.data) return;
-    const data = j.data;
-    const answers = data.answers || {};
-    let idx = Number(data.currentStepIndex);
-    if (!Number.isFinite(idx)) idx = 0;
-    idx = Math.min(Math.max(idx, 0), STEPS.length - 1);
-    setClientSessionId(id);
-    setLead(answers);
-    setStepIdx(idx);
-    setMessages(rebuildMessagesForStep(idx, answers));
-    setEditingStepKey(null);
-    setStarted(true);
-    setIsDone(false);
-    setIsTyping(false);
-    setSelectedOpts([]);
-    setInputValue('');
-    setFeedbackRating(null);
-    setFeedbackComment('');
-    setPendingFiles([]);
-    setFilesError('');
-  }, []);
-
-  const handleDiscardDraft = useCallback(() => {
-    try {
-      sessionStorage.removeItem(DISCOVERY_SESSION_KEY);
-    } catch (_) {}
-    setClientSessionId(null);
-    setDraftAvailable(false);
-  }, []);
 
   const cancelEdit = useCallback(() => {
     setEditingStepKey(null);
@@ -1563,6 +1442,9 @@ export default function DiscoveryPage() {
     for (let j = newIdx; j < STEPS.length; j += 1) {
       delete newLead[STEPS[j].key];
     }
+    setPendingFiles([]);
+    setFilesError('');
+    setFilesSubmitting(false);
     setLead(newLead);
     setStepIdx(newIdx);
     setMessages(rebuildMessagesForStep(newIdx, newLead));
@@ -1774,7 +1656,7 @@ export default function DiscoveryPage() {
     const cur = localStorage.getItem(THEME_STORAGE_KEY) === 'dark';
     const next = cur ? 'light' : 'dark';
     localStorage.setItem(THEME_STORAGE_KEY, next);
-    window.dispatchEvent(new Event(THEME_EVENT));
+    window.dispatchEvent(new Event(DILO_THEME_CHANGE_EVENT));
   }, []);
 
   const uiValue = useMemo(
@@ -1841,12 +1723,7 @@ export default function DiscoveryPage() {
 
           {!started ? (
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <WelcomeScreen
-                onStart={beginNewSession}
-                draftAvailable={draftAvailable}
-                onResume={handleResume}
-                onDiscardDraft={handleDiscardDraft}
-              />
+              <WelcomeScreen onStart={beginNewSession} />
             </div>
           ) : isDone ? (
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>

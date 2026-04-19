@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { useClerk, UserButton } from '@clerk/nextjs'
 import {
+  ArrowRightStartOnRectangleIcon,
   Bars3Icon,
-  ChatBubbleLeftRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  EllipsisVerticalIcon,
   FolderOpenIcon,
   MoonIcon,
   PuzzlePieceIcon,
@@ -16,12 +17,14 @@ import {
   Squares2X2Icon,
   SunIcon,
   SwatchIcon,
+  UserCircleIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { SparklesIcon as SparklesIconSolid } from '@heroicons/react/24/solid'
+import { cn } from '@/lib/utils'
+import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
 
 const THEME_STORAGE_KEY = 'theme'
-const THEME_EVENT = 'mordecai-theme-change'
 
 function getThemeSnapshot() {
   if (typeof window === 'undefined') return 'light'
@@ -36,11 +39,11 @@ function subscribeTheme(cb: () => void) {
   const handler = () => cb()
   media.addEventListener('change', handler)
   window.addEventListener('storage', handler)
-  window.addEventListener(THEME_EVENT, handler)
+  window.addEventListener(DILO_THEME_CHANGE_EVENT, handler)
   return () => {
     media.removeEventListener('change', handler)
     window.removeEventListener('storage', handler)
-    window.removeEventListener(THEME_EVENT, handler)
+    window.removeEventListener(DILO_THEME_CHANGE_EVENT, handler)
   }
 }
 
@@ -52,13 +55,88 @@ function flowIdFromPath(pathname: string): string | null {
 
 function breadcrumbLabel(pathname: string): string {
   if (pathname === '/dashboard') return 'Mis flows'
+  if (pathname.startsWith('/dashboard/account')) return 'Mi cuenta'
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
   return 'Dashboard'
 }
 
-function cn(...a: (string | false | undefined)[]) {
-  return a.filter(Boolean).join(' ')
+const headerMenuTrigger =
+  'p-2 rounded-lg text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] transition-colors'
+
+const headerMenuPanel =
+  'absolute right-0 top-full z-50 mt-2 min-w-[220px] overflow-visible rounded-xl border border-[#E5E7EB] bg-white pt-2 px-0 pb-2 shadow-lg dark:border-[#2A2F3F] dark:bg-[#1A1D29]'
+
+const headerMenuItem =
+  'flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium rounded-md transition-colors text-[#4B5563] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] hover:text-[#1A1A1A] dark:hover:text-[#F8F9FB]'
+
+const headerMenuDivider = 'my-2 border-t border-[#E5E7EB] dark:border-[#2A2F3F]'
+
+/** Menú ⋮ del header (mismo patrón que Mordecai `DashboardShell`): cuenta + cerrar sesión. */
+function DashboardHeaderUserMenu() {
+  const { signOut } = useClerk()
+  const [open, setOpen] = useState(false)
+  const closeMenu = useCallback(() => setOpen(false), [])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, closeMenu])
+
+  const handleSignOut = async () => {
+    closeMenu()
+    await signOut({ redirectUrl: '/sign-in' })
+  }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={headerMenuTrigger}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="Cuenta y sesión"
+        aria-label="Menú de cuenta"
+      >
+        <EllipsisVerticalIcon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+      </button>
+      {open ? (
+        <>
+          <div className="fixed inset-0 z-40" aria-hidden onClick={closeMenu} />
+          <div
+            className={headerMenuPanel}
+            role="menu"
+            aria-label="Cuenta y sesión"
+          >
+            <Link
+              href="/dashboard/account"
+              role="menuitem"
+              onClick={closeMenu}
+              className={headerMenuItem}
+            >
+              <UserCircleIcon className="h-5 w-5 shrink-0" strokeWidth={1.5} aria-hidden />
+              Mi cuenta
+            </Link>
+            <div className={headerMenuDivider} />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => void handleSignOut()}
+              className={`${headerMenuItem} w-full rounded-b-xl rounded-t-none`}
+            >
+              <ArrowRightStartOnRectangleIcon className="h-5 w-5 shrink-0" strokeWidth={1.5} aria-hidden />
+              Cerrar sesión
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
 }
 
 export default function DiloDashboardShell({ children }: { children: React.ReactNode }) {
@@ -86,7 +164,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const handleToggleTheme = useCallback(() => {
     const next = isDark ? 'light' : 'dark'
     localStorage.setItem(THEME_STORAGE_KEY, next)
-    window.dispatchEvent(new Event(THEME_EVENT))
+    window.dispatchEvent(new Event(DILO_THEME_CHANGE_EVENT))
   }, [isDark])
 
   const misFlowsActive = pathname === '/dashboard'
@@ -97,11 +175,11 @@ export default function DiloDashboardShell({ children }: { children: React.React
 
   const navBtn = (active: boolean, collapsed: boolean, extra?: string) =>
     cn(
-      'w-full flex items-center rounded-lg text-sm font-medium transition-all',
+      'w-full flex items-center rounded-xl text-sm font-medium transition-colors duration-200',
       collapsed ? 'md:justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
       active
-        ? 'bg-[#9C77F5]/10 dark:bg-[#9C77F5]/20 text-[#9C77F5] dark:text-[#9C77F5]'
-        : 'text-[#4B5563] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936]',
+        ? 'bg-[#9C77F5]/8 text-[#6B4DD4] ring-1 ring-inset ring-[#9C77F5]/18 dark:bg-[#9C77F5]/12 dark:text-[#D4C4FC] dark:ring-[#9C77F5]/22'
+        : 'text-[#4B5563] dark:text-[#9CA3AF] hover:bg-black/[0.03] dark:hover:bg-white/[0.04]',
       extra,
     )
 
@@ -152,13 +230,13 @@ export default function DiloDashboardShell({ children }: { children: React.React
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#00d4b0] items-center justify-center shadow-lg hover:bg-[#00d4b0]/90 transition-colors z-10"
+            className="hidden md:flex absolute -right-2 top-1/2 z-10 h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#94A3B8] shadow-sm transition-colors hover:border-[#CBD5E1] hover:text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#64748B] dark:hover:border-[#3d4456] dark:hover:text-[#94A3B8]"
             aria-label={isSidebarCollapsed ? 'Expandir barra' : 'Contraer barra'}
           >
             {isSidebarCollapsed ? (
-              <ChevronRightIcon className="w-2.5 h-2.5 text-white" />
+              <ChevronRightIcon className="h-3 w-3" strokeWidth={1.75} aria-hidden />
             ) : (
-              <ChevronLeftIcon className="w-2.5 h-2.5 text-white" />
+              <ChevronLeftIcon className="h-3 w-3" strokeWidth={1.75} aria-hidden />
             )}
           </button>
         </div>
@@ -279,31 +357,19 @@ export default function DiloDashboardShell({ children }: { children: React.React
           </ul>
 
           <div className="flex-1 min-h-2" />
-
-          <ul className="space-y-1 pt-2 border-t border-[#E5E7EB] dark:border-[#2A2F3F]">
-            <li>
-              <Link
-                href="/discovery"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={navBtn(pathname.startsWith('/discovery'), isSidebarCollapsed)}
-              >
-                <ChatBubbleLeftRightIcon className="w-5 h-5 shrink-0" />
-                {!isSidebarCollapsed && <span className="flex-1 text-left">Demo conversación</span>}
-              </Link>
-            </li>
-          </ul>
         </nav>
 
-        <div className="relative p-4 border-t border-[#E5E7EB] dark:border-[#2A2F3F] shrink-0">
-          {!isSidebarCollapsed && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Dilo</span>
-                <span className="text-xs font-semibold text-[#9C77F5]">Beta</span>
-              </div>
-              <div className="w-full h-2 bg-[#E5E7EB] dark:bg-[#2A2F3F] rounded-full overflow-hidden">
-                <div className="h-full bg-linear-to-r from-[#9C77F5] to-[#9C77F5]/80 rounded-full w-full" />
-              </div>
+        <div className="relative shrink-0 border-t border-[#E5E7EB] p-4 dark:border-[#2A2F3F]">
+          {!isSidebarCollapsed ? (
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Dilo</span>
+              <span className="rounded-full bg-dilo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dilo-500">
+                Beta
+              </span>
+            </div>
+          ) : (
+            <div className="mb-3 flex justify-center" title="Beta">
+              <span className="rounded-full bg-dilo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-dilo-500">β</span>
             </div>
           )}
           <div className={`flex items-center ${isSidebarCollapsed ? 'md:justify-center' : 'gap-3'}`}>
@@ -331,14 +397,17 @@ export default function DiloDashboardShell({ children }: { children: React.React
               <span>/</span>
               <span className="truncate">{breadcrumbLabel(pathname)}</span>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleTheme}
-              className="p-2 rounded-lg text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] transition-colors"
-              aria-label="Tema"
-            >
-              {isDark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={handleToggleTheme}
+                className="p-2 rounded-lg text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] transition-colors"
+                aria-label="Tema"
+              >
+                {isDark ? <SunIcon className="w-5 h-5" strokeWidth={1.5} /> : <MoonIcon className="w-5 h-5" strokeWidth={1.5} />}
+              </button>
+              <DashboardHeaderUserMenu />
+            </div>
           </div>
         </header>
 

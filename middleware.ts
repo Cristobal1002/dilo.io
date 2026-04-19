@@ -6,7 +6,6 @@ const isPublicRoute = createRouteMatcher([
   '/f/(.*)', // flows públicos — el usuario final no necesita login
   '/api/f/(.*)', // API de flows públicos
   '/discovery(.*)', // UI de referencia (mismo estilo que Mordecai discovery)
-  '/api/v1/public/discovery(.*)', // stub de sesión para la demo /discovery
 ])
 
 export default clerkMiddleware(async (auth, request) => {

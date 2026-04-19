@@ -5,12 +5,12 @@
 :root {
   --background: #F8F9FB;
   --foreground: #1A1A1A;
-  --mordecai-purple: #9C77F5;
-  --mordecai-green: #00d4b0;
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B7280;
-  --text-tertiary: #9CA3AF;
-  --border-subtle: #E5E7EB;
+  --dilo-primary: #9c77f5;
+  --dilo-mint: #00d4b0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border-subtle: #e5e7eb;
   /* Pay portal: light gradient (white-label parametrizable via inline style override) */
   --pay-bg-start: #FDFBFF;
   --pay-bg-mid: #F8F6FC;
@@ -22,6 +22,8 @@
 .dark {
   --background: #0f1117;
   --foreground: #f8f9fb;
+  --text-secondary: #9ca3af; /* gray-400 — contraste ~5.9:1 sobre #0f1117 (WCAG AA texto) */
+  --border-subtle: #2a2f3f;
   --surface: #1a1d29;
   --sidenav: #1a1d29;
 }
@@ -29,16 +31,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-mordecai-purple: var(--mordecai-purple);
-  --color-mordecai-green: var(--mordecai-green);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-tertiary: var(--text-tertiary);
   --color-border-subtle: var(--border-subtle);
   --color-dilo-50: #f3eeff;
-  --color-dilo-500: var(--mordecai-purple);
+  --color-dilo-500: var(--dilo-primary);
   --color-dilo-600: #7b5bd4;
-  --color-mint-500: var(--mordecai-green);
+  --color-mint-500: var(--dilo-mint);
   --color-muted-foreground: var(--text-secondary);
   --color-border: var(--border-subtle);
   --color-muted: var(--text-secondary);

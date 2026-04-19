@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ButtonSpinner } from '@/components/spinners'
@@ -55,13 +56,12 @@ export default function NewFlowPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="text-muted-foreground hover:text-foreground text-sm mb-4 flex items-center gap-1 transition-colors"
+        <Link
+          href="/dashboard"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           ← Volver
-        </button>
+        </Link>
         <h2 className="text-2xl font-bold text-foreground tracking-tight">Nuevo Flow</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Describe lo que necesitas en una frase y Dilo genera el flujo completo
