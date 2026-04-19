@@ -80,10 +80,20 @@ export function AuthPageShell({
 }: AuthPageShellProps) {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
+      {/* Blobs decorativos — style inline para evitar dependencias de tokens Tailwind */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute left-1/2 top-[30%] h-[min(380px,52vh)] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-dilo-500/14 blur-3xl dark:bg-dilo-500/10" />
-        <div className="absolute bottom-[14%] right-[6%] h-52 w-64 rounded-full bg-mint-500/12 blur-3xl dark:bg-mint-500/8" />
-        <div className="absolute top-[18%] left-[4%] h-44 w-52 rounded-full bg-dilo-500/10 blur-3xl dark:bg-dilo-500/7" />
+        <div
+          className="absolute left-1/2 top-[28%] h-[min(420px,55vh)] w-[min(560px,95vw)] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+          style={{ background: 'radial-gradient(ellipse, rgba(156,119,245,0.18) 0%, transparent 70%)' }}
+        />
+        <div
+          className="absolute bottom-[10%] right-[4%] h-60 w-72 rounded-full blur-3xl"
+          style={{ background: 'radial-gradient(ellipse, rgba(0,212,176,0.14) 0%, transparent 70%)' }}
+        />
+        <div
+          className="absolute top-[14%] left-[3%] h-48 w-56 rounded-full blur-3xl"
+          style={{ background: 'radial-gradient(ellipse, rgba(156,119,245,0.12) 0%, transparent 70%)' }}
+        />
       </div>
 
       <header className="relative z-10 flex shrink-0 justify-end px-4 py-4 sm:px-6">
@@ -91,7 +101,7 @@ export function AuthPageShell({
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center px-4 pb-16 pt-2 sm:px-6 sm:pt-0">
-        <div className="flex w-full max-w-[400px] flex-1 flex-col justify-center sm:max-w-md">
+        <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center">
           <div className="mb-8 text-center">
             <p className="select-none text-[1.75rem] font-black leading-none tracking-tight">
               <span className="bg-linear-to-r from-[#9C77F5] via-[#8B5CF6] to-[#00d4b0] bg-clip-text text-transparent">
@@ -107,7 +117,29 @@ export function AuthPageShell({
             </p>
           </div>
 
-          <div className="auth-clerk-root w-full [&_.cl-card]:overflow-hidden [&_.cl-card]:rounded-2xl [&_.cl-footer]:rounded-b-2xl [&_.cl-footerAction]:border-t [&_.cl-footerAction]:border-[#E5E7EB] [&_.cl-footerAction]:bg-[#FAFAFA] [&_.cl-footerAction]:px-4 [&_.cl-footerAction]:py-3.5 dark:[&_.cl-footerAction]:border-[#2A2F3F] dark:[&_.cl-footerAction]:bg-[#14151c]">
+          {/*
+            Clerk no expone un API estable para ocultar el footer de "Secured by Clerk".
+            layout.footerPages: 'hidden' no funciona. La forma más robusta es CSS directo.
+          */}
+          <style>{`
+            /* Ocultar "Secured by Clerk" y "Development mode" */
+            .auth-clerk-root .cl-footerPages { display: none !important; }
+            .auth-clerk-root [class*="cl-footerPage"] { display: none !important; }
+            .auth-clerk-root [class*="cl-footer__page"] { display: none !important; }
+            /* Eliminar bullet del divisor "o" */
+            .auth-clerk-root .cl-dividerText,
+            .auth-clerk-root [class*="cl-divider"] li,
+            .auth-clerk-root [class*="cl-divider"] span {
+              list-style: none !important;
+            }
+            .auth-clerk-root [class*="cl-divider"] li::marker { display: none !important; content: none !important; }
+          `}</style>
+          <div
+            className="auth-clerk-root w-full rounded-2xl [&_.cl-card]:overflow-hidden [&_.cl-card]:rounded-2xl [&_.cl-footer]:rounded-b-2xl [&_.cl-footerAction]:border-t [&_.cl-footerAction]:border-[#E5E7EB] [&_.cl-footerAction]:bg-[#F4F4F6] [&_.cl-footerAction]:px-4 [&_.cl-footerAction]:py-3.5"
+            style={{
+              boxShadow: '-22px 22px 64px rgba(156,119,245,0.18), 22px 22px 64px rgba(0,212,176,0.13)',
+            }}
+          >
             {children}
           </div>
         </div>

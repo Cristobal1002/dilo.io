@@ -1,6 +1,6 @@
 import {
     pgTable, uuid, text, integer, boolean,
-    timestamp, jsonb, index
+    timestamp, jsonb, index, uniqueIndex,
   } from 'drizzle-orm/pg-core'
   
   // ─── Organizations ───────────────────────────────────────
@@ -95,6 +95,7 @@ import {
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   }, (t) => [
     index('answers_session_idx').on(t.sessionId),
+    uniqueIndex('answers_session_step_uidx').on(t.sessionId, t.stepId),
   ])
   
   // ─── Results ──────────────────────────────────────────────
