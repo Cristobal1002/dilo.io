@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, after } from 'next/server'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -7,6 +7,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 import { apiNoContent, apiSuccess } from '@/lib/api-response'
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
+import { processSessionCompletion } from '@/lib/session-completion'
 import {
   DISCOVERY_STUB_FLOW_SEGMENT,
   DiscoverySessionPutBodySchema,
@@ -15,7 +16,12 @@ import { loadPublishedFlowWithSteps } from '@/lib/load-published-flow'
 
 const log = createLogger('api/f/[flowId]/sessions/[token]')
 
-const MAX_PUT_BYTES = 512_000
+export const maxDuration = 120
+
+/** Solo stub `/discovery` (sin persistencia real de adjuntos). */
+const DISCOVERY_MAX_PUT_BYTES = 512_000
+/** Sesiones publicadas: completar con data URLs de archivos puede superar 512 KB. */
+const PUBLIC_FLOW_MAX_PUT_BYTES = 8_000_000
 const flowIdSchema = z.string().uuid()
 
 function isDiscoveryStubFlow(flowId: string): boolean {
@@ -83,7 +89,7 @@ export const PUT = withApiHandler(
       }
 
       const len = req.headers.get('content-length')
-      if (len && Number(len) > MAX_PUT_BYTES) {
+      if (len && Number(len) > DISCOVERY_MAX_PUT_BYTES) {
         throw new ValidationError('Cuerpo demasiado grande')
       }
 
@@ -118,7 +124,7 @@ export const PUT = withApiHandler(
     }
 
     const len = req.headers.get('content-length')
-    if (len && Number(len) > MAX_PUT_BYTES) {
+    if (len && Number(len) > PUBLIC_FLOW_MAX_PUT_BYTES) {
       throw new ValidationError('Cuerpo demasiado grande')
     }
 
@@ -143,6 +149,8 @@ export const PUT = withApiHandler(
     if (!sessionRow) {
       throw new NotFoundError('Sesión')
     }
+
+    const wasAlreadyCompleted = sessionRow.status === 'completed'
 
     const bodyAnswers = parsed.data.answers ?? {}
     for (const stepId of Object.keys(bodyAnswers)) {
@@ -202,6 +210,24 @@ export const PUT = withApiHandler(
       },
       'Public session PUT persisted',
     )
+
+    if (completed && !wasAlreadyCompleted) {
+      // En producción, after() encola el trabajo (Vercel waitUntil) sin alargar la respuesta al visitante.
+      // En desarrollo, after() no es fiable con `next dev`; await aquí acepta ~10–15s extra en el PUT.
+      if (process.env.NODE_ENV === 'production') {
+        after(() => {
+          void processSessionCompletion(sessionRow.id).catch((err) => {
+            log.error({ err, sessionId: sessionRow.id }, 'processSessionCompletion failed')
+          })
+        })
+      } else {
+        try {
+          await processSessionCompletion(sessionRow.id)
+        } catch (err) {
+          log.error({ err, sessionId: sessionRow.id }, 'processSessionCompletion failed')
+        }
+      }
+    }
 
     return apiNoContent()
   },

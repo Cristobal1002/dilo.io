@@ -12,11 +12,9 @@ import {
   EllipsisVerticalIcon,
   FolderOpenIcon,
   MoonIcon,
-  PuzzlePieceIcon,
   SparklesIcon,
   Squares2X2Icon,
   SunIcon,
-  SwatchIcon,
   UserCircleIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
@@ -48,7 +46,7 @@ function subscribeTheme(cb: () => void) {
 }
 
 function flowIdFromPath(pathname: string): string | null {
-  const m = pathname.match(/^\/dashboard\/flows\/([^/]+)$/)
+  const m = pathname.match(/^\/dashboard\/flows\/([^/]+)/)
   if (!m || m[1] === 'new') return null
   return m[1]
 }
@@ -65,7 +63,7 @@ const headerMenuTrigger =
   'p-2 rounded-lg text-[#6B7280] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] transition-colors'
 
 const headerMenuPanel =
-  'absolute right-0 top-full z-50 mt-2 min-w-[220px] overflow-visible rounded-xl border border-[#E5E7EB] bg-white pt-2 px-0 pb-2 shadow-lg dark:border-[#2A2F3F] dark:bg-[#1A1D29]'
+  'absolute right-0 top-full z-50 mt-2 min-w-[220px] overflow-visible rounded-xl border border-[#E5E7EB] bg-white px-0 pt-2 pb-2 font-sans text-sm antialiased shadow-lg dark:border-[#2A2F3F] dark:bg-[#1A1D29]'
 
 const headerMenuItem =
   'flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium rounded-md transition-colors text-[#4B5563] dark:text-[#9CA3AF] hover:bg-[#F8F9FB] dark:hover:bg-[#252936] hover:text-[#1A1A1A] dark:hover:text-[#F8F9FB]'
@@ -150,7 +148,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const isDark = theme === 'dark'
 
   const flowId = flowIdFromPath(pathname)
-  const panelOpen = Boolean(flowId && tool && ['ia', 'elements', 'design', 'integrations'].includes(tool))
+  const panelOpen = Boolean(flowId && tool && ['ia', 'elements'].includes(tool))
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark)
@@ -311,46 +309,6 @@ export default function DiloDashboardShell({ children }: { children: React.React
                 >
                   <Squares2X2Icon className="w-5 h-5 shrink-0" />
                   {!isSidebarCollapsed && <span className="flex-1 text-left">Forms Elements</span>}
-                </span>
-              )}
-            </li>
-            <li>
-              {toolHref('design') ? (
-                <Link
-                  href={toolHref('design')!}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={navBtn(editorTool === 'design', isSidebarCollapsed)}
-                >
-                  <SwatchIcon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span className="flex-1 text-left">Design options</span>}
-                </Link>
-              ) : (
-                <span
-                  className={navBtn(false, isSidebarCollapsed, 'opacity-45 cursor-not-allowed pointer-events-none')}
-                  title="Abre un flow desde Mis flows"
-                >
-                  <SwatchIcon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span className="flex-1 text-left">Design options</span>}
-                </span>
-              )}
-            </li>
-            <li>
-              {toolHref('integrations') ? (
-                <Link
-                  href={toolHref('integrations')!}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={navBtn(editorTool === 'integrations', isSidebarCollapsed)}
-                >
-                  <PuzzlePieceIcon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span className="flex-1 text-left">Integrations</span>}
-                </Link>
-              ) : (
-                <span
-                  className={navBtn(false, isSidebarCollapsed, 'opacity-45 cursor-not-allowed pointer-events-none')}
-                  title="Abre un flow desde Mis flows"
-                >
-                  <PuzzlePieceIcon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span className="flex-1 text-left">Integrations</span>}
                 </span>
               )}
             </li>

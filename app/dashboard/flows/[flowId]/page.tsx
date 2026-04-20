@@ -1,35 +1,44 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { flows, steps, stepOptions, organizations } from '@/db/schema'
-import { eq, and, asc } from 'drizzle-orm'
+import { steps, stepOptions } from '@/db/schema'
+import { asc, eq, inArray } from 'drizzle-orm'
 import { notFound, redirect } from 'next/navigation'
+import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import FlowWorkspace, { type FlowWorkspaceFlow, type FlowWorkspaceStep } from './flow-workspace'
 
 async function getFlow(flowId: string, orgIdentifier: string) {
-  const org = await db.query.organizations.findFirst({
-    where: eq(organizations.slug, orgIdentifier),
-  })
-  if (!org) return null
+  const access = await findDashboardFlow(flowId, orgIdentifier)
+  if (!access) return null
 
-  const flow = await db.query.flows.findFirst({
-    where: and(eq(flows.id, flowId), eq(flows.organizationId, org.id)),
-  })
-  if (!flow) return null
+  const { flow } = access
 
   const flowSteps = await db.query.steps.findMany({
     where: eq(steps.flowId, flowId),
     orderBy: asc(steps.order),
   })
 
-  const stepsWithOptions = await Promise.all(
-    flowSteps.map(async (step) => {
-      const options = await db.query.stepOptions.findMany({
-        where: eq(stepOptions.stepId, step.id),
-        orderBy: asc(stepOptions.order),
-      })
-      return { ...step, options }
-    }),
-  )
+  const allOptions =
+    flowSteps.length === 0
+      ? []
+      : await db.query.stepOptions.findMany({
+          where: inArray(
+            stepOptions.stepId,
+            flowSteps.map((s) => s.id),
+          ),
+          orderBy: [asc(stepOptions.stepId), asc(stepOptions.order)],
+        })
+
+  const optionsByStep = new Map<string, typeof allOptions>()
+  for (const o of allOptions) {
+    const list = optionsByStep.get(o.stepId) ?? []
+    list.push(o)
+    optionsByStep.set(o.stepId, list)
+  }
+
+  const stepsWithOptions = flowSteps.map((step) => ({
+    ...step,
+    options: optionsByStep.get(step.id) ?? [],
+  }))
 
   return { flow, steps: stepsWithOptions }
 }

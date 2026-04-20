@@ -1,7 +1,7 @@
 /** Respuesta persistida / en memoria para pasos tipo `file` (misma forma que discovery). */
 export type FileAnswerPayload = {
   skipped: boolean
-  items: Array<{ name: string; mime: string; size: number; dataUrl?: string }>
+  items: Array<{ name: string; mime: string; size: number; dataUrl?: string; url?: string }>
 }
 
 export function isFilePayload(v: unknown): v is FileAnswerPayload {
@@ -30,7 +30,10 @@ export function stripFileDataUrlsFromAnswers(answers: Record<string, string>): R
       if (isFilePayload(p) && Array.isArray(p.items)) {
         out[k] = JSON.stringify({
           ...p,
-          items: p.items.map(({ name, mime, size }) => ({ name, mime, size })),
+          items: p.items.map(({ name, mime, size, url }) => {
+            const base = { name, mime, size }
+            return typeof url === 'string' && url ? { ...base, url } : base
+          }),
         })
       }
     } catch {

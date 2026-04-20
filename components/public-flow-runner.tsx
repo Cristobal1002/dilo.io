@@ -212,7 +212,8 @@ function canEditUserBubble(msg: Msg, stepIdx: number, steps: PublicFlowStep[]) {
   return ix >= 0 && ix < stepIdx
 }
 
-type FlowPayload = { flow: PublicFlowRecord; steps: PublicFlowStep[] }
+/** Datos del flow publicados, resueltos en el servidor (RSC) y pasados al cliente. */
+export type PublicFlowInitialPayload = { flow: PublicFlowRecord; steps: PublicFlowStep[] }
 
 function completionFromSettings(settings: unknown) {
   if (!settings || typeof settings !== 'object') return null
@@ -272,7 +273,7 @@ function FlowChatHeader({
                 className="h-9 max-h-9 w-auto max-w-[min(56vw,200px)] object-contain object-center"
               />
             ) : (
-              <span className="bg-linear-to-rrom-[#9C77F5] to-[#00d4b0] bg-clip-text text-[1.35rem] font-extrabold leading-none tracking-tight text-transparent sm:text-2xl">
+              <span className="bg-linear-to-r from-[#9C77F5] to-[#00d4b0] bg-clip-text text-[1.35rem] font-extrabold leading-none tracking-tight text-transparent sm:text-2xl">
                 Dilo
               </span>
             )}
@@ -282,7 +283,7 @@ function FlowChatHeader({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex items-baseline gap-0.5">
-              <span className="bg-linear-to-rrom-[#9C77F5] to-[#00d4b0] bg-clip-text text-[1.35rem] font-extrabold tabular-nums text-transparent sm:text-[1.4rem]">
+              <span className="bg-linear-to-r from-[#9C77F5] to-[#00d4b0] bg-clip-text text-[1.35rem] font-extrabold tabular-nums text-transparent sm:text-[1.4rem]">
                 {pct}
               </span>
               <span className="text-[13px] font-semibold text-[#5B5670] dark:text-[#9CA3AF]">%</span>
@@ -473,7 +474,7 @@ function FlowDoneCelebration({
           ) : null}
           <p className="mt-10 text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
             <span className="opacity-80">Hecho con </span>
-            <span className="bg-linear-to-rrom-[#9C77F5] to-[#00d4b0] bg-clip-text font-bold text-transparent">Dilo</span>
+            <span className="bg-linear-to-r from-[#9C77F5] to-[#00d4b0] bg-clip-text font-bold text-transparent">Dilo</span>
           </p>
         </div>
       </div>
@@ -584,7 +585,15 @@ function WelcomeScreen({
   )
 }
 
-export function PublicFlowRunner({ flowId }: { flowId: string }) {
+export function PublicFlowRunner({
+  flowId,
+  initialPayload,
+}: {
+  flowId: string
+  initialPayload: PublicFlowInitialPayload
+}) {
+  const { flow, steps } = initialPayload
+
   useEffect(() => {
     const t = localStorage.getItem(THEME_KEY)
     document.documentElement.classList.toggle('dark', t === 'dark')
@@ -593,8 +602,6 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
   type Phase = 'loading' | 'error' | 'empty' | 'welcome' | 'chat' | 'done'
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorMsg, setErrorMsg] = useState('')
-  const [flow, setFlow] = useState<PublicFlowRecord | null>(null)
-  const [steps, setSteps] = useState<PublicFlowStep[]>([])
   const [token, setToken] = useState<string | null>(null)
   const [resumeAvailable, setResumeAvailable] = useState(false)
   const [resumePayload, setResumePayload] = useState<{
@@ -655,8 +662,9 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
   const flushCompleteSession = useCallback(async () => {
     const t = token
     if (!t) return
+    // Al completar persistimos data URLs de archivos para que el panel pueda descargarlos.
     const body = {
-      answers: stripFileDataUrlsFromAnswers(answersRef.current),
+      answers: answersRef.current,
       currentStepIndex: stepIdxRef.current,
       completed: true,
     }
@@ -687,96 +695,104 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
     })
   }, [messages, isTyping, stepIdx, phase])
 
+  /**
+   * Único efecto necesario para el arranque: `sessionStorage` y la API de sesión solo existen en el cliente
+   * y son asíncronos; no se pueden resolver en RSC. El flow y los pasos ya vienen en `initialPayload`.
+   */
   useEffect(() => {
+    const ac = new AbortController()
+    const { signal } = ac
     let cancelled = false
-    async function run() {
-      setPhase('loading')
-      setErrorMsg('')
-      setResumeAvailable(false)
-      setResumePayload(null)
 
-      const fr = await fetch(`/api/f/${encodeURIComponent(flowId)}`)
-      const flowRes = await readApiResult<FlowPayload>(fr)
-      if (cancelled) return
-      if (!flowRes.ok) {
-        setErrorMsg(flowRes.message)
-        setPhase('error')
-        return
-      }
-      const { flow: f, steps: st } = flowRes.data
-      setFlow(f)
-      setSteps(st)
-      if (st.length === 0) {
-        setPhase('empty')
-        setErrorMsg('Este flow no tiene pasos publicados.')
-        return
-      }
-
-      let t: string | null = null
+    async function hydrateClientSession() {
       try {
-        t = sessionStorage.getItem(sessionStorageKey(flowId))
-      } catch {
-        t = null
-      }
+        setPhase('loading')
+        setErrorMsg('')
+        setResumeAvailable(false)
+        setResumePayload(null)
 
-      if (t) {
-        const sr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions/${encodeURIComponent(t)}`)
-        const sessionRes = await readApiResult<{
-          session: { status: string; metadata: unknown }
-          answers: Record<string, string | null>
-        }>(sr)
-        if (!sessionRes.ok) {
-          try {
-            sessionStorage.removeItem(sessionStorageKey(flowId))
-          } catch {
-            /* ignore */
-          }
-          t = null
-        } else {
-          const raw = sessionRes.data.answers
-          const norm: Record<string, string> = {}
-          for (const [k, v] of Object.entries(raw)) {
-            if (v != null) norm[k] = v
-          }
-          const done = sessionRes.data.session.status === 'completed'
-          const meta = sessionRes.data.session.metadata as { currentStepIndex?: number } | null
-          if (done) {
-            setToken(t)
-            setAnswers(norm)
-            setMessages(buildFullThread(st, norm))
-            setStepIdx(Math.max(0, st.length - 1))
-            setShowDoneSummary(false)
-            setPhase('done')
-            return
-          }
-          const open = firstOpenStep(st, norm)
-          const touched =
-            Object.keys(norm).length > 0 ||
-            (typeof meta?.currentStepIndex === 'number' && meta.currentStepIndex > 0)
-          const canResume = touched && open < st.length
-          setToken(t)
-          setAnswers(norm)
-          setResumeAvailable(canResume)
-          if (canResume) {
-            setResumePayload({ answers: norm, open, token: t })
-          }
-          setStepIdx(0)
-          setMessages([])
-          setPhase('welcome')
+        if (steps.length === 0) {
+          setPhase('empty')
+          setErrorMsg('Este flow no tiene pasos publicados.')
           return
         }
-      }
 
-      setToken(null)
-      setAnswers({})
-      setResumeAvailable(false)
-      setPhase('welcome')
+        let t: string | null = null
+        try {
+          t = sessionStorage.getItem(sessionStorageKey(flowId))
+        } catch {
+          t = null
+        }
+
+        if (t) {
+          const sr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions/${encodeURIComponent(t)}`, {
+            signal,
+          })
+          const sessionRes = await readApiResult<{
+            session: { status: string; metadata: unknown }
+            answers: Record<string, string | null>
+          }>(sr)
+          if (cancelled || signal.aborted) return
+          if (!sessionRes.ok) {
+            try {
+              sessionStorage.removeItem(sessionStorageKey(flowId))
+            } catch {
+              /* ignore */
+            }
+            t = null
+          } else {
+            const raw = sessionRes.data.answers
+            const norm: Record<string, string> = {}
+            for (const [k, v] of Object.entries(raw)) {
+              if (v != null) norm[k] = v
+            }
+            const done = sessionRes.data.session.status === 'completed'
+            const meta = sessionRes.data.session.metadata as { currentStepIndex?: number } | null
+            if (done) {
+              setToken(t)
+              setAnswers(norm)
+              setMessages(buildFullThread(steps, norm))
+              setStepIdx(Math.max(0, steps.length - 1))
+              setShowDoneSummary(false)
+              setPhase('done')
+              return
+            }
+            const open = firstOpenStep(steps, norm)
+            const touched =
+              Object.keys(norm).length > 0 ||
+              (typeof meta?.currentStepIndex === 'number' && meta.currentStepIndex > 0)
+            const canResume = touched && open < steps.length
+            setToken(t)
+            setAnswers(norm)
+            setResumeAvailable(canResume)
+            if (canResume) {
+              setResumePayload({ answers: norm, open, token: t })
+            }
+            setStepIdx(0)
+            setMessages([])
+            setPhase('welcome')
+            return
+          }
+        }
+
+        setToken(null)
+        setAnswers({})
+        setResumeAvailable(false)
+        setPhase('welcome')
+      } catch (e) {
+        if (signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return
+        if (!cancelled) {
+          setErrorMsg('No se pudo comprobar la sesión guardada. Revisa tu conexión e inténtalo de nuevo.')
+          setPhase('error')
+        }
+      }
     }
-    void run()
+    void hydrateClientSession()
     return () => {
       cancelled = true
+      ac.abort()
     }
-  }, [flowId])
+  }, [flowId, flow.id, steps.length])
 
   const enterChatFresh = useCallback(
     (st: PublicFlowStep[], tok: string) => {
@@ -793,12 +809,11 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
       setIsTyping(true)
       setPhase('chat')
       setTimeout(() => {
-        if (!flow) return
         setMessages(withOpeningLine(rebuildMessages(0, st, {}), flow))
         setIsTyping(false)
       }, 480)
     },
-    [flowId, flow],
+    [flowId, flow.id, flow],
   )
 
   const enterChatResume = useCallback(
@@ -808,14 +823,13 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
       setShowDoneSummary(false)
       const idx = Math.min(open, st.length - 1)
       setStepIdx(idx)
-      setMessages(flow ? withOpeningLine(rebuildMessages(open, st, norm), flow) : rebuildMessages(open, st, norm))
+      setMessages(withOpeningLine(rebuildMessages(open, st, norm), flow))
       setPhase('chat')
     },
-    [flow],
+    [flow.id, flow],
   )
 
   const handleWelcomeStartFresh = useCallback(async () => {
-    if (!flow) return
     const st = steps
     if (token && !resumeAvailable) {
       enterChatFresh(st, token)
@@ -834,7 +848,7 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
       return
     }
     enterChatFresh(st, postRes.data.session.token)
-  }, [flow, steps, token, resumeAvailable, flowId, enterChatFresh])
+  }, [flow.id, flow, steps, token, resumeAvailable, flowId, enterChatFresh])
 
   const handleWelcomeResume = useCallback(() => {
     if (!resumePayload) return
@@ -842,7 +856,6 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
   }, [resumePayload, steps, enterChatResume])
 
   const handleWelcomeReturnToChat = useCallback(() => {
-    if (!flow) return
     setEditingStepId(null)
     setShowDoneSummary(false)
     setTextInput('')
@@ -850,10 +863,8 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
     setPendingFiles([])
     setFileErr('')
     setPhase('chat')
-    setMessages(
-      flow ? withOpeningLine(rebuildMessages(stepIdx, steps, answers), flow) : rebuildMessages(stepIdx, steps, answers),
-    )
-  }, [flow, stepIdx, steps, answers])
+    setMessages(withOpeningLine(rebuildMessages(stepIdx, steps, answers), flow))
+  }, [flow.id, flow, stepIdx, steps, answers])
 
   const handleDiscardDraft = useCallback(async () => {
     try {
@@ -957,7 +968,7 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
         const nextAnswers = { ...answersRef.current, [sid]: value }
         setAnswers(nextAnswers)
         setMessages(
-          flow ? withOpeningLine(rebuildMessages(stepIdxRef.current, steps, nextAnswers), flow) : rebuildMessages(stepIdxRef.current, steps, nextAnswers),
+          withOpeningLine(rebuildMessages(stepIdxRef.current, steps, nextAnswers), flow),
         )
         setEditingStepId(null)
         setTextInput('')
@@ -987,7 +998,7 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
       setTimeout(() => {
         setStepIdx(nextIdx)
         const msgs = rebuildMessages(nextIdx, steps, nextAnswers)
-        setMessages(flow ? withOpeningLine(msgs, flow) : msgs)
+        setMessages(withOpeningLine(msgs, flow))
         setIsTyping(false)
       }, 520)
     },
@@ -1083,7 +1094,7 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
     setAnswers(nextAnswers)
     setStepIdx(newIdx)
     setMessages(
-      flow ? withOpeningLine(rebuildMessages(newIdx, steps, nextAnswers), flow) : rebuildMessages(newIdx, steps, nextAnswers),
+      withOpeningLine(rebuildMessages(newIdx, steps, nextAnswers), flow),
     )
     setTextInput('')
     setSelected([])
@@ -1092,7 +1103,7 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
     setEditingStepId(null)
   }, [isTyping, phase, stepIdx, steps, flow, editingStepId, cancelEdit])
 
-  const completion = useMemo(() => completionFromSettings(flow?.settings), [flow?.settings])
+  const completion = useMemo(() => completionFromSettings(flow.settings), [flow.settings])
 
   if (phase === 'loading') {
     return (
@@ -1117,10 +1128,6 @@ export function PublicFlowRunner({ flowId }: { flowId: string }) {
         <p className="text-center text-sm text-[#6B7280] dark:text-[#9CA3AF]">{errorMsg}</p>
       </div>
     )
-  }
-
-  if (!flow) {
-    return null
   }
 
   const pageBg =

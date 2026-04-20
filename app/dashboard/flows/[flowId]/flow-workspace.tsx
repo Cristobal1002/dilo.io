@@ -4,20 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowDownTrayIcon,
   ChatBubbleLeftRightIcon,
   ChevronLeftIcon,
   ClockIcon,
   ComputerDesktopIcon,
   DevicePhoneMobileIcon,
-  LinkIcon,
   MoonIcon,
   PencilSquareIcon,
-  PuzzlePieceIcon,
   SparklesIcon,
   Squares2X2Icon,
   SunIcon,
-  SwatchIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { SavingSpinner } from '@/components/spinners'
@@ -72,15 +68,13 @@ export type FlowWorkspaceFlow = {
   settings: FlowPresentationSettings | Record<string, unknown>
 }
 
-type ToolId = 'ia' | 'elements' | 'design' | 'integrations'
+type ToolId = 'ia' | 'elements'
 
-const TOOL_IDS = new Set<ToolId>(['ia', 'elements', 'design', 'integrations'])
+const TOOL_IDS = new Set<ToolId>(['ia', 'elements'])
 
 const TOOLS: { id: ToolId; label: string; Icon: typeof SparklesIcon }[] = [
   { id: 'ia', label: 'Create with IA', Icon: SparklesIcon },
   { id: 'elements', label: 'Forms Elements', Icon: Squares2X2Icon },
-  { id: 'design', label: 'Design options', Icon: SwatchIcon },
-  { id: 'integrations', label: 'Integrations', Icon: PuzzlePieceIcon },
 ]
 
 function parseTool(raw: string | null): ToolId | null {
@@ -470,8 +464,16 @@ export default function FlowWorkspace({
   steps: FlowWorkspaceStep[]
   publicFlowUrl: string | null
 }) {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const activeTool = parseTool(searchParams.get('tool'))
+  const rawTool = searchParams.get('tool')
+  const activeTool = parseTool(rawTool)
+
+  useEffect(() => {
+    if (rawTool === 'design' || rawTool === 'integrations') {
+      router.replace(`/dashboard/flows/${flow.id}?tool=ia`)
+    }
+  }, [rawTool, flow.id, router])
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   type PreviewSection = 'presentation' | 'main'
   const [previewSection, setPreviewSection] = useState<PreviewSection>('presentation')
@@ -600,63 +602,6 @@ export default function FlowWorkspace({
                         </button>
                       </li>
                     ))}
-                  </ul>
-                </div>
-              )}
-              {activeTool === 'design' && (
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Apariencia del chat público</p>
-                  <p className="text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
-                    Colores de marca, tipografía y mensaje de bienvenida se configurarán aquí (próximamente).
-                  </p>
-                  <p className="rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 text-xs leading-relaxed text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]">
-                    El preview inferior hereda tema claro / oscuro del sistema.
-                  </p>
-                </div>
-              )}
-              {activeTool === 'integrations' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-[15px] font-semibold tracking-tight text-[#0f172a] dark:text-[#f8fafc]">
-                      Integraciones
-                    </h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[#64748b] dark:text-[#94a3b8]">
-                      Conecta webhooks y exportación cuando alguien complete una conversación en tu flow público.
-                    </p>
-                  </div>
-                  <ul className="space-y-2.5">
-                    <li>
-                      <div className="flex items-center gap-3 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 dark:border-[#2A2F3F] dark:bg-[#161821]">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
-                          <LinkIcon className="h-4 w-4 text-[#94A3B8]" strokeWidth={1.5} aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">Webhook al completar</p>
-                          <p className="text-xs leading-snug text-[#64748b] dark:text-[#94a3b8]">
-                            POST JSON cuando termine una sesión
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                          Próximamente
-                        </span>
-                      </div>
-                    </li>
-                    <li>
-                      <div className="flex items-center gap-3 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 dark:border-[#2A2F3F] dark:bg-[#161821]">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
-                          <ArrowDownTrayIcon className="h-4 w-4 text-[#94A3B8]" strokeWidth={1.5} aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">Exportar respuestas</p>
-                          <p className="text-xs leading-snug text-[#64748b] dark:text-[#94a3b8]">
-                            CSV o sincronización con tu stack
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                          Próximamente
-                        </span>
-                      </div>
-                    </li>
                   </ul>
                 </div>
               )}
@@ -811,7 +756,7 @@ function FlowMainPreviewProgressChrome({ totalSteps }: { totalSteps: number }) {
 
   return (
     <div
-      className="mb-4 w-full border-b border-border bg-linear-to-b from-white/95 to-white/[0.88] px-3 pb-3 pt-2 backdrop-blur-md dark:from-[#1A1D29]/98 dark:to-[#1A1D29]/88"
+      className="mb-4 w-full border-b border-border bg-linear-to-b from-white/95 to-white/88 px-3 pb-3 pt-2 backdrop-blur-md dark:from-[#1A1D29]/98 dark:to-[#1A1D29]/88"
       role="region"
       aria-label="Ejemplo de barra de avance en la conversación"
     >

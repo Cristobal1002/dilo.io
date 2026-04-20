@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { PublicFlowRunner } from '@/components/public-flow-runner'
+import { loadPublishedFlowWithSteps } from '@/lib/load-published-flow'
 
 export async function generateMetadata({
   params,
@@ -19,5 +21,13 @@ export default async function PublicFlowPage({
   params: Promise<{ flowId: string }>
 }) {
   const { flowId } = await params
-  return <PublicFlowRunner flowId={flowId} />
+
+  let initialPayload
+  try {
+    initialPayload = await loadPublishedFlowWithSteps(flowId)
+  } catch {
+    notFound()
+  }
+
+  return <PublicFlowRunner key={flowId} flowId={flowId} initialPayload={initialPayload} />
 }
