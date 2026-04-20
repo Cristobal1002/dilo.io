@@ -929,6 +929,130 @@ export default function FlowWorkspace({
     [flow.id, localSteps, steps, router],
   )
 
+  // ── IA Chat ───────────────────────────────────────────────────────────────
+
+  type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; pending?: boolean }
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [
+    ...(flow.promptOrigin
+      ? [{ id: 'origin', role: 'user' as const, content: flow.promptOrigin }]
+      : []),
+    {
+      id: 'init',
+      role: 'assistant' as const,
+      content: `Flow generado con IA ✨ — ${steps.length} paso${steps.length !== 1 ? 's' : ''} listos. Dime qué quieres ajustar.`,
+    },
+  ])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  const handleChatSend = useCallback(async () => {
+    const msg = chatInput.trim()
+    if (!msg || chatLoading) return
+    setChatInput('')
+
+    const userMsg: ChatMessage = { id: `u_${Date.now()}`, role: 'user', content: msg }
+    const pendingId = `a_${Date.now()}`
+    const pendingMsg: ChatMessage = { id: pendingId, role: 'assistant', content: '…', pending: true }
+
+    setChatMessages((prev) => [...prev, userMsg, pendingMsg])
+    setChatLoading(true)
+
+    // Build history (last 12 messages, excluding pending + seed messages).
+    // 'origin' and 'init' are display-only seed bubbles — the system prompt
+    // already provides full flow context, so sending them again causes
+    // the original prompt to appear twice in the OpenAI messages array.
+    const history = [...chatMessages, userMsg]
+      .filter((m) => !m.pending && m.id !== 'origin' && m.id !== 'init')
+      .slice(-12)
+      .map((m) => ({ role: m.role, content: m.content }))
+
+    try {
+      const res = await fetch(`/api/flows/${flow.id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history }),
+      })
+      const result = await readApiResult<{ message: string; changes: unknown[] }>(res)
+
+      if (!result.ok) {
+        setChatMessages((prev) =>
+          prev.map((m) =>
+            m.id === pendingId
+              ? { ...m, content: 'Ocurrió un error. Intenta de nuevo.', pending: false }
+              : m,
+          ),
+        )
+        return
+      }
+
+      const { message: aiMsg, changes } = result.data
+
+      // Replace pending bubble with real response
+      setChatMessages((prev) =>
+        prev.map((m) => (m.id === pendingId ? { ...m, content: aiMsg, pending: false } : m)),
+      )
+
+      // Apply changes sequentially
+      if (Array.isArray(changes) && changes.length > 0) {
+        for (const change of changes as Array<Record<string, string>>) {
+          try {
+            if (change.action === 'add_step' && change.type) {
+              await fetch(`/api/flows/${flow.id}/steps`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: change.type,
+                  question: change.question,
+                  variableName: change.variableName,
+                }),
+              })
+            } else if (change.action === 'update_step' && change.stepId) {
+              const fields: Record<string, unknown> = {}
+              if (change.question) fields.question = change.question
+              if (change.type) fields.type = change.type
+              if (change.hint !== undefined) fields.hint = change.hint
+              if (change.variableName) fields.variableName = change.variableName
+              if (Object.keys(fields).length) {
+                await fetch(`/api/flows/${flow.id}/steps/${change.stepId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(fields),
+                })
+              }
+            } else if (change.action === 'delete_step' && change.stepId) {
+              await fetch(`/api/flows/${flow.id}/steps/${change.stepId}`, { method: 'DELETE' })
+            } else if (change.action === 'add_option' && change.stepId && change.label) {
+              await fetch(`/api/flows/${flow.id}/steps/${change.stepId}/options`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label: change.label }),
+              })
+            }
+          } catch {
+            // continue applying other changes even if one fails
+          }
+        }
+        router.refresh()
+      }
+    } catch {
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? { ...m, content: 'No se pudo conectar. Revisa tu conexión.', pending: false }
+            : m,
+        ),
+      )
+    } finally {
+      setChatLoading(false)
+    }
+  }, [chatInput, chatLoading, chatMessages, flow.id, router])
+
   const flowBasePath = `/dashboard/flows/${flow.id}`
 
   const sectionTabClass = (id: PreviewSection) =>
@@ -982,63 +1106,85 @@ export default function FlowWorkspace({
 
             <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 text-sm text-[#4B5563] dark:text-[#9CA3AF]">
 
-              {/* ── IA panel: chat-style ──────────────────────────────── */}
+              {/* ── IA panel: live chat ───────────────────────────────── */}
               {activeTool === 'ia' && (
-                <div className="flex h-full flex-col">
-                  {/* Chat messages */}
-                  <div className="flex-1 space-y-3 pb-4">
-                    {/* User bubble: original prompt */}
-                    {flow.promptOrigin ? (
-                      <div className="flex justify-end">
-                        <div className="max-w-[88%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-3.5 py-2.5 text-left text-sm text-white shadow-sm shadow-[#9C77F5]/20">
-                          <p className="leading-relaxed">{flow.promptOrigin}</p>
+                <div className="flex h-full flex-col gap-3">
+                  {/* Messages */}
+                  <div className="flex-1 space-y-2.5 overflow-y-auto pb-1 scrollbar-hide">
+                    {chatMessages.map((m) => (
+                      m.role === 'user' ? (
+                        <div key={m.id} className="flex justify-end">
+                          <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-3 py-2 text-left shadow-sm shadow-[#9C77F5]/20">
+                            <p className="break-words text-[11px] leading-relaxed text-white whitespace-pre-wrap">{m.content}</p>
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
-
-                    {/* Assistant bubble: result */}
-                    <div className="flex justify-start">
-                      <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-2.5 dark:border-[#2A2F3F] dark:bg-[#1c1f2a]">
-                        <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">
-                          ✨ Flow generado con IA
-                        </p>
-                        <p className="mt-1 text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
-                          {localSteps.length} paso{localSteps.length !== 1 ? 's' : ''} listos. Puedes editarlos desde la
-                          pestaña <strong className="text-[#9C77F5]">Editar pasos</strong>.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Hint: coming soon */}
-                    <div className="flex justify-start">
-                      <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-dashed border-[#9C77F5]/25 bg-[#9C77F5]/4 px-3.5 py-2.5 dark:border-[#9C77F5]/20 dark:bg-[#9C77F5]/6">
-                        <p className="text-xs text-[#9C77F5]/80 dark:text-[#C4B5FD]/70">
-                          Pronto podrás seguir refinando el flow con IA desde aquí.
-                        </p>
-                      </div>
-                    </div>
+                      ) : (
+                        <div key={m.id} className="flex justify-start">
+                          <div className={cn(
+                            'max-w-[88%] rounded-2xl rounded-tl-md border px-3 py-2',
+                            m.pending
+                              ? 'border-[#9C77F5]/20 bg-[#9C77F5]/5 dark:border-[#9C77F5]/15 dark:bg-[#9C77F5]/8'
+                              : 'border-[#E8EAEF] bg-[#FAFBFC] dark:border-[#2A2F3F] dark:bg-[#1c1f2a]',
+                          )}>
+                            {m.pending ? (
+                              <span className="flex gap-1 py-0.5">
+                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9C77F5]/60 [animation-delay:0ms]" />
+                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9C77F5]/60 [animation-delay:150ms]" />
+                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9C77F5]/60 [animation-delay:300ms]" />
+                              </span>
+                            ) : (
+                              <p className="break-words text-[11px] leading-relaxed text-[#1A1A1A] whitespace-pre-wrap dark:text-[#F8F9FB]">
+                                {m.content}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    ))}
+                    <div ref={chatBottomRef} />
                   </div>
 
-                  {/* Disabled input */}
-                  <div className="mt-auto border-t border-[#E8EAEF] pt-3 dark:border-[#2A2F3F]">
-                    <div className="flex items-center gap-2 rounded-2xl border border-[#E8EAEF] bg-[#F8F9FB] px-3.5 py-2.5 dark:border-[#2A2F3F] dark:bg-[#161821]">
-                      <input
-                        type="text"
-                        disabled
-                        placeholder="Próximamente: refina con IA…"
-                        className="flex-1 bg-transparent text-sm text-[#9CA3AF] placeholder:text-[#9CA3AF] focus:outline-none"
+                  {/* Input */}
+                  <div className="shrink-0 border-t border-[#E8EAEF] pt-3 dark:border-[#2A2F3F]">
+                    <div className={cn(
+                      'flex flex-col gap-2 rounded-2xl border px-3 py-2.5 transition-colors',
+                      chatLoading
+                        ? 'border-[#9C77F5]/25 bg-[#F8F9FB] dark:border-[#9C77F5]/20 dark:bg-[#161821]'
+                        : 'border-[#E8EAEF] bg-[#F8F9FB] focus-within:border-[#9C77F5]/35 focus-within:ring-2 focus-within:ring-[#9C77F5]/10 dark:border-[#2A2F3F] dark:bg-[#161821]',
+                    )}>
+                      <textarea
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            void handleChatSend()
+                          }
+                        }}
+                        disabled={chatLoading}
+                        placeholder="Ej: añade una pregunta de presupuesto…"
+                        maxLength={2000}
+                        rows={3}
+                        className="w-full resize-none bg-transparent text-[11px] leading-relaxed text-[#1A1A1A] placeholder:text-[#9CA3AF] focus:outline-none dark:text-[#F8F9FB] dark:placeholder:text-[#6B7280]"
                       />
-                      <button
-                        type="button"
-                        disabled
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#9C77F5]/20 text-[#9C77F5]/50"
-                      >
-                        <PaperAirplaneIcon className="h-4 w-4" strokeWidth={1.75} />
-                      </button>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] text-[#9CA3AF]">Shift+Enter para salto de línea</span>
+                        <button
+                          type="button"
+                          disabled={chatLoading || !chatInput.trim()}
+                          onClick={() => void handleChatSend()}
+                          className={cn(
+                            'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors',
+                            chatLoading || !chatInput.trim()
+                              ? 'bg-[#9C77F5]/15 text-[#9C77F5]/40'
+                              : 'bg-[#9C77F5] text-white shadow-sm shadow-[#9C77F5]/30 hover:bg-[#8B67E5]',
+                          )}
+                          title="Enviar (Enter)"
+                        >
+                          <PaperAirplaneIcon className="h-3 w-3" strokeWidth={2} />
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-1.5 text-center text-[10px] text-[#9CA3AF]">
-                      Esta función estará disponible próximamente
-                    </p>
                   </div>
                 </div>
               )}

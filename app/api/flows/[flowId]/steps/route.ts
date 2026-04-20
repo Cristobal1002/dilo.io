@@ -51,6 +51,14 @@ const TYPE_VAR_BASE: Record<string, string> = {
 
 const CreateStepSchema = z.object({
   type: z.enum(STEP_TYPES),
+  question: z.string().min(1).max(2000).optional(),
+  hint: z.string().max(500).nullable().optional(),
+  variableName: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Solo letras, números y guiones bajos')
+    .optional(),
 })
 
 export const POST = withApiHandler(
@@ -79,9 +87,9 @@ export const POST = withApiHandler(
     const order = (agg?.maxOrder ?? -1) + 1
     const { type } = parsed.data
     const varBase = TYPE_VAR_BASE[type] ?? type
-    // Use 1-based display index in variable name
-    const variableName = `${varBase}_${order + 1}`
-    const question = DEFAULT_QUESTIONS[type] ?? 'Nueva pregunta'
+    // Use provided values if available, otherwise fall back to defaults
+    const variableName = parsed.data.variableName ?? `${varBase}_${order + 1}`
+    const question = parsed.data.question ?? DEFAULT_QUESTIONS[type] ?? 'Nueva pregunta'
 
     const [created] = await db
       .insert(steps)
@@ -91,6 +99,7 @@ export const POST = withApiHandler(
         type,
         question,
         variableName,
+        hint: parsed.data.hint ?? null,
         required: true,
       })
       .returning()
