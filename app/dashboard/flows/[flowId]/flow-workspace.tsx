@@ -1,19 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ChatBubbleLeftRightIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
+  ChevronUpIcon,
   ClockIcon,
   ComputerDesktopIcon,
   DevicePhoneMobileIcon,
+  EnvelopeIcon,
+  HashtagIcon,
+  ListBulletIcon,
   MoonIcon,
+  PaperAirplaneIcon,
+  PaperClipIcon,
   PencilSquareIcon,
+  PhoneIcon,
   SparklesIcon,
   Squares2X2Icon,
+  StarIcon,
   SunIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { SavingSpinner } from '@/components/spinners'
@@ -34,6 +44,19 @@ const TYPE_LABELS: Record<string, string> = {
   yes_no: 'Sí / No',
   file: 'Archivo',
 }
+
+const TYPE_PALETTE: { type: string; icon: React.ReactNode }[] = [
+  { type: 'text', icon: <span className="text-base font-bold leading-none">Aa</span> },
+  { type: 'long_text', icon: <span className="text-base font-bold leading-none">¶</span> },
+  { type: 'select', icon: <ListBulletIcon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'multi_select', icon: <Squares2X2Icon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'email', icon: <EnvelopeIcon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'phone', icon: <PhoneIcon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'number', icon: <HashtagIcon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'rating', icon: <StarIcon className="h-5 w-5" strokeWidth={1.5} /> },
+  { type: 'yes_no', icon: <span className="text-base font-bold leading-none">?</span> },
+  { type: 'file', icon: <PaperClipIcon className="h-5 w-5" strokeWidth={1.5} /> },
+]
 
 export type FlowWorkspaceStep = {
   id: string
@@ -69,6 +92,7 @@ export type FlowWorkspaceFlow = {
 }
 
 type ToolId = 'ia' | 'elements'
+type PreviewSection = 'presentation' | 'main' | 'edit'
 
 const TOOL_IDS = new Set<ToolId>(['ia', 'elements'])
 
@@ -455,6 +479,317 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
   )
 }
 
+// ---------------------------------------------------------------------------
+// EditableStepCard — step in edit mode
+// ---------------------------------------------------------------------------
+
+const HAS_OPTIONS = new Set(['select', 'multi_select'])
+
+function EditableStepCard({
+  flowId,
+  step,
+  isFirst,
+  isLast,
+  onUpdate,
+  onDelete,
+  onMove,
+  onRefresh,
+  saving,
+}: {
+  flowId: string
+  step: FlowWorkspaceStep
+  isFirst: boolean
+  isLast: boolean
+  onUpdate: (stepId: string, fields: Record<string, unknown>) => Promise<void>
+  onDelete: (stepId: string) => void
+  onMove: (stepId: string, direction: 'up' | 'down') => void
+  onRefresh: () => void
+  saving: boolean
+}) {
+  const [stepType, setStepType] = useState(step.type)
+  const [question, setQuestion] = useState(step.question)
+  const [variableName, setVariableName] = useState(step.variableName)
+  const [required, setRequired] = useState(step.required)
+
+  type LocalOption = { id: string; label: string; order: number; temp?: boolean }
+  const [localOptions, setLocalOptions] = useState<LocalOption[]>(
+    step.options.map((o) => ({ id: o.id, label: o.label, order: o.order })),
+  )
+  const [newOptionLabel, setNewOptionLabel] = useState('')
+  const [savingOption, setSavingOption] = useState(false)
+  const newOptionInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync when step prop changes (e.g. after router.refresh)
+  useEffect(() => { setStepType(step.type) }, [step.type])
+  useEffect(() => { setQuestion(step.question) }, [step.question])
+  useEffect(() => { setVariableName(step.variableName) }, [step.variableName])
+  useEffect(() => { setRequired(step.required) }, [step.required])
+  useEffect(() => {
+    // Only sync real (non-temp) options from server
+    setLocalOptions(step.options.map((o) => ({ id: o.id, label: o.label, order: o.order })))
+  }, [step.options])
+
+  const handleTypeChange = async (newType: string) => {
+    if (newType === stepType) return
+    setStepType(newType)
+    await onUpdate(step.id, { type: newType })
+  }
+
+  const handleBlurQuestion = async () => {
+    const q = question.trim()
+    if (!q || q === step.question) return
+    await onUpdate(step.id, { question: q })
+  }
+
+  const handleBlurVariable = async () => {
+    const v = variableName.trim()
+    if (!v || v === step.variableName) return
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(v)) {
+      setVariableName(step.variableName)
+      return
+    }
+    await onUpdate(step.id, { variableName: v })
+  }
+
+  const handleToggleRequired = async () => {
+    const next = !required
+    setRequired(next)
+    await onUpdate(step.id, { required: next })
+  }
+
+  // ── Options CRUD ───────────────────────────────────────────────────────────
+
+  const submitNewOption = async () => {
+    const label = newOptionLabel.trim()
+    if (!label) return
+    setNewOptionLabel('')
+    // Optimistic: add immediately with a temp ID
+    const tempId = `temp_${Date.now()}`
+    setLocalOptions((prev) => [...prev, { id: tempId, label, order: prev.length, temp: true }])
+    setSavingOption(true)
+    try {
+      const res = await fetch(`/api/flows/${flowId}/steps/${step.id}/options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      })
+      if (res.ok) {
+        onRefresh() // sync real ID from server
+      } else {
+        setLocalOptions((prev) => prev.filter((o) => o.id !== tempId)) // revert
+      }
+    } catch {
+      setLocalOptions((prev) => prev.filter((o) => o.id !== tempId))
+    } finally {
+      setSavingOption(false)
+    }
+  }
+
+  const handleDeleteOption = async (optionId: string) => {
+    setLocalOptions((prev) => prev.filter((o) => o.id !== optionId))
+    try {
+      await fetch(`/api/flows/${flowId}/steps/${step.id}/options/${optionId}`, { method: 'DELETE' })
+      onRefresh()
+    } catch {
+      onRefresh() // re-sync from server on error
+    }
+  }
+
+  const handleUpdateOptionLabel = async (optionId: string, label: string) => {
+    const trimmed = label.trim()
+    const prev = localOptions.find((o) => o.id === optionId)
+    if (!trimmed || trimmed === prev?.label) return
+    try {
+      await fetch(`/api/flows/${flowId}/steps/${step.id}/options/${optionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: trimmed }),
+      })
+      onRefresh()
+    } catch { /* noop */ }
+  }
+
+  const hasOptions = HAS_OPTIONS.has(stepType)
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border bg-white transition-all dark:bg-[#1A1D29]',
+        saving
+          ? 'border-[#9C77F5]/40 shadow-sm shadow-[#9C77F5]/10 dark:border-[#9C77F5]/30'
+          : 'border-[#E8EAEF] dark:border-[#2A2F3F]',
+      )}
+    >
+      {/* Header: order + type selector + saving + move arrows + delete */}
+      <div className="flex items-center gap-2 border-b border-[#F1F5F9] px-3.5 py-2.5 dark:border-[#252936]">
+        {/* Order */}
+        <span className="shrink-0 text-[11px] font-bold text-[#9C77F5]">#{step.order + 1}</span>
+
+        {/* Type selector */}
+        <select
+          value={stepType}
+          onChange={(e) => void handleTypeChange(e.target.value)}
+          className="min-w-0 flex-1 cursor-pointer rounded-lg border border-[#E8EAEF] bg-[#F8F9FB] px-2 py-1 text-[11px] font-medium text-[#64748B] focus:border-[#9C77F5]/40 focus:outline-none focus:ring-1 focus:ring-[#9C77F5]/20 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#94A3B8]"
+          title="Cambiar tipo de pregunta"
+        >
+          {Object.entries(TYPE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+
+        {saving && <SavingSpinner size="xs" />}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Move up/down */}
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            disabled={isFirst}
+            onClick={() => onMove(step.id, 'up')}
+            className="rounded-lg p-1 text-[#9CA3AF] transition-colors hover:bg-[#F1F5F9] hover:text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-[#252936] dark:hover:text-[#9CA3AF]"
+            title="Mover arriba"
+            aria-label="Mover arriba"
+          >
+            <ChevronUpIcon className="h-4 w-4" strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            disabled={isLast}
+            onClick={() => onMove(step.id, 'down')}
+            className="rounded-lg p-1 text-[#9CA3AF] transition-colors hover:bg-[#F1F5F9] hover:text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-[#252936] dark:hover:text-[#9CA3AF]"
+            title="Mover abajo"
+            aria-label="Mover abajo"
+          >
+            <ChevronDownIcon className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Delete */}
+        <button
+          type="button"
+          onClick={() => onDelete(step.id)}
+          className="rounded-lg p-1 text-[#9CA3AF] transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+          title="Eliminar paso"
+          aria-label="Eliminar paso"
+        >
+          <TrashIcon className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-3">
+        {/* Question textarea */}
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onBlur={() => void handleBlurQuestion()}
+          rows={2}
+          maxLength={2000}
+          placeholder="Escribe la pregunta…"
+          className="w-full resize-none rounded-xl border border-transparent bg-[#F8F9FB] px-3 py-2 text-sm font-medium text-[#1A1A1A] placeholder:text-[#9CA3AF] transition-colors focus:border-[#9C77F5]/35 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9C77F5]/12 dark:bg-[#252936] dark:text-[#F8F9FB] dark:placeholder:text-[#6B7280] dark:focus:bg-[#1A1D29]"
+        />
+
+        {/* ── Options editor (select / multi_select only) ────────── */}
+        {hasOptions && (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9CA3AF]">
+              Opciones
+            </p>
+
+            {/* Existing options */}
+            {localOptions.map((opt) => (
+              <div key={opt.id} className={cn('flex items-center gap-2', opt.temp && 'opacity-50')}>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#9C77F5]/50" aria-hidden />
+                <input
+                  type="text"
+                  defaultValue={opt.label}
+                  disabled={opt.temp}
+                  onBlur={(e) => void handleUpdateOptionLabel(opt.id, e.target.value)}
+                  maxLength={200}
+                  className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm text-[#374151] transition-colors hover:bg-[#F8F9FB] focus:border-[#9C77F5]/25 focus:bg-[#F8F9FB] focus:outline-none disabled:cursor-default dark:text-[#D1D5DB] dark:hover:bg-[#252936] dark:focus:bg-[#252936]"
+                />
+                {opt.temp ? (
+                  <span className="shrink-0 px-1 text-[10px] text-[#9CA3AF]">…</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteOption(opt.id)}
+                    className="shrink-0 rounded-lg p-1 text-[#9CA3AF] transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                    title="Eliminar opción"
+                  >
+                    <XMarkIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {/* Add new option */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full border border-dashed border-[#9C77F5]/40" aria-hidden />
+              <input
+                ref={newOptionInputRef}
+                type="text"
+                value={newOptionLabel}
+                onChange={(e) => setNewOptionLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); void submitNewOption() }
+                  if (e.key === 'Escape') setNewOptionLabel('')
+                }}
+                placeholder="Añadir opción…"
+                maxLength={200}
+                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm text-[#374151] placeholder:text-[#9CA3AF] transition-colors hover:bg-[#F8F9FB] focus:border-[#9C77F5]/25 focus:bg-[#F8F9FB] focus:outline-none dark:text-[#D1D5DB] dark:placeholder:text-[#6B7280] dark:hover:bg-[#252936] dark:focus:bg-[#252936]"
+              />
+              {newOptionLabel.trim() && (
+                <button
+                  type="button"
+                  disabled={savingOption}
+                  onClick={() => void submitNewOption()}
+                  className="shrink-0 rounded-lg bg-[#9C77F5]/10 px-2 py-1 text-[11px] font-semibold text-[#6B4DD4] transition-colors hover:bg-[#9C77F5]/20 disabled:opacity-50 dark:bg-[#9C77F5]/15 dark:text-[#C4B5FD]"
+                >
+                  {savingOption ? '…' : '+ Añadir'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Variable name + required toggle */}
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            value={variableName}
+            onChange={(e) => setVariableName(e.target.value)}
+            onBlur={() => void handleBlurVariable()}
+            maxLength={100}
+            placeholder="variable_nombre"
+            title="Nombre de variable (letras, números y _)"
+            className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 font-mono text-[11px] text-[#94A3B8] transition-colors hover:bg-[#F8F9FB] focus:border-[#9C77F5]/25 focus:bg-[#F8F9FB] focus:outline-none dark:hover:bg-[#252936] dark:focus:bg-[#252936]"
+          />
+          <button
+            type="button"
+            onClick={() => void handleToggleRequired()}
+            className={cn(
+              'shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-medium transition-colors',
+              required
+                ? 'bg-[#9C77F5]/10 text-[#6B4DD4] dark:bg-[#9C77F5]/15 dark:text-[#C4B5FD]'
+                : 'text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#252936]',
+            )}
+            title={required ? 'Requerido — clic para hacer opcional' : 'Opcional — clic para hacer requerido'}
+          >
+            {required ? '✓ Requerido' : 'Opcional'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main FlowWorkspace component
+// ---------------------------------------------------------------------------
+
 export default function FlowWorkspace({
   flow,
   steps,
@@ -474,25 +809,125 @@ export default function FlowWorkspace({
       router.replace(`/dashboard/flows/${flow.id}?tool=ia`)
     }
   }, [rawTool, flow.id, router])
+
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
-  type PreviewSection = 'presentation' | 'main'
   const [previewSection, setPreviewSection] = useState<PreviewSection>('presentation')
-  const [search, setSearch] = useState('')
 
-  const filteredSteps = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return steps
-    return steps.filter(
-      (s) =>
-        s.question.toLowerCase().includes(q) ||
-        s.variableName.toLowerCase().includes(q) ||
-        (TYPE_LABELS[s.type] ?? s.type).toLowerCase().includes(q),
-    )
-  }, [steps, search])
+  // Local steps state for optimistic updates
+  const [localSteps, setLocalSteps] = useState<FlowWorkspaceStep[]>(steps)
+  const [addingStep, setAddingStep] = useState(false)
+  const [savingStepIds, setSavingStepIds] = useState<Set<string>>(new Set())
 
-  const scrollToStep = (id: string) => {
-    document.getElementById(`preview-step-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }
+  // Sync local steps when server-refreshed props arrive
+  useEffect(() => {
+    setLocalSteps(steps)
+  }, [steps])
+
+  // ── Step CRUD ─────────────────────────────────────────────────────────────
+
+  const handleAddStep = useCallback(
+    async (type: string) => {
+      setAddingStep(true)
+      try {
+        const res = await fetch(`/api/flows/${flow.id}/steps`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type }),
+        })
+        const result = await readApiResult(res)
+        if (!result.ok) {
+          console.error('Failed to add step:', result.message)
+          return
+        }
+        router.refresh()
+      } catch (err) {
+        console.error('Failed to add step:', err)
+      } finally {
+        setAddingStep(false)
+      }
+    },
+    [flow.id, router],
+  )
+
+  const handleUpdateStep = useCallback(
+    async (stepId: string, fields: Record<string, unknown>) => {
+      setSavingStepIds((prev) => new Set([...prev, stepId]))
+      try {
+        const res = await fetch(`/api/flows/${flow.id}/steps/${stepId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fields),
+        })
+        const result = await readApiResult(res)
+        if (!result.ok) {
+          console.error('Failed to update step:', result.message)
+        }
+        router.refresh()
+      } catch (err) {
+        console.error('Failed to update step:', err)
+      } finally {
+        setSavingStepIds((prev) => {
+          const next = new Set(prev)
+          next.delete(stepId)
+          return next
+        })
+      }
+    },
+    [flow.id, router],
+  )
+
+  const handleDeleteStep = useCallback(
+    async (stepId: string) => {
+      // Optimistic remove
+      setLocalSteps((prev) => prev.filter((s) => s.id !== stepId))
+      try {
+        // DELETE returns 204 No Content — don't use readApiResult (it tries to parse JSON body)
+        const res = await fetch(`/api/flows/${flow.id}/steps/${stepId}`, {
+          method: 'DELETE',
+        })
+        if (!res.ok) {
+          setLocalSteps(steps) // revert
+          return
+        }
+        router.refresh()
+      } catch {
+        setLocalSteps(steps)
+      }
+    },
+    [flow.id, steps, router],
+  )
+
+  const handleMoveStep = useCallback(
+    async (stepId: string, direction: 'up' | 'down') => {
+      const idx = localSteps.findIndex((s) => s.id === stepId)
+      if (idx === -1) return
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= localSteps.length) return
+
+      // Optimistic reorder
+      const next = [...localSteps]
+      ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+      const reordered = next.map((s, i) => ({ ...s, order: i }))
+      setLocalSteps(reordered)
+
+      try {
+        // Reorder also returns 204 No Content
+        const res = await fetch(`/api/flows/${flow.id}/steps/reorder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stepIds: reordered.map((s) => s.id) }),
+        })
+        if (!res.ok) {
+          setLocalSteps(steps) // revert
+          return
+        }
+        router.refresh()
+      } catch {
+        setLocalSteps(steps)
+      }
+    },
+    [flow.id, localSteps, steps, router],
+  )
 
   const flowBasePath = `/dashboard/flows/${flow.id}`
 
@@ -504,12 +939,13 @@ export default function FlowWorkspace({
         : 'border-transparent bg-transparent font-medium text-[#64748B] hover:bg-black/[0.04] hover:text-[#475569] dark:text-[#94A3B8] dark:hover:bg-white/[0.05] dark:hover:text-[#CBD5E1]',
     )
 
-  /** Altura mínima alineada con el header del shell; puede crecer si hay descripción. */
   const toolBar = cn(
     'shrink-0 flex min-h-16 items-center justify-between gap-3 border-b px-4 py-2',
     workspaceDivider,
     workspaceSurface,
   )
+
+  const isEditMode = previewSection === 'edit'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -519,6 +955,7 @@ export default function FlowWorkspace({
           workspaceSurface,
         )}
       >
+        {/* ── Left panel ─────────────────────────────────────────────────── */}
         {activeTool ? (
           <aside
             className={cn(
@@ -542,73 +979,104 @@ export default function FlowWorkspace({
                 Cerrar
               </Link>
             </div>
+
             <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 text-sm text-[#4B5563] dark:text-[#9CA3AF]">
+
+              {/* ── IA panel: chat-style ──────────────────────────────── */}
               {activeTool === 'ia' && (
-                <div className="space-y-5">
-                  <p className="text-sm leading-snug text-[#1A1A1A] dark:text-[#F8F9FB] font-medium">
-                    Este flow salió de un prompt. Aquí verás el origen; más adelante podrás refinar con IA.
-                  </p>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280] mb-2">
-                      Prompt de origen
-                    </p>
-                    <p className="text-xs sm:text-sm leading-relaxed text-[#374151] dark:text-[#D1D5DB] border-l-2 border-[#9C77F5] pl-3 py-1 max-h-[min(40vh,14rem)] overflow-y-auto scrollbar-hide">
-                      {flow.promptOrigin ?? '—'}
+                <div className="flex h-full flex-col">
+                  {/* Chat messages */}
+                  <div className="flex-1 space-y-3 pb-4">
+                    {/* User bubble: original prompt */}
+                    {flow.promptOrigin ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[88%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-3.5 py-2.5 text-left text-sm text-white shadow-sm shadow-[#9C77F5]/20">
+                          <p className="leading-relaxed">{flow.promptOrigin}</p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Assistant bubble: result */}
+                    <div className="flex justify-start">
+                      <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-2.5 dark:border-[#2A2F3F] dark:bg-[#1c1f2a]">
+                        <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">
+                          ✨ Flow generado con IA
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
+                          {localSteps.length} paso{localSteps.length !== 1 ? 's' : ''} listos. Puedes editarlos desde la
+                          pestaña <strong className="text-[#9C77F5]">Editar pasos</strong>.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Hint: coming soon */}
+                    <div className="flex justify-start">
+                      <div className="max-w-[92%] rounded-2xl rounded-tl-md border border-dashed border-[#9C77F5]/25 bg-[#9C77F5]/4 px-3.5 py-2.5 dark:border-[#9C77F5]/20 dark:bg-[#9C77F5]/6">
+                        <p className="text-xs text-[#9C77F5]/80 dark:text-[#C4B5FD]/70">
+                          Pronto podrás seguir refinando el flow con IA desde aquí.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Disabled input */}
+                  <div className="mt-auto border-t border-[#E8EAEF] pt-3 dark:border-[#2A2F3F]">
+                    <div className="flex items-center gap-2 rounded-2xl border border-[#E8EAEF] bg-[#F8F9FB] px-3.5 py-2.5 dark:border-[#2A2F3F] dark:bg-[#161821]">
+                      <input
+                        type="text"
+                        disabled
+                        placeholder="Próximamente: refina con IA…"
+                        className="flex-1 bg-transparent text-sm text-[#9CA3AF] placeholder:text-[#9CA3AF] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        disabled
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#9C77F5]/20 text-[#9C77F5]/50"
+                      >
+                        <PaperAirplaneIcon className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-center text-[10px] text-[#9CA3AF]">
+                      Esta función estará disponible próximamente
                     </p>
                   </div>
-                  <Link
-                    href="/dashboard/flows/new"
-                    className="inline-flex items-center justify-center w-full rounded-xl bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] text-white text-sm font-semibold py-2.5 shadow-md shadow-[#9C77F5]/20 hover:opacity-95"
-                  >
-                    Nuevo flow con IA
-                  </Link>
                 </div>
               )}
+
+              {/* ── Elements panel ────────────────────────────────────── */}
               {activeTool === 'elements' && (
                 <div className="space-y-4">
-                  <label className="block text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
-                    Buscar en pasos
-                  </label>
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Pregunta, variable, tipo…"
-                    className="w-full rounded-2xl border border-[#E8EAEF] bg-white px-3.5 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#94A3B8] transition-shadow focus:border-[#9C77F5]/35 focus:outline-none focus:ring-2 focus:ring-[#9C77F5]/12 dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#F8F9FB] dark:placeholder:text-[#64748B]"
-                  />
-                  <p className="text-xs leading-relaxed text-[#6B7280] dark:text-[#9CA3AF]">
-                    El lienzo muestra la conversación; aquí navegas la estructura (preguntas y tipos).
+                  <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                    Haz clic en un elemento para añadirlo al flow
                   </p>
-                  <ul className="space-y-2">
-                    {filteredSteps.map((s) => (
-                      <li key={s.id}>
-                        <button
-                          type="button"
-                          onClick={() => scrollToStep(s.id)}
-                          className="w-full rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3.5 py-3 text-left transition-colors duration-200 hover:border-[#9C77F5]/22 hover:bg-[#F8F6FF] dark:border-[#2A2F3F] dark:bg-[#161821] dark:hover:border-[#9C77F5]/28 dark:hover:bg-[#1c1f2a]"
-                        >
-                          <span className="text-[11px] font-semibold tracking-wide text-[#9C77F5]/90">
-                            #{s.order}
-                          </span>
-                          <span className="mt-0.5 block line-clamp-2 text-sm font-medium leading-snug text-[#1A1A1A] dark:text-[#F8F9FB]">
-                            {s.question}
-                          </span>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-[10px] text-[#94A3B8]">{s.variableName}</span>
-                            <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-medium text-[#64748B] dark:bg-[#252936] dark:text-[#94A3B8]">
-                              {TYPE_LABELS[s.type] ?? s.type}
-                            </span>
-                          </div>
-                        </button>
-                      </li>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TYPE_PALETTE.map(({ type, icon }) => (
+                      <button
+                        key={type}
+                        type="button"
+                        disabled={addingStep}
+                        onClick={() => void handleAddStep(type)}
+                        className="flex flex-col items-center gap-2 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-3 py-3.5 text-center transition-colors hover:border-[#9C77F5]/30 hover:bg-[#F8F6FF] disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#161821] dark:hover:border-[#9C77F5]/30 dark:hover:bg-[#1c1f2a]"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#9C77F5]/10 text-[#6B4DD4] dark:bg-[#9C77F5]/15 dark:text-[#D4C4FC]">
+                          {icon}
+                        </span>
+                        <span className="text-[11px] font-medium leading-tight text-[#374151] dark:text-[#D1D5DB]">
+                          {TYPE_LABELS[type]}
+                        </span>
+                      </button>
                     ))}
-                  </ul>
+                  </div>
+                  {addingStep && (
+                    <SavingSpinner className="justify-center text-xs" size="xs" />
+                  )}
                 </div>
               )}
             </div>
           </aside>
         ) : null}
 
+        {/* ── Main canvas ──────────────────────────────────────────────────── */}
         <div className={cn('flex-1 flex flex-col min-w-0 min-h-0', workspaceSurface)}>
           <div className={toolBar}>
             <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-0.5 leading-tight">
@@ -616,7 +1084,10 @@ export default function FlowWorkspace({
                 {flow.name}
               </h1>
               <p className="text-xs leading-snug text-[#6B7280] dark:text-[#9CA3AF]">
-                {steps.length} pasos · preview {device === 'mobile' ? 'móvil' : 'escritorio'}
+                {localSteps.length} pasos
+                {isEditMode
+                  ? ' · modo edición'
+                  : ` · preview ${device === 'mobile' ? 'móvil' : 'escritorio'}`}
               </p>
             </div>
             <div className="shrink-0 self-center">
@@ -624,81 +1095,142 @@ export default function FlowWorkspace({
             </div>
           </div>
 
-          <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-background p-5 pb-6 scrollbar-hide">
-            <div
-              className="pointer-events-none absolute inset-0 overflow-hidden"
-              aria-hidden
-            >
-              <div className="absolute left-1/2 top-[32%] h-[min(380px,52vh)] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-dilo-500/14 blur-3xl dark:bg-dilo-500/10" />
-              <div className="absolute bottom-[12%] right-[6%] h-52 w-64 rounded-full bg-mint-500/12 blur-3xl dark:bg-mint-500/8" />
-              <div className="absolute top-[22%] left-[4%] h-44 w-52 rounded-full bg-dilo-500/10 blur-3xl dark:bg-dilo-500/7" />
+          {/* Canvas content */}
+          {isEditMode ? (
+            /* ── EDIT MODE: editable step list ────────────────────── */
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-background scrollbar-hide">
+              {/* Subtle background blobs */}
+              <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+                <div className="absolute left-1/2 top-1/3 h-64 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-dilo-500/8 blur-3xl dark:bg-dilo-500/6" />
+              </div>
+
+              <div className="relative z-10 mx-auto w-full max-w-2xl px-5 py-6">
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#9C77F5]">Pasos del flow</p>
+                    <p className="mt-0.5 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                      Edita preguntas y variables · los cambios se guardan al salir del campo
+                    </p>
+                  </div>
+                  {addingStep && <SavingSpinner size="xs" className="text-xs" />}
+                </div>
+
+                {/* Step list */}
+                {localSteps.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[#9C77F5]/25 py-12 text-center dark:border-[#9C77F5]/20">
+                    <span className="text-3xl">📋</span>
+                    <p className="text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+                      No hay pasos todavía
+                    </p>
+                    <p className="max-w-xs text-xs text-[#9CA3AF]">
+                      Abre el panel de <strong>Forms Elements</strong> y haz clic en un tipo para añadir el primer paso.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {localSteps.map((step, idx) => (
+                      <EditableStepCard
+                        key={step.id}
+                        flowId={flow.id}
+                        step={step}
+                        isFirst={idx === 0}
+                        isLast={idx === localSteps.length - 1}
+                        onUpdate={handleUpdateStep}
+                        onDelete={handleDeleteStep}
+                        onMove={handleMoveStep}
+                        onRefresh={() => router.refresh()}
+                        saving={savingStepIds.has(step.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick add hint */}
+                <p className="mt-4 text-center text-[11px] text-[#9CA3AF]">
+                  Usa el panel <strong>Forms Elements</strong> para añadir más pasos →
+                </p>
+              </div>
             </div>
-            <div
-              className={cn(
-                'relative z-10 w-full overflow-hidden transition-[max-width] duration-300 ease-out',
-                device === 'mobile' &&
-                  'max-w-[390px] rounded-4xl border-[6px] border-[#1a1a1a] bg-surface shadow-none dark:border-[#0a0a0a]',
-                device === 'desktop' &&
-                  'max-w-2xl rounded-2xl border border-border bg-surface shadow-none',
-              )}
-            >
+          ) : (
+            /* ── PREVIEW MODE: existing preview ───────────────────── */
+            <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-y-auto bg-background p-5 pb-6 scrollbar-hide">
+              <div
+                className="pointer-events-none absolute inset-0 overflow-hidden"
+                aria-hidden
+              >
+                <div className="absolute left-1/2 top-[32%] h-[min(380px,52vh)] w-[min(480px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-dilo-500/14 blur-3xl dark:bg-dilo-500/10" />
+                <div className="absolute bottom-[12%] right-[6%] h-52 w-64 rounded-full bg-mint-500/12 blur-3xl dark:bg-mint-500/8" />
+                <div className="absolute top-[22%] left-[4%] h-44 w-52 rounded-full bg-dilo-500/10 blur-3xl dark:bg-dilo-500/7" />
+              </div>
               <div
                 className={cn(
-                  'shrink-0 overflow-hidden bg-border',
-                  device === 'mobile' && 'rounded-t-[1.625rem]',
-                  device === 'desktop' && 'rounded-t-2xl',
+                  'relative z-10 w-full overflow-hidden transition-[max-width] duration-300 ease-out',
+                  device === 'mobile' &&
+                    'max-w-[390px] rounded-4xl border-[6px] border-[#1a1a1a] bg-surface shadow-none dark:border-[#0a0a0a]',
+                  device === 'desktop' &&
+                    'max-w-2xl rounded-2xl border border-border bg-surface shadow-none',
                 )}
               >
-                <div className="h-1 w-full overflow-hidden" aria-hidden>
-                  <div className="h-full w-1/3 rounded-full bg-linear-to-r from-dilo-500 to-mint-500" />
+                <div
+                  className={cn(
+                    'shrink-0 overflow-hidden bg-border',
+                    device === 'mobile' && 'rounded-t-[1.625rem]',
+                    device === 'desktop' && 'rounded-t-2xl',
+                  )}
+                >
+                  <div className="h-1 w-full overflow-hidden" aria-hidden>
+                    <div className="h-full w-1/3 rounded-full bg-linear-to-r from-dilo-500 to-mint-500" />
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    'max-h-[min(76dvh,720px)] overflow-x-hidden overflow-y-auto scrollbar-hide',
+                    device === 'mobile' && 'rounded-b-[1.625rem]',
+                    device === 'desktop' && 'rounded-b-2xl',
+                    previewSection === 'presentation' ? 'p-0' : 'space-y-4 p-5',
+                  )}
+                >
+                  {previewSection === 'presentation' ? (
+                    <FlowPresentationPreview flow={flow} stepCount={localSteps.length} />
+                  ) : (
+                    <>
+                      <FlowMainPreviewProgressChrome totalSteps={localSteps.length} />
+                      <PreviewBubble role="assistant">
+                        <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">¡Hola! 👋</p>
+                        <p className="mt-2 text-sm leading-relaxed opacity-90">
+                          Este es un <strong>preview conversacional</strong> de tu flow. Así verá las preguntas quien lo
+                          responda, de una en una.
+                        </p>
+                      </PreviewBubble>
+                      {localSteps.map((s) => (
+                        <div key={s.id} id={`preview-step-${s.id}`} className="scroll-mt-4 space-y-2">
+                          <PreviewBubble role="assistant">
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{s.question}</p>
+                            {s.hint ? (
+                              <p className="mt-1 text-xs italic opacity-75">{String(s.hint)}</p>
+                            ) : null}
+                            <p className="mt-2 text-[10px] uppercase tracking-wide text-[#9C77F5] font-semibold">
+                              {TYPE_LABELS[s.type] ?? s.type}
+                              {!s.required ? ' · opcional' : ''}
+                            </p>
+                          </PreviewBubble>
+                          <PreviewBubble role="user">
+                            <span className="text-sm opacity-80">Respuesta del visitante…</span>
+                          </PreviewBubble>
+                        </div>
+                      ))}
+                      <PreviewBubble role="assistant">
+                        <p className="text-sm">✨ Gracias. Aquí iría el cierre o siguiente paso del flow.</p>
+                      </PreviewBubble>
+                    </>
+                  )}
                 </div>
               </div>
-              <div
-                className={cn(
-                  'max-h-[min(76dvh,720px)] overflow-x-hidden overflow-y-auto scrollbar-hide',
-                  device === 'mobile' && 'rounded-b-[1.625rem]',
-                  device === 'desktop' && 'rounded-b-2xl',
-                  previewSection === 'presentation' ? 'p-0' : 'space-y-4 p-5',
-                )}
-              >
-                {previewSection === 'presentation' ? (
-                  <FlowPresentationPreview flow={flow} stepCount={steps.length} />
-                ) : (
-                  <>
-                    <FlowMainPreviewProgressChrome totalSteps={steps.length} />
-                    <PreviewBubble role="assistant">
-                      <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">¡Hola! 👋</p>
-                      <p className="mt-2 text-sm leading-relaxed opacity-90">
-                        Este es un <strong>preview conversacional</strong> de tu flow. Así verá las preguntas quien lo
-                        responda, de una en una.
-                      </p>
-                    </PreviewBubble>
-                    {steps.map((s) => (
-                      <div key={s.id} id={`preview-step-${s.id}`} className="scroll-mt-4 space-y-2">
-                        <PreviewBubble role="assistant">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{s.question}</p>
-                          {s.hint ? (
-                            <p className="mt-1 text-xs italic opacity-75">{String(s.hint)}</p>
-                          ) : null}
-                          <p className="mt-2 text-[10px] uppercase tracking-wide text-[#9C77F5] font-semibold">
-                            {TYPE_LABELS[s.type] ?? s.type}
-                            {!s.required ? ' · opcional' : ''}
-                          </p>
-                        </PreviewBubble>
-                        <PreviewBubble role="user">
-                          <span className="text-sm opacity-80">Respuesta del visitante…</span>
-                        </PreviewBubble>
-                      </div>
-                    ))}
-                    <PreviewBubble role="assistant">
-                      <p className="text-sm">✨ Gracias. Aquí iría el cierre o siguiente paso del flow.</p>
-                    </PreviewBubble>
-                  </>
-                )}
-              </div>
             </div>
-          </div>
+          )}
 
+          {/* ── Bottom toolbar ─────────────────────────────────────── */}
           <div
             className={cn(
               'flex shrink-0 flex-wrap items-center gap-2 border-t px-4 py-4',
@@ -706,9 +1238,22 @@ export default function FlowWorkspace({
               workspaceSurface,
             )}
           >
-            <span className="mr-1 text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Vista previa</span>
-            <DevicePreviewToggle device={device} onChange={setDevice} />
-            <div className="inline-flex items-center gap-1" role="tablist" aria-label="Sección de vista previa">
+            {!isEditMode && (
+              <>
+                <span className="mr-1 text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Vista previa</span>
+                <DevicePreviewToggle device={device} onChange={setDevice} />
+              </>
+            )}
+            <div className="inline-flex items-center gap-1" role="tablist" aria-label="Modo del lienzo">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={previewSection === 'edit'}
+                onClick={() => setPreviewSection('edit')}
+                className={sectionTabClass('edit')}
+              >
+                Editar pasos
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -745,9 +1290,10 @@ export default function FlowWorkspace({
   )
 }
 
-/**
- * Ejemplo estático del header de avance en la conversación (alineado con discovery).
- */
+// ---------------------------------------------------------------------------
+// Supporting preview components (unchanged)
+// ---------------------------------------------------------------------------
+
 function FlowMainPreviewProgressChrome({ totalSteps }: { totalSteps: number }) {
   const hasSteps = totalSteps > 0
   const denom = Math.max(1, totalSteps)
