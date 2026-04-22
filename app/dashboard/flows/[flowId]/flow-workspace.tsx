@@ -794,10 +794,12 @@ export default function FlowWorkspace({
   flow,
   steps,
   publicFlowUrl,
+  sessionCount,
 }: {
   flow: FlowWorkspaceFlow
   steps: FlowWorkspaceStep[]
   publicFlowUrl: string | null
+  sessionCount: number
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1237,7 +1239,12 @@ export default function FlowWorkspace({
               </p>
             </div>
             <div className="shrink-0 self-center">
-              <FlowEditor flowId={flow.id} status={flow.status} />
+              <FlowEditor
+                flowId={flow.id}
+                status={flow.status}
+                flowName={flow.name}
+                sessionCount={sessionCount}
+              />
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { steps, stepOptions } from '@/db/schema'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { steps, stepOptions, sessions } from '@/db/schema'
+import { asc, count, eq, inArray } from 'drizzle-orm'
 import { notFound, redirect } from 'next/navigation'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import FlowWorkspace, { type FlowWorkspaceFlow, type FlowWorkspaceStep } from './flow-workspace'
@@ -40,7 +40,12 @@ async function getFlow(flowId: string, orgIdentifier: string) {
     options: optionsByStep.get(step.id) ?? [],
   }))
 
-  return { flow, steps: stepsWithOptions }
+  const [{ value: sessionCount }] = await db
+    .select({ value: count() })
+    .from(sessions)
+    .where(eq(sessions.flowId, flowId))
+
+  return { flow, steps: stepsWithOptions, sessionCount }
 }
 
 export default async function FlowDetailPage({
@@ -55,7 +60,7 @@ export default async function FlowDetailPage({
   const data = await getFlow(flowId, orgId ?? userId)
   if (!data) notFound()
 
-  const { flow, steps: flowSteps } = data
+  const { flow, steps: flowSteps, sessionCount } = data
 
   const flowPayload: FlowWorkspaceFlow = {
     id: flow.id,
@@ -88,5 +93,12 @@ export default async function FlowDetailPage({
   const publicFlowUrl =
     flow.status === 'published' && base ? `${base}/f/${flow.id}` : flow.status === 'published' ? `/f/${flow.id}` : null
 
-  return <FlowWorkspace flow={flowPayload} steps={stepsPayload} publicFlowUrl={publicFlowUrl} />
+  return (
+    <FlowWorkspace
+      flow={flowPayload}
+      steps={stepsPayload}
+      publicFlowUrl={publicFlowUrl}
+      sessionCount={sessionCount}
+    />
+  )
 }

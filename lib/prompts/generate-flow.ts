@@ -16,7 +16,9 @@ REGLAS OBLIGATORIAS:
 7. El último paso siempre es open_ended: pregunta si hay algo más que quiera agregar
 8. Si el input está en español, el flow va en español. Si en inglés, en inglés.
 9. No uses jerga técnica en las preguntas. El usuario final puede ser cualquier persona.
-10. Define scoring_criteria específico para este caso de uso, no genérico
+10. Define scoring_criteria MUY específico basado en el objetivo de medición del usuario.
+    Los criterios deben reflejar exactamente qué hace que una respuesta sea valiosa o no
+    para ESE objetivo específico — no usar criterios genéricos de ventas.
 11. Para steps de tipo file, genera file_config con accept específico al caso.
     Ejemplos:
     - Logo/imágenes de marca: { "accept": ["image/*"], "max_size_mb": 10, "max_files": 3 }
@@ -40,12 +42,22 @@ Si una respuesta hace irrelevante una pregunta posterior, usa conditions.
 Formato: { "if": "variable_name", "equals": "value", "skip_to": order_number }
 `
 
-export const buildFlowGeneratorPrompt = (userInput: string) => `
-El usuario quiere crear el siguiente flujo conversacional:
-
+export const buildFlowGeneratorPrompt = (userInput: string, scoringGoal: string) => `
+El usuario quiere construir el siguiente flujo conversacional:
 "${userInput}"
 
-Genera el flujo completo siguiendo las reglas del sistema.
-Asegúrate de que el scoring_criteria sea específico para este caso de uso,
-no genérico. Piensa en qué hace que un lead sea caliente o frío en este contexto particular.
+Lo que quiere medir o evaluar de las respuestas:
+"${scoringGoal}"
+
+INSTRUCCIONES PARA EL SCORING:
+Usa el objetivo de medición para definir scoring_criteria muy específico.
+Piensa en qué respuestas concretas hacen que alguien sea clasificado en cada nivel
+según ESE objetivo — no uses criterios genéricos de ventas/leads.
+
+Por ejemplo, si el objetivo es "${scoringGoal}", entonces:
+- hot debe describir exactamente qué combinación de respuestas satisface ese objetivo al máximo
+- warm debe describir satisfacción parcial o potencial con seguimiento
+- cold debe describir cuando las respuestas no encajan con ese objetivo
+
+Genera el flujo completo siguiendo todas las reglas del sistema.
 `

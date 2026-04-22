@@ -10,7 +10,7 @@ export default function SignUpPage() {
         path="/sign-up"
         signInUrl="/sign-in"
         appearance={diloClerkAppearance}
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl="/onboarding"
       />
     </AuthPageShell>
   )

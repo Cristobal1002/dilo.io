@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
-    "db:generate": "dotenv -e .env.local -- drizzle-kit generate"
+    "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
+    "db:seed": "dotenv -e .env.local -- tsx db/seed-plans.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.53",
@@ -28,6 +29,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.0",
+    "svix": "^1.90.0",
     "uploadthing": "^7.7.4",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"

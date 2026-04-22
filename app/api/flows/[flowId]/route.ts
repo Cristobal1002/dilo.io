@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, count } from 'drizzle-orm'
 import { db } from '@/db'
-import { flows } from '@/db/schema'
+import { flows, sessions } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError, NotFoundError } from '@/lib/errors'
@@ -60,4 +60,33 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) =
   log.info({ flowId, orgId: org.id, changes: Object.keys(updateData) }, 'Flow updated')
 
   return apiSuccess({ flow: updated })
+}, { requireAuth: true })
+
+export const DELETE = withApiHandler(async (_req: NextRequest, { auth, params }) => {
+  const { org } = auth
+  const { flowId } = params
+
+  // Verify the flow belongs to this org before touching anything
+  const flow = await db.query.flows.findFirst({
+    where: and(eq(flows.id, flowId), eq(flows.organizationId, org.id)),
+    columns: { id: true, name: true },
+  })
+
+  if (!flow) throw new NotFoundError('Flow')
+
+  // Count sessions so we can log how much data was removed
+  const [{ value: sessionCount }] = await db
+    .select({ value: count() })
+    .from(sessions)
+    .where(eq(sessions.flowId, flowId))
+
+  // Delete flow — ON DELETE CASCADE handles steps, options, sessions, answers,
+  // results, webhooks and webhook_deliveries automatically
+  await db
+    .delete(flows)
+    .where(and(eq(flows.id, flowId), eq(flows.organizationId, org.id)))
+
+  log.info({ flowId, orgId: org.id, sessionsDeleted: sessionCount }, 'Flow deleted')
+
+  return apiSuccess({ deleted: true, sessionsDeleted: sessionCount })
 }, { requireAuth: true })

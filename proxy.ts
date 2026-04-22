@@ -1,11 +1,15 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isPublicRoute = createRouteMatcher([
+  '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/f/(.*)', // flows públicos — el usuario final no necesita login
-  '/api/f/(.*)', // API de flows públicos
-  '/discovery(.*)', // UI de referencia (mismo estilo que Mordecai discovery)
+  '/f/(.*)',               // flows públicos — el usuario final no necesita login
+  '/api/f/(.*)',          // API de flows públicos
+  '/onboarding',          // accesible para usuarios autenticados sin perfil completo
+  '/api/onboarding',
+  '/api/webhooks/(.*)',   // webhooks — sin sesión de usuario
+  '/discovery(.*)',
 ])
 
 export default clerkMiddleware(async (auth, request) => {

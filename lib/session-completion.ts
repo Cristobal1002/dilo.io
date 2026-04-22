@@ -35,11 +35,17 @@ type StepRow = {
   options: { label: string; value: string }[]
 }
 
-function parseScoringCriteria(raw: unknown): { hot: string; warm: string; cold: string } {
+function parseScoringCriteria(raw: unknown): {
+  hot: string
+  warm: string
+  cold: string
+  objective: string | null
+} {
   const defaults = {
-    hot: 'Lead muy alineado con el objetivo del flow o con intención clara de avanzar.',
-    warm: 'Interés moderado, perfil parcialmente alineado o necesita seguimiento.',
-    cold: 'Bajo encaje, poca señal de intención o respuestas insuficientes.',
+    hot: 'Respuesta muy alineada con el objetivo del flow, perfil completo y señales claras de avanzar.',
+    warm: 'Alineación parcial con el objetivo o información incompleta que requiere seguimiento.',
+    cold: 'Bajo encaje con el objetivo del flow o respuestas insuficientes para evaluar.',
+    objective: null,
   }
   if (!raw || typeof raw !== 'object') return defaults
   const o = raw as Record<string, unknown>
@@ -47,6 +53,7 @@ function parseScoringCriteria(raw: unknown): { hot: string; warm: string; cold: 
     hot: typeof o.hot === 'string' && o.hot.trim() ? o.hot.trim() : defaults.hot,
     warm: typeof o.warm === 'string' && o.warm.trim() ? o.warm.trim() : defaults.warm,
     cold: typeof o.cold === 'string' && o.cold.trim() ? o.cold.trim() : defaults.cold,
+    objective: typeof o.objective === 'string' && o.objective.trim() ? o.objective.trim() : null,
   }
 }
 
@@ -214,17 +221,25 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
       model: openai('gpt-4o'),
       schema: SessionAnalysisSchema,
       system: [
-        'Eres un analista que resume conversaciones de captación (forms conversacionales).',
-        'Debes devolver SIEMPRE JSON que cumpla el schema: resumen en español, clasificación hot|warm|cold, score 0-100 o null, suggested_action breve o null (siguiente paso sugerido para el equipo comercial).',
-        'Usa las definiciones de scoring del flow para decidir hot/warm/cold:',
+        'Eres un analista que evalúa respuestas de formularios conversacionales.',
+        'Devuelve SIEMPRE JSON válido con el schema: resumen en español, clasificación hot|warm|cold, score 0-100 o null, suggested_action breve o null.',
+        '',
+        criteria.objective
+          ? `Objetivo de evaluación definido por el creador del flow: "${criteria.objective}"`
+          : 'Evalúa qué tan bien las respuestas cumplen el propósito del flow.',
+        '',
+        'Criterios de clasificación específicos para este flow:',
         `- HOT: ${criteria.hot}`,
         `- WARM: ${criteria.warm}`,
         `- COLD: ${criteria.cold}`,
-        'Sé concreto y profesional. No inventes datos que no aparezcan en el transcript.',
+        '',
+        'El resumen debe ser concreto y en español. El suggested_action es el siguiente paso recomendado según el objetivo del flow.',
+        'No inventes datos que no aparezcan en el transcript. No uses lenguaje de ventas si el flow no es de ventas.',
       ].join('\n'),
       prompt: [
         `Flow: "${flowRow.name}"`,
         flowRow.description ? `Descripción del flow: ${flowRow.description}` : '',
+        criteria.objective ? `Lo que se quiere medir: ${criteria.objective}` : '',
         '',
         'Transcript de respuestas:',
         transcript || '(vacío)',

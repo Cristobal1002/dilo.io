@@ -78,6 +78,110 @@ button[aria-disabled='true'],
   display: none;
 }
 
+/* Landing page animations */
+@keyframes landingSlideUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes landingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-5px); }
+}
+@keyframes landingPulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.45; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.landing-anim-in  { animation: landingSlideUp 0.7s ease forwards; }
+.landing-anim-in2 { animation: landingSlideUp 0.8s 0.1s ease both; }
+.landing-scroll-fade { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
+.landing-scroll-fade.in { opacity: 1; transform: none; }
+.landing-card-h { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+.landing-card-h:hover { transform: translateY(-4px) !important; }
+.landing-grad-text {
+  background: linear-gradient(120deg, #A78BFA 0%, #06B6D4 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.landing-grad-text-light {
+  background: linear-gradient(120deg, #7C3AED 0%, #06B6D4 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+/* Nav hamburger — hidden on desktop */
+.landing-nav-hamburger { display: none; }
+/* Nav drawer — always hidden by default; shown only on mobile via media query */
+.landing-nav-drawer { display: none !important; }
+
+/* Landing responsive grids */
+.landing-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.landing-compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-top: 2px;
+}
+.landing-steps-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  position: relative;
+  z-index: 1;
+}
+.landing-steps-connector {
+  position: absolute;
+  top: 60px;
+  left: 16.67%;
+  right: 16.67%;
+  height: 1px;
+  z-index: 0;
+}
+
+@media (max-width: 767px) {
+  /* Reduce section padding on mobile */
+  .landing-section-padding { padding-top: 72px !important; padding-bottom: 72px !important; }
+  .landing-mb-header { margin-bottom: 48px !important; }
+  .landing-stats-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .landing-stat-first { border-radius: 20px !important; }
+  .landing-stat-mid   { border-radius: 20px !important; }
+  .landing-stat-last  { border-radius: 20px !important; }
+
+  .landing-compare-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .landing-compare-bad  { border-radius: 20px 20px 0 0 !important; padding: 28px 24px !important; }
+  .landing-compare-good { border-radius: 0 0 20px 20px !important; padding: 28px 24px !important; }
+
+  .landing-steps-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .landing-steps-connector { display: none; }
+
+  /* Nav mobile */
+  .landing-nav-links     { display: none !important; }
+  .landing-nav-hamburger { display: flex !important; }
+  .landing-nav-drawer {
+    position: absolute;
+    top: 68px;
+    left: 0; right: 0;
+    flex-direction: column;
+    padding: 16px 20px 24px;
+    gap: 4px;
+    border-bottom: 1px solid;
+  }
+  .landing-nav-drawer.open { display: flex !important; }
+}
+
 /* react-international-phone dark theme */
 .mordecai-phone-input-wrapper {
   --react-international-phone-height: 42px;

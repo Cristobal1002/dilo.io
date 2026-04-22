@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useClerk, UserButton } from '@clerk/nextjs'
+import { useClerk, useUser } from '@clerk/nextjs'
 import {
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CreditCardIcon,
   EllipsisVerticalIcon,
   FolderOpenIcon,
   MoonIcon,
@@ -16,8 +17,10 @@ import {
   Squares2X2Icon,
   SunIcon,
   UserCircleIcon,
+  UsersIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import { PLAN_LABELS, PLAN_COLORS, isPlan } from '@/lib/plan-limits'
 import { SparklesIcon as SparklesIconSolid } from '@heroicons/react/24/solid'
 import { cn } from '@/lib/utils'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
@@ -56,6 +59,10 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.startsWith('/dashboard/account')) return 'Mi cuenta'
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
+  if (pathname.startsWith('/dashboard/settings/profile')) return 'Perfil'
+  if (pathname.startsWith('/dashboard/settings/plan')) return 'Plan & Uso'
+  if (pathname.startsWith('/dashboard/settings/team')) return 'Equipo'
+  if (pathname.startsWith('/dashboard/settings')) return 'Configuración'
   return 'Dashboard'
 }
 
@@ -137,15 +144,119 @@ function DashboardHeaderUserMenu() {
   )
 }
 
+type ClerkUser = ReturnType<typeof useUser>['user']
+
+function userInitials(user: ClerkUser): string {
+  const full = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim()
+  if (full) {
+    return full
+      .split(/\s+/)
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
+  }
+  const email = user?.primaryEmailAddress?.emailAddress ?? ''
+  return email.slice(0, 2).toUpperCase()
+}
+
+function SidebarUserCard({
+  user,
+  plan,
+  meLoaded,
+  collapsed,
+  onNavigate,
+}: {
+  user: ClerkUser
+  plan: string
+  meLoaded: boolean
+  collapsed: boolean
+  onNavigate: () => void
+}) {
+  const initials = userInitials(user)
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
+    user?.primaryEmailAddress?.emailAddress?.split('@')[0] ||
+    '—'
+  const email = user?.primaryEmailAddress?.emailAddress ?? ''
+  const resolvedPlan = isPlan(plan) ? plan : 'free'
+  const planLabel = meLoaded ? PLAN_LABELS[resolvedPlan] : ''
+  const planColor = meLoaded ? PLAN_COLORS[resolvedPlan] : ''
+
+  return (
+    <div className="shrink-0 border-t border-[#E5E7EB] dark:border-[#2A2F3F] p-3">
+      <Link
+        href="/dashboard/settings/profile"
+        onClick={onNavigate}
+        className={`
+          flex items-center gap-3 rounded-xl p-2 transition-colors
+          hover:bg-[#F3F4F6] dark:hover:bg-[#252936]
+          ${collapsed ? 'justify-center' : ''}
+        `}
+        title={collapsed ? displayName : undefined}
+      >
+        {/* Initials avatar */}
+        <div className="relative shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#7C3AED]/12 text-[#7C3AED] dark:bg-[#7C3AED]/20 dark:text-[#C4B5FD] text-xs font-bold select-none">
+            {initials}
+          </div>
+          {/* Plan indicator dot — only when collapsed */}
+          {collapsed && meLoaded && (
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#F8F9FB] dark:border-[#1A1D29] ${
+                resolvedPlan === 'agency'
+                  ? 'bg-[#06B6D4]'
+                  : resolvedPlan === 'pro'
+                  ? 'bg-[#7C3AED]'
+                  : 'bg-[#D1D5DB]'
+              }`}
+            />
+          )}
+        </div>
+
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate text-xs font-medium text-[#111827] dark:text-[#F9FAFB]">
+                {displayName}
+              </span>
+              {meLoaded && (
+                <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide ${planColor}`}>
+                  {planLabel}
+                </span>
+              )}
+            </div>
+            <span className="block truncate text-[11px] text-[#9CA3AF] dark:text-[#6B7280]">
+              {email}
+            </span>
+          </div>
+        )}
+      </Link>
+    </div>
+  )
+}
+
 export default function DiloDashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/dashboard'
   const searchParams = useSearchParams()
   const tool = searchParams.get('tool')
+  const { user } = useUser()
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => 'light')
   const isDark = theme === 'dark'
+
+  const [plan, setPlan] = useState<string>('')
+  const [meLoaded, setMeLoaded] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/settings/me')
+      .then((r) => r.json())
+      .then((res) => { if (res.success) setPlan(res.data.plan ?? 'free') })
+      .catch(() => setPlan('free'))
+      .finally(() => setMeLoaded(true))
+  }, [])
 
   const flowId = flowIdFromPath(pathname)
   const panelOpen = Boolean(flowId && tool && ['ia', 'elements'].includes(tool))
@@ -170,6 +281,10 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const editorTool = flowId ? tool : null
   const createIaHref = flowId ? `/dashboard/flows/${flowId}?tool=ia` : '/dashboard/flows/new'
   const createIaActive = newFlowActive || editorTool === 'ia'
+
+  const settingsProfileActive = pathname.startsWith('/dashboard/settings/profile')
+  const settingsPlanActive = pathname.startsWith('/dashboard/settings/plan')
+  const settingsTeamActive = pathname.startsWith('/dashboard/settings/team')
 
   const navBtn = (active: boolean, collapsed: boolean, extra?: string) =>
     cn(
@@ -314,29 +429,67 @@ export default function DiloDashboardShell({ children }: { children: React.React
             </li>
           </ul>
 
-          <div className="flex-1 min-h-2" />
+          <div className="flex-1 min-h-4" />
+
+          <div
+            className={cn(
+              'my-3 h-px bg-[#E5E7EB] dark:bg-[#2A2F3F]',
+              isSidebarCollapsed && 'mx-1',
+            )}
+            role="separator"
+          />
+
+          <p
+            className={cn(
+              'text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] mb-2 px-1',
+              isSidebarCollapsed && 'sr-only',
+            )}
+          >
+            Configuración
+          </p>
+          <ul className="space-y-1">
+            <li>
+              <Link
+                href="/dashboard/settings/profile"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(settingsProfileActive, isSidebarCollapsed)}
+              >
+                <UserCircleIcon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Perfil</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/dashboard/settings/plan"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(settingsPlanActive, isSidebarCollapsed)}
+              >
+                <CreditCardIcon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Plan & Uso</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/dashboard/settings/team"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(settingsTeamActive, isSidebarCollapsed)}
+              >
+                <UsersIcon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Equipo</span>}
+              </Link>
+            </li>
+          </ul>
+
+          <div className="min-h-2" />
         </nav>
 
-        <div className="relative shrink-0 border-t border-[#E5E7EB] p-4 dark:border-[#2A2F3F]">
-          {!isSidebarCollapsed ? (
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Dilo</span>
-              <span className="rounded-full bg-dilo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dilo-500">
-                Beta
-              </span>
-            </div>
-          ) : (
-            <div className="mb-3 flex justify-center" title="Beta">
-              <span className="rounded-full bg-dilo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-dilo-500">β</span>
-            </div>
-          )}
-          <div className={`flex items-center ${isSidebarCollapsed ? 'md:justify-center' : 'gap-3'}`}>
-            <UserButton />
-            {!isSidebarCollapsed && (
-              <div className="flex-1 min-w-0 text-xs text-[#9CA3AF] dark:text-[#6B7280]">Cuenta</div>
-            )}
-          </div>
-        </div>
+        <SidebarUserCard
+          user={user}
+          plan={plan}
+          meLoaded={meLoaded}
+          collapsed={isSidebarCollapsed}
+          onNavigate={() => setIsMobileMenuOpen(false)}
+        />
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">

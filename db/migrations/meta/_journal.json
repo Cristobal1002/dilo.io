@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1776708942245,
+      "tag": "0000_add_user_phone",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776709333004,
+      "tag": "0001_add_user_phone_org_onboarding",
+      "breakpoints": true
+    }
+  ]
+}

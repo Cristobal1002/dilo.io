@@ -19,6 +19,7 @@ export const maxDuration = 60
 
 const RequestSchema = z.object({
   prompt: z.string().min(10, 'El prompt debe tener al menos 10 caracteres').max(500),
+  scoringGoal: z.string().min(5, 'Describe qué quieres evaluar').max(300),
 })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
@@ -30,7 +31,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   if (!parsed.success) {
     throw new ValidationError('Prompt inválido', parsed.error.flatten().fieldErrors)
   }
-  const { prompt } = parsed.data
+  const { prompt, scoringGoal } = parsed.data
 
   log.info({ userId, orgId: org.id, promptLength: prompt.length }, 'Generating flow')
 
@@ -39,7 +40,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
     model: openai('gpt-4o-mini'),
     schema: FlowGenerationSchema,
     system: FLOW_GENERATOR_SYSTEM,
-    prompt: buildFlowGeneratorPrompt(prompt),
+    prompt: buildFlowGeneratorPrompt(prompt, scoringGoal),
   })
 
   log.info(
@@ -60,7 +61,10 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
         promptOrigin: prompt,
         status: 'draft',
         settings: generated.flow.settings,
-        scoringCriteria: generated.flow.scoring_criteria,
+        scoringCriteria: {
+          ...generated.flow.scoring_criteria,
+          objective: scoringGoal,
+        },
       })
       .returning()
 

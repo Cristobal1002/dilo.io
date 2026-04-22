@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "onboarding_data" jsonb DEFAULT '{}'::jsonb;
