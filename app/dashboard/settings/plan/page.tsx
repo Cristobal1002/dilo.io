@@ -164,7 +164,7 @@ export default function PlanPage() {
           </div>
           {plan === 'free' && (
             <a
-              href="mailto:hola@getdilo.io?subject=Quiero actualizar mi plan"
+              href="mailto:hola@modecaitech.com?subject=Quiero actualizar mi plan"
               className="flex items-center gap-1.5 rounded-lg bg-[#7C3AED] px-4 py-2 text-xs font-medium text-white hover:bg-[#6D28D9] transition-colors shrink-0"
             >
               <SparklesIcon className="h-3.5 w-3.5" />
@@ -214,8 +214,8 @@ export default function PlanPage() {
       {plan === 'free' && (
         <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
           ¿Necesitas más? Escríbenos a{' '}
-          <a href="mailto:hola@getdilo.io" className="text-[#7C3AED] hover:underline">
-            hola@getdilo.io
+          <a href="mailto:hola@modecaitech.com" className="text-[#7C3AED] hover:underline">
+            hola@modecaitech.com
           </a>{' '}
           y te armamos un plan a tu medida.
         </p>

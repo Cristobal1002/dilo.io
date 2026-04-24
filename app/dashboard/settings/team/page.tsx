@@ -166,8 +166,8 @@ export default function TeamPage() {
         </div>
         <p className="mt-3 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
           Por ahora, escríbenos a{' '}
-          <a href="mailto:hola@getdilo.io" className="text-[#7C3AED] hover:underline">
-            hola@getdilo.io
+          <a href="mailto:hola@modecaitech.com" className="text-[#7C3AED] hover:underline">
+            hola@modecaitech.com
           </a>{' '}
           y te ayudamos a añadir tu equipo.
         </p>
