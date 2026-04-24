@@ -855,18 +855,18 @@ function Footer({ t }: { t: ThemeTokens }) {
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', lineHeight: 1.7 }}>Flows conversacionales que convierten más, con menos fricción.</p>
           </div>
           {[
-            { title: 'Producto', links: ['Cómo funciona', 'Precios', 'Integraciones', 'Changelog'] },
-            { title: 'Empresa',  links: ['Sobre nosotros', 'Blog', 'Contacto'] },
-            { title: 'Legal',    links: ['Términos', 'Privacidad'] },
+            { title: 'Producto', links: [{ label: 'Cómo funciona', href: '#' }, { label: 'Precios', href: '#' }, { label: 'Integraciones', href: '#' }, { label: 'Changelog', href: '#' }] },
+            { title: 'Empresa',  links: [{ label: 'Sobre nosotros', href: '#' }, { label: 'Blog', href: '#' }, { label: 'Contacto', href: '#' }] },
+            { title: 'Legal',    links: [{ label: 'Términos', href: '/terms' }, { label: 'Privacidad', href: '/privacy' }] },
           ].map(col => (
             <div key={col.title}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.2)', letterSpacing: '.1em', marginBottom: 16, textTransform: 'uppercase' }}>{col.title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {col.links.map(l => (
-                  <a key={l} href="#" style={{ fontSize: 14, color: 'rgba(255,255,255,.4)', textDecoration: 'none', transition: 'color .2s' }}
+                  <Link key={l.label} href={l.href} style={{ fontSize: 14, color: 'rgba(255,255,255,.4)', textDecoration: 'none', transition: 'color .2s' }}
                     onMouseEnter={e => { (e.target as HTMLElement).style.color = '#fff' }}
                     onMouseLeave={e => { (e.target as HTMLElement).style.color = 'rgba(255,255,255,.4)' }}
-                  >{l}</a>
+                  >{l.label}</Link>
                 ))}
               </div>
             </div>
