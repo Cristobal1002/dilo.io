@@ -8,6 +8,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
+import { normalizeEmailNotificationSettings } from '@/lib/email-notification-settings'
 
 const log = createLogger('settings/profile')
 
@@ -59,10 +60,30 @@ export const GET = withApiHandler(
 
     const user = await db.query.users.findFirst({
       where: eq(users.clerkId, userId),
-      columns: { name: true, phone: true, email: true, role: true },
+      columns: {
+        name: true,
+        phone: true,
+        email: true,
+        role: true,
+        emailNotificationSettings: true,
+        lastDigestSentAt: true,
+      },
     })
 
-    return apiSuccess({ user })
+    return apiSuccess({
+      user: user
+        ? {
+            name: user.name,
+            phone: user.phone,
+            email: user.email,
+            role: user.role,
+          }
+        : null,
+      notifications: {
+        settings: normalizeEmailNotificationSettings(user?.emailNotificationSettings),
+        lastDigestSentAt: user?.lastDigestSentAt?.toISOString() ?? null,
+      },
+    })
   },
   { requireAuth: true },
 )

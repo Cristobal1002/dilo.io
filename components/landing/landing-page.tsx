@@ -212,6 +212,10 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
               onMouseLeave={e => { (e.target as HTMLElement).style.color = t.navLink }}
             >{l}</a>
           ))}
+          <Link href="/sign-in" style={{ color: t.navLink, fontSize: 14, fontWeight: 500, textDecoration: 'none', padding: '6px 14px', borderRadius: 8, transition: 'color .2s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = t.text }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = t.navLink }}
+          >Iniciar sesión</Link>
           <button onClick={toggleTheme} title={isDark ? 'Modo claro' : 'Modo oscuro'} style={{ width: 38, height: 38, borderRadius: 12, background: t.toggleBg, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
             <Icon name={isDark ? 'sun' : 'moon'} size={18} color={t.toggleIcon} />
           </button>
@@ -242,6 +246,10 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
         >Precios</a>
+        <Link href="/sign-in" onClick={closeMenu} style={{ display: 'block', padding: '13px 16px', borderRadius: 12, color: t.text, fontSize: 16, fontWeight: 500, textDecoration: 'none', background: 'transparent', transition: 'background .15s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+        >Iniciar sesión</Link>
         <div style={{ height: 1, background: t.border, margin: '8px 0' }} />
         <Link href="/sign-up" onClick={closeMenu} style={{ display: 'block', background: P, color: '#fff', borderRadius: 14, padding: '14px 20px', fontSize: 16, fontWeight: 700, textDecoration: 'none', textAlign: 'center', boxShadow: `0 4px 16px ${P}40` }}>
           Crea tu flow gratis →

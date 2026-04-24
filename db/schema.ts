@@ -54,6 +54,16 @@ import {
     name:           text('name'),
     phone:          text('phone'),
     role:           text('role').notNull().default('owner'), // 'owner' | 'member'
+    /** Preferencias de email: digest (off|daily|weekly), alertas por lead caliente / score. */
+    emailNotificationSettings: jsonb('email_notification_settings').notNull().default({
+      digest: 'weekly',
+      alertHot: false,
+      alertMinScore: null,
+      alertMaxPerDay: 3,
+    }),
+    lastDigestSentAt: timestamp('last_digest_sent_at'),
+    /** Estado interno p. ej. { hotDay, hotCount } para tope de alertas instantáneas. */
+    notificationStats: jsonb('notification_stats').notNull().default({}),
     createdAt:      timestamp('created_at').notNull().defaultNow(),
   })
 

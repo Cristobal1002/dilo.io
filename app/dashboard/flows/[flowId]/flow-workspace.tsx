@@ -30,6 +30,7 @@ import { SavingSpinner } from '@/components/spinners'
 import { cn } from '@/lib/utils'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
 import { readApiResult } from '@/lib/read-api-result'
+import { resolvePublicFlowChatOpening } from '@/lib/public-flow-chat-opening'
 import FlowEditor from './flow-editor'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -78,8 +79,14 @@ export type FlowPresentationSettings = {
   logo_url?: string
   presentation_label?: string
   tone_pill?: string
+  /** Instrucción para el LLM en transiciones entre preguntas (flow público). */
+  tone?: string
+  transition_style?: 'ai' | 'none'
+  hide_branding?: boolean
   estimated_minutes_min?: number
   estimated_minutes_max?: number
+  /** Primer mensaje del chat público; vacío → la app arma saludo desde la descripción. */
+  chat_intro?: string
 }
 
 export type FlowWorkspaceFlow = {
@@ -214,6 +221,48 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
   const minM = pres.estMin ?? derived.min
   const maxM = pres.estMax ?? derived.max
   const timeLabel = minM === maxM ? `~${minM} min` : `${minM}–${maxM} min`
+
+  const [toneAssist, setToneAssist] = useState('cálido, breve y natural')
+  const [transitionAi, setTransitionAi] = useState(false)
+  const [chatIntroDraft, setChatIntroDraft] = useState('')
+  const [savingAssist, setSavingAssist] = useState(false)
+  const [assistError, setAssistError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const o =
+      flow.settings && typeof flow.settings === 'object' ? (flow.settings as FlowPresentationSettings) : {}
+    setToneAssist(typeof o.tone === 'string' && o.tone.trim() ? o.tone.trim() : 'cálido, breve y natural')
+    setTransitionAi(o.transition_style === 'ai')
+    setChatIntroDraft(typeof o.chat_intro === 'string' ? o.chat_intro : '')
+  }, [flow.settings])
+
+  const saveAssistant = useCallback(async () => {
+    setAssistError(null)
+    setSavingAssist(true)
+    try {
+      const res = await fetch(`/api/flows/${flow.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            tone: toneAssist.trim().slice(0, 220) || 'cálido, breve y natural',
+            transition_style: transitionAi ? 'ai' : 'none',
+            chat_intro: chatIntroDraft.slice(0, 4000),
+          },
+        }),
+      })
+      const result = await readApiResult(res)
+      if (!result.ok) {
+        setAssistError(result.message)
+        return
+      }
+      router.refresh()
+    } catch {
+      setAssistError('No se pudo guardar.')
+    } finally {
+      setSavingAssist(false)
+    }
+  }, [flow.id, router, toneAssist, transitionAi, chatIntroDraft])
 
   const [editTitle, setEditTitle] = useState(false)
   const [editDesc, setEditDesc] = useState(false)
@@ -464,6 +513,60 @@ function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow;
             <span aria-hidden>🎯</span>
             {pres.tonePill}
           </span>
+        </div>
+
+        <div className="mt-8 w-full max-w-md rounded-2xl border border-[#E5E7EB] bg-white/90 px-4 py-4 text-left dark:border-[#2A2F3F] dark:bg-[#1A1D29]/90">
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9C77F5]">Conversación pública</p>
+          <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+            <input
+              type="checkbox"
+              checked={transitionAi}
+              onChange={(e) => setTransitionAi(e.target.checked)}
+              className="h-4 w-4 rounded border-[#CBD5E1] text-dilo-600 focus:ring-dilo-500"
+            />
+            <span className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Transiciones con IA entre preguntas</span>
+          </label>
+          <p className="mt-1 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            Acuse breve tras cada respuesta (máx. una frase). Si lo desactivas, el flow sigue al instante.
+          </p>
+          <label className="mt-4 block text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">Tono del asistente (para la IA)</label>
+          <input
+            type="text"
+            value={toneAssist}
+            onChange={(e) => setToneAssist(e.target.value)}
+            maxLength={220}
+            placeholder="cálido, breve y natural"
+            className="mt-1.5 w-full rounded-xl border border-[#E8EAEF] bg-[#F8F9FB] px-3 py-2 text-sm text-[#1A1A1A] outline-none focus:border-[#9C77F5]/45 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
+          />
+          <label className="mt-4 block text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
+            Saludo al entrar al chat (opcional)
+          </label>
+          <p className="mt-1 text-[11px] leading-snug text-[#6B7280] dark:text-[#9CA3AF]">
+            Primera burbuja del asistente, antes de la primera pregunta. Si lo dejas vacío, armamos el texto a partir de la
+            descripción del flow (editada arriba).
+          </p>
+          <textarea
+            value={chatIntroDraft}
+            onChange={(e) => setChatIntroDraft(e.target.value.slice(0, 4000))}
+            rows={5}
+            maxLength={4000}
+            placeholder="Ej: ¡Hola! 👋 Te explico en un momento qué vamos a hacer…"
+            className="mt-1.5 w-full resize-y rounded-xl border border-[#E8EAEF] bg-[#F8F9FB] px-3 py-2 text-sm leading-relaxed text-[#1A1A1A] outline-none focus:border-[#9C77F5]/45 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
+          />
+          <p className="mt-0.5 text-right text-[10px] tabular-nums text-[#9CA3AF]">{chatIntroDraft.length}/4000</p>
+          {assistError ? (
+            <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+              {assistError}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={savingAssist}
+            onClick={() => void saveAssistant()}
+            className="mt-3 w-full rounded-xl bg-linear-to-r from-dilo-500 to-dilo-600 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+          >
+            {savingAssist ? 'Guardando…' : 'Guardar tono y saludo'}
+          </button>
         </div>
 
         <button
@@ -1117,7 +1220,7 @@ export default function FlowWorkspace({
                       m.role === 'user' ? (
                         <div key={m.id} className="flex justify-end">
                           <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-3 py-2 text-left shadow-sm shadow-[#9C77F5]/20">
-                            <p className="break-words text-[11px] leading-relaxed text-white whitespace-pre-wrap">{m.content}</p>
+                            <p className="wrap-break-word text-[11px] leading-relaxed text-white whitespace-pre-wrap">{m.content}</p>
                           </div>
                         </div>
                       ) : (
@@ -1135,7 +1238,7 @@ export default function FlowWorkspace({
                                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9C77F5]/60 [animation-delay:300ms]" />
                               </span>
                             ) : (
-                              <p className="break-words text-[11px] leading-relaxed text-[#1A1A1A] whitespace-pre-wrap dark:text-[#F8F9FB]">
+                              <p className="wrap-break-word text-[11px] leading-relaxed text-[#1A1A1A] whitespace-pre-wrap dark:text-[#F8F9FB]">
                                 {m.content}
                               </p>
                             )}
@@ -1350,10 +1453,8 @@ export default function FlowWorkspace({
                     <>
                       <FlowMainPreviewProgressChrome totalSteps={localSteps.length} />
                       <PreviewBubble role="assistant">
-                        <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">¡Hola! 👋</p>
-                        <p className="mt-2 text-sm leading-relaxed opacity-90">
-                          Este es un <strong>preview conversacional</strong> de tu flow. Así verá las preguntas quien lo
-                          responda, de una en una.
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#1A1A1A] dark:text-[#F8F9FB]">
+                          {resolvePublicFlowChatOpening(flow)}
                         </p>
                       </PreviewBubble>
                       {localSteps.map((s) => (

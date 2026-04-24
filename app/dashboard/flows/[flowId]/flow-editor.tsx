@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   ChartBarSquareIcon,
+  CodeBracketIcon,
   EllipsisVerticalIcon,
   LinkIcon,
   PuzzlePieceIcon,
@@ -13,7 +14,9 @@ import {
 import { ButtonSpinner } from '@/components/spinners'
 import { readApiResult } from '@/lib/read-api-result'
 import { DeleteFlowModal } from '@/components/ui/delete-flow-modal'
+import { DiloModal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
+import { publicAppOrigin } from '@/lib/public-site'
 
 interface FlowEditorProps {
   flowId: string
@@ -48,6 +51,7 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
   const [menuOpen, setMenuOpen] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [embedModalOpen, setEmbedModalOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
   useEffect(() => {
@@ -88,6 +92,14 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
     closeMenu()
   }
 
+  const embedSnippet = `<!-- Dilo — pega antes de </body> -->
+<script src="${publicAppOrigin()}/embed.js" data-flow="${flowId}"></script>`
+
+  const handleCopyEmbed = () => {
+    navigator.clipboard.writeText(embedSnippet)
+    toast('Código de embed copiado', 'success')
+  }
+
   const handleDeleteConfirm = async () => {
     const res = await fetch(`/api/flows/${flowId}`, { method: 'DELETE' })
     if (res.ok) {
@@ -126,6 +138,18 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
                     <button type="button" role="menuitem" className={menuItemBase} onClick={handleCopyLink}>
                       <LinkIcon className={menuIcon} strokeWidth={1.5} aria-hidden="true" />
                       Copiar enlace público
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={menuItemBase}
+                      onClick={() => {
+                        closeMenu()
+                        setEmbedModalOpen(true)
+                      }}
+                    >
+                      <CodeBracketIcon className={menuIcon} strokeWidth={1.5} aria-hidden="true" />
+                      Código de embed
                     </button>
                     <Link
                       href={`/dashboard/flows/${flowId}/connectors`}
@@ -203,6 +227,47 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
         sessionCount={sessionCount}
         onConfirm={handleDeleteConfirm}
       />
+
+      <DiloModal
+        isOpen={embedModalOpen}
+        onClose={() => setEmbedModalOpen(false)}
+        title="Embed en tu web"
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] transition-colors hover:bg-[#F8F9FB] dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#9CA3AF] dark:hover:bg-[#2a3040]"
+              onClick={() => setEmbedModalOpen(false)}
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-linear-to-br from-dilo-500 to-dilo-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-dilo-500/20 hover:opacity-95"
+              onClick={handleCopyEmbed}
+            >
+              Copiar código
+            </button>
+          </>
+        }
+      >
+        <p className="mb-3 text-sm text-[#6B7280] dark:text-[#9CA3AF]">
+          Copia este bloque y pégalo antes de <code className="rounded bg-[#F3F4F6] px-1 dark:bg-[#252936]">&lt;/body&gt;</code> en
+          tu sitio. El script debe cargarse desde tu dominio público de Dilo (URL absoluta).
+        </p>
+        <pre className="max-h-[220px] overflow-auto rounded-xl border border-[#E5E7EB] bg-[#0F1117] p-4 text-left text-xs leading-relaxed text-[#E5E7EB] dark:border-[#2A2F3F]">
+          {embedSnippet}
+        </pre>
+        <a
+          href={`/f/${flowId}?embed=1`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-block text-sm font-medium text-[#6B4DD4] underline-offset-2 hover:underline dark:text-[#B8A4FC]"
+        >
+          Vista previa en modo embed →
+        </a>
+      </DiloModal>
     </>
   )
 }

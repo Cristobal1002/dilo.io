@@ -9,9 +9,11 @@ import {
   PencilSquareIcon,
 } from '@heroicons/react/24/outline'
 import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field'
+import type { EmailNotificationSettings } from '@/lib/email-notification-settings'
 
 type DiloProfile = { name: string | null; email: string; phone: string | null }
 type DiloSave = 'idle' | 'saving' | 'saved' | 'error'
+type NotifSave = 'idle' | 'saving' | 'saved' | 'error'
 
 function Card({
   title,
@@ -83,6 +85,14 @@ export default function DashboardAccountPage() {
   const [diloSave, setDiloSave] = useState<DiloSave>('idle')
   const [diloErr, setDiloErr] = useState('')
 
+  const [digest, setDigest] = useState<EmailNotificationSettings['digest']>('weekly')
+  const [alertHot, setAlertHot] = useState(false)
+  const [alertMinScore, setAlertMinScore] = useState('')
+  const [alertMaxPerDay, setAlertMaxPerDay] = useState(3)
+  const [lastDigestSentAt, setLastDigestSentAt] = useState<string | null>(null)
+  const [notifSave, setNotifSave] = useState<NotifSave>('idle')
+  const [notifErr, setNotifErr] = useState('')
+
   useEffect(() => {
     if (!user) return
     setFirstName(user.firstName ?? '')
@@ -97,6 +107,14 @@ export default function DashboardAccountPage() {
           const u = res.data.user as DiloProfile
           setDiloProfile(u)
           setDiloPhone(u.phone ?? '')
+        }
+        if (res.success && res.data.notifications?.settings) {
+          const s = res.data.notifications.settings as EmailNotificationSettings
+          setDigest(s.digest)
+          setAlertHot(s.alertHot)
+          setAlertMinScore(s.alertMinScore != null ? String(s.alertMinScore) : '')
+          setAlertMaxPerDay(s.alertMaxPerDay)
+          setLastDigestSentAt(res.data.notifications.lastDigestSentAt ?? null)
         }
       })
       .catch(() => {})
@@ -186,6 +204,45 @@ export default function DashboardAccountPage() {
       setTimeout(() => setDiloSave('idle'), 4000)
     }
   }, [diloProfile, diloPhone, user])
+
+  const saveNotifications = useCallback(async () => {
+    const trimmed = alertMinScore.trim()
+    let minScore: number | null = null
+    if (trimmed !== '') {
+      const n = Number(trimmed)
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        setNotifErr('El score mínimo debe estar entre 0 y 100.')
+        setNotifSave('error')
+        setTimeout(() => setNotifSave('idle'), 4000)
+        return
+      }
+      minScore = Math.round(n)
+    }
+    setNotifSave('saving')
+    setNotifErr('')
+    try {
+      const res = await fetch('/api/settings/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          digest,
+          alertHot,
+          alertMinScore: minScore,
+          alertMaxPerDay,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message ?? 'Error al guardar')
+      }
+      setNotifSave('saved')
+      setTimeout(() => setNotifSave('idle'), 2500)
+    } catch (err) {
+      setNotifErr(err instanceof Error ? err.message : 'Error al guardar')
+      setNotifSave('error')
+      setTimeout(() => setNotifSave('idle'), 4000)
+    }
+  }, [digest, alertHot, alertMinScore, alertMaxPerDay])
 
   if (!isLoaded || !sessionLoaded) {
     return (
@@ -337,6 +394,95 @@ export default function DashboardAccountPage() {
         <p className="mt-4 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
           Usamos el correo principal para avisos importantes.
         </p>
+      </Card>
+
+      <Card
+        title="Resúmenes y alertas"
+        description="Ya no enviamos un correo por cada respuesta. Puedes recibir un resumen y, si quieres, alertas solo para leads destacados."
+      >
+        <div className="space-y-4">
+          <div>
+            <FieldLabel htmlFor="notif-digest">Resumen por correo</FieldLabel>
+            <select
+              id="notif-digest"
+              value={digest}
+              onChange={(e) => setDigest(e.target.value as EmailNotificationSettings['digest'])}
+              className="mt-1 w-full max-w-md rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm outline-none focus:border-[#9C77F5] focus:ring-2 focus:ring-[#9C77F5]/15 dark:border-[#374151] dark:bg-[#252936] dark:text-[#F9FAFB]"
+            >
+              <option value="off">Desactivado</option>
+              <option value="daily">Diario</option>
+              <option value="weekly">Semanal</option>
+            </select>
+            <p className="mt-1 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+              Incluye sesiones completadas en tu organización. Último envío:{' '}
+              {lastDigestSentAt ? formatDate(new Date(lastDigestSentAt)) : '—'}
+            </p>
+          </div>
+
+          <div className="border-t border-[#F0EBFF] pt-4 dark:border-[#2A2F3F]">
+            <p className="text-xs font-medium text-[#374151] dark:text-[#D1D5DB]">Alertas al instante (opcional)</p>
+            <label className="mt-3 flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={alertHot}
+                onChange={(e) => setAlertHot(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-[#D1D5DB] text-[#9C77F5] focus:ring-[#9C77F5]/25"
+              />
+              <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
+                Avisar cuando la IA clasifique el lead como <strong className="font-medium">Hot</strong>
+              </span>
+            </label>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel htmlFor="notif-min-score">Score mínimo (0–100, vacío = no usar)</FieldLabel>
+                <input
+                  id="notif-min-score"
+                  type="text"
+                  inputMode="numeric"
+                  value={alertMinScore}
+                  onChange={(e) => setAlertMinScore(e.target.value.replace(/[^\d]/g, ''))}
+                  placeholder="Ej. 80"
+                  className="mt-1 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm outline-none focus:border-[#9C77F5] focus:ring-2 focus:ring-[#9C77F5]/15 dark:border-[#374151] dark:bg-[#252936] dark:text-[#F9FAFB]"
+                />
+              </div>
+              <div>
+                <FieldLabel htmlFor="notif-max-day">Máx. alertas instantáneas por día</FieldLabel>
+                <select
+                  id="notif-max-day"
+                  value={String(alertMaxPerDay)}
+                  onChange={(e) => setAlertMaxPerDay(Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm outline-none focus:border-[#9C77F5] focus:ring-2 focus:ring-[#9C77F5]/15 dark:border-[#374151] dark:bg-[#252936] dark:text-[#F9FAFB]"
+                >
+                  {[0, 1, 2, 3, 5, 10].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 0 ? '0 (solo resumen)' : n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-[#9CA3AF] dark:text-[#6B7280]">
+              Si activas score mínimo o Hot, te escribimos solo cuando corresponda y sin pasar del límite diario.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => void saveNotifications()}
+              disabled={notifSave === 'saving'}
+              className="rounded-lg bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#9C77F5]/25 disabled:opacity-50"
+            >
+              {notifSave === 'saving' ? 'Guardando…' : notifSave === 'saved' ? 'Guardado' : 'Guardar preferencias'}
+            </button>
+            {notifSave === 'error' && notifErr ? (
+              <span className="flex items-center gap-1.5 text-xs text-[#EF4444]">
+                <ExclamationCircleIcon className="h-4 w-4 shrink-0" />
+                {notifErr}
+              </span>
+            ) : null}
+          </div>
+        </div>
       </Card>
 
       <Card title="Teléfono" description="Número de contacto de tu organización; puedes editarlo aquí.">

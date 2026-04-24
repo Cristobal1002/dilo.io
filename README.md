@@ -22,6 +22,17 @@
 11. [Setup local](#11-setup-local)
 12. [Convenciones del equipo](#12-convenciones-del-equipo)
 13. [Roadmap — próxima semana](#13-roadmap--próxima-semana)
+14. [Sprint 1 — spec y checklist](#14-sprint-1--spec-y-checklist)
+
+---
+
+## 14. Sprint 1 — spec y checklist
+
+Documento de trabajo del equipo (orden de implementación, QA, convenciones de dominio y contratos de API):
+
+- **[docs/SPRINT1.md](./docs/SPRINT1.md)**
+
+Resumen: branding en flow público → email al completar (Resend) → embed (`public/embed.js` + `?embed=1`) → transiciones con IA (`/acknowledge` + settings en builder). Todo el mundo público debe usar **`NEXT_PUBLIC_APP_URL`** como origen canónico (p. ej. `https://getdilo.io`).
 
 ---
 
@@ -407,6 +418,13 @@ OPENAI_API_KEY=sk-...
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Resend — digest semanal/diario y alertas por lead (opcional en local)
+# RESEND_API_KEY=re_...
+# RESEND_FROM_EMAIL=notificaciones@tu-dominio-verificado.com
+
+# Cron en Vercel — resúmenes por email (misma ruta que `vercel.json` → `/api/cron/digest-notifications`)
+# CRON_SECRET=una-cadena-larga-aleatoria
 
 # Logging (opcional — default: info)
 LOG_LEVEL=debug

@@ -15,6 +15,13 @@
       "when": 1776709333004,
       "tag": "0001_add_user_phone_org_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776710000000,
+      "tag": "0002_user_email_notifications",
+      "breakpoints": true
     }
   ]
 }

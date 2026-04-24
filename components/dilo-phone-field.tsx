@@ -22,6 +22,8 @@ type Props = {
   onChange: (e164: string) => void
   /** ISO2 (p. ej. `co` o `CO`). */
   defaultCountry?: CountryIso2 | string
+  /** País activo en el selector (tras elegir prefijo). */
+  onActiveCountryChange?: (iso2: string) => void
   disabled?: boolean
   placeholder?: string
   className?: string
@@ -60,6 +62,7 @@ export function DiloPhoneField({
   value,
   onChange,
   defaultCountry = 'co',
+  onActiveCountryChange,
   disabled,
   placeholder,
   className,
@@ -79,7 +82,10 @@ export function DiloPhoneField({
       <PhoneInput
         defaultCountry={toIso2(defaultCountry)}
         value={value}
-        onChange={(phone) => onChange(phone ?? '')}
+        onChange={(phone, meta) => {
+          onChange(phone ?? '')
+          onActiveCountryChange?.(meta.country.iso2)
+        }}
         forceDialCode
         preferredCountries={['co', 'mx', 'es', 'ar', 'cl', 'pe', 'ec', 'us', 've']}
         disabled={disabled}

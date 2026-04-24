@@ -43,6 +43,11 @@ export const FlowGenerationSchema = z.object({
     settings: z.object({
       language: z.enum(['es', 'en']),
       completion_message: z.string(),
+      /** Obligatorio en el JSON: OpenAI `strict` exige que toda clave de `properties` vaya en `required`. */
+      transition_style: z.enum(['ai', 'none']),
+      tone: z.string().max(200),
+      /** Saludo inicial del chat; `""` si prefieres que la app arme el texto desde `description`. */
+      chat_intro: z.string().max(2000),
     }),
     scoring_criteria: z.object({
       hot: z.string(),

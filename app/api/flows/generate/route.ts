@@ -6,11 +6,15 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { flows, steps, stepOptions } from '@/db/schema'
 import { FlowGenerationSchema } from '@/lib/schemas/flow-generation'
-import { FLOW_GENERATOR_SYSTEM, buildFlowGeneratorPrompt } from '@/lib/prompts/generate-flow'
+import { FLOW_GENERATOR_SYSTEM, buildFlowGeneratorPrompt, type FlowGeneratorExtras } from '@/lib/prompts/generate-flow'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiCreated } from '@/lib/api-response'
 import { ValidationError, InternalError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
+import {
+  FLOW_GENERATE_PROMPT_MAX_CHARS,
+  FLOW_GENERATE_SCORING_GOAL_MAX_CHARS,
+} from '@/lib/flow-generate-input-limits'
 
 const log = createLogger('flows/generate')
 
@@ -18,8 +22,22 @@ const log = createLogger('flows/generate')
 export const maxDuration = 60
 
 const RequestSchema = z.object({
-  prompt: z.string().min(10, 'El prompt debe tener al menos 10 caracteres').max(500),
-  scoringGoal: z.string().min(5, 'Describe qué quieres evaluar').max(300),
+  prompt: z
+    .string()
+    .min(10, 'El prompt debe tener al menos 10 caracteres')
+    .max(FLOW_GENERATE_PROMPT_MAX_CHARS, `El prompt no puede superar ${FLOW_GENERATE_PROMPT_MAX_CHARS} caracteres`),
+  scoringGoal: z
+    .string()
+    .min(5, 'Describe qué quieres evaluar')
+    .max(
+      FLOW_GENERATE_SCORING_GOAL_MAX_CHARS,
+      `El objetivo de medición no puede superar ${FLOW_GENERATE_SCORING_GOAL_MAX_CHARS} caracteres`,
+    ),
+  flowName: z.string().min(2).max(200).optional(),
+  description: z.string().min(1).max(2000).optional(),
+  toneAssistant: z.string().min(3).max(220).optional(),
+  /** Vacío = saludo automático desde la descripción en runtime. */
+  chatIntro: z.string().max(4000).optional(),
 })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
@@ -31,16 +49,25 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   if (!parsed.success) {
     throw new ValidationError('Prompt inválido', parsed.error.flatten().fieldErrors)
   }
-  const { prompt, scoringGoal } = parsed.data
+  const { prompt, scoringGoal, flowName, description, toneAssistant, chatIntro } = parsed.data
 
   log.info({ userId, orgId: org.id, promptLength: prompt.length }, 'Generating flow')
 
+  const extras: FlowGeneratorExtras | undefined =
+    flowName?.trim() || description?.trim() || toneAssistant?.trim()
+      ? {
+          flowName: flowName?.trim(),
+          descriptionHint: description?.trim(),
+          toneHint: toneAssistant?.trim(),
+        }
+      : undefined
+
   // Generate flow with AI
   const { object: generated } = await generateObject({
-    model: openai('gpt-4o-mini'),
+    model: openai('gpt-4o'),
     schema: FlowGenerationSchema,
     system: FLOW_GENERATOR_SYSTEM,
-    prompt: buildFlowGeneratorPrompt(prompt, scoringGoal),
+    prompt: buildFlowGeneratorPrompt(prompt, scoringGoal, extras),
   })
 
   log.info(
@@ -52,15 +79,33 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   // On partial failure we delete the flow (CASCADE cleans steps/options).
   let newFlow: (typeof flows.$inferSelect) | undefined
   try {
+    const resolvedName = (flowName?.trim() || generated.flow.name).trim().slice(0, 200)
+    const resolvedDescription = (description?.trim() || generated.flow.description).trim().slice(0, 2000)
+    const resolvedTone = (toneAssistant?.trim() ||
+      (typeof generated.flow.settings.tone === 'string' && generated.flow.settings.tone.trim()
+        ? generated.flow.settings.tone.trim()
+        : 'cálido, breve y natural'))!.slice(0, 220)
+    const resolvedChatIntro =
+      chatIntro !== undefined
+        ? chatIntro.slice(0, 4000)
+        : typeof generated.flow.settings.chat_intro === 'string'
+          ? generated.flow.settings.chat_intro.slice(0, 2000)
+          : ''
+
     const [inserted] = await db
       .insert(flows)
       .values({
         organizationId: org.id,
-        name: generated.flow.name,
-        description: generated.flow.description,
+        name: resolvedName,
+        description: resolvedDescription,
         promptOrigin: prompt,
         status: 'draft',
-        settings: generated.flow.settings,
+        settings: {
+          ...generated.flow.settings,
+          transition_style: generated.flow.settings.transition_style ?? 'ai',
+          tone: resolvedTone,
+          chat_intro: resolvedChatIntro,
+        },
         scoringCriteria: {
           ...generated.flow.scoring_criteria,
           objective: scoringGoal,

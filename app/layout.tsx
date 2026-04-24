@@ -12,12 +12,24 @@ const diloSans = Space_Grotesk({
   weight: ['400', '500', '600', '700'],
 })
 
+/** Base para URLs absolutas en metadata (OG, etc.). El favicon lo sirve `app/favicon.ico`. */
+function metadataBaseUrl(): URL {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL
+  if (explicit) {
+    try {
+      return new URL(explicit)
+    } catch {
+      /* ignore */
+    }
+  }
+  if (process.env.VERCEL_URL) return new URL(`https://${process.env.VERCEL_URL}`)
+  return new URL('http://localhost:3000')
+}
+
 export const metadata: Metadata = {
+  metadataBase: metadataBaseUrl(),
   title: 'Dilo',
   description: 'Convierte texto en flujos conversacionales inteligentes',
-  icons: {
-    icon: '/favicon.ico',
-  },
 }
 
 export default function RootLayout({

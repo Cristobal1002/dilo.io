@@ -15,6 +15,7 @@ import {
   webhooks,
 } from '@/db/schema'
 import { createLogger } from '@/lib/logger'
+import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
 import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
 
 const log = createLogger('session-completion')
@@ -127,6 +128,30 @@ function buildStructuredFromSteps(stepRows: StepRow[], answerByStep: Record<stri
   const out: Record<string, string> = {}
   for (const s of stepRows) {
     out[s.variableName] = displayAnswer(s, answerByStep[s.id] ?? null)
+  }
+  return out
+}
+
+function extractLeadContact(
+  stepRows: StepRow[],
+  answerByStep: Record<string, string | null>,
+): { name?: string; email?: string; phone?: string } {
+  const out: { name?: string; email?: string; phone?: string } = {}
+  for (const s of stepRows) {
+    const v = answerByStep[s.id]
+    if (v == null || v === '') continue
+    if (s.type === 'email' && !out.email) out.email = displayAnswer(s, v)
+    if (s.type === 'phone' && !out.phone) out.phone = displayAnswer(s, v)
+    if (s.type === 'text' && /name|nombre|full/i.test(s.variableName) && !out.name) {
+      out.name = displayAnswer(s, v)
+    }
+  }
+  if (!out.name) {
+    const firstText = stepRows.find((s) => s.type === 'text' && answerByStep[s.id])
+    if (firstText) {
+      const v = answerByStep[firstText.id]
+      if (v) out.name = displayAnswer(firstText, v)
+    }
   }
   return out
 }
@@ -308,6 +333,23 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
       sessionId: sessionRow.id,
       flowId: flowRow.id,
       payload,
+    })
+  }
+
+  if (resultRow) {
+    const contact = extractLeadContact(stepRows, answerByStep)
+    void notifyOrgUsersInstantLeadAlerts({
+      organizationId: flowRow.organizationId,
+      flowName: flowRow.name,
+      flowId: flowRow.id,
+      sessionId: sessionRow.id,
+      summary: resultRow.summary,
+      score: resultRow.score,
+      classification: resultRow.classification,
+      suggestedAction: resultRow.suggestedAction,
+      contact,
+    }).catch((err) => {
+      log.error({ err, sessionId: sessionRow.id }, 'notifyOrgUsersInstantLeadAlerts failed')
     })
   }
 

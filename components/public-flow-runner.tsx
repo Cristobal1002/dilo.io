@@ -6,6 +6,7 @@ import { readApiResult } from '@/lib/read-api-result'
 import type { PublicFlowRecord, PublicFlowStep } from '@/lib/load-published-flow'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
 import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field'
+import { buildPhoneStepFooterHint } from '@/lib/phone-e164'
 import { cn } from '@/lib/utils'
 import {
   buildFileItemsFromFiles,
@@ -14,6 +15,8 @@ import {
   stripFileDataUrlsFromAnswers,
   type FileAnswerPayload,
 } from '@/lib/public-flow-file-helpers'
+import { PublicFlowBrandingFooter } from '@/components/public-flow-branding'
+import { resolvePublicFlowChatOpening } from '@/lib/public-flow-chat-opening'
 
 const THEME_KEY = 'theme'
 
@@ -65,7 +68,15 @@ function ThemeToggle({ className }: { className?: string }) {
   )
 }
 
-type Msg = { id: string; role: 'assistant' | 'user'; content: string; stepId?: string }
+type Msg = {
+  id: string
+  role: 'assistant' | 'user'
+  content: string
+  stepId?: string
+  isTransition?: boolean
+  /** Saludo / contexto antes de la primera pregunta. */
+  isOpening?: boolean
+}
 
 function uid() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -156,6 +167,52 @@ function firstOpenStep(steps: PublicFlowStep[], answers: Record<string, string>)
   return steps.length
 }
 
+async function fetchAcknowledge(params: {
+  flowId: string
+  sessionToken: string
+  stepId: string
+  answeredStepQuestion: string
+  answer: string
+  variableName: string
+  nextQuestion: string
+  collectedData: Record<string, string>
+}): Promise<{ message: string } | null> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 26_000)
+    const res = await fetch(`/api/f/${params.flowId}/acknowledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionToken: params.sessionToken,
+        stepId: params.stepId,
+        answeredStepQuestion: params.answeredStepQuestion,
+        answer: params.answer,
+        variableName: params.variableName,
+        nextQuestion: params.nextQuestion,
+        collectedData: params.collectedData,
+      }),
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!res.ok) return null
+    const json = (await res.json()) as { success?: boolean; data?: { message?: string } }
+    if (json.success === false) return null
+    const msg = typeof json.data?.message === 'string' ? json.data.message.trim() : ''
+    return { message: msg }
+  } catch {
+    return null
+  }
+}
+
+function readTransitionSettings(flow: PublicFlowRecord): { style: 'ai' | 'none'; tone: string } {
+  const o = flow.settings && typeof flow.settings === 'object' ? (flow.settings as Record<string, unknown>) : {}
+  const style = o.transition_style === 'ai' ? 'ai' : 'none'
+  const tone =
+    typeof o.tone === 'string' && o.tone.trim() ? o.tone.trim().slice(0, 220) : 'cálido, breve y natural'
+  return { style, tone }
+}
+
 function rebuildMessages(currentStepIdx: number, steps: PublicFlowStep[], answers: Record<string, string>) {
   const lead = buildLead(steps, answers)
   const out: Msg[] = []
@@ -188,22 +245,14 @@ function buildFullThread(steps: PublicFlowStep[], answers: Record<string, string
   return out
 }
 
-function readChatIntro(flow: PublicFlowRecord): string | null {
-  const o = flow.settings && typeof flow.settings === 'object' ? (flow.settings as Record<string, unknown>) : {}
-  const t = o.chat_intro
-  return typeof t === 'string' && t.trim() ? t.trim() : null
-}
-
-/** Saludo opcional delante de la primera pregunta (p. ej. desde prompt / settings). */
+/** Inserta una burbuja de saludo antes de la primera pregunta (texto desde `chat_intro`, descripción o fallback). */
 function withOpeningLine(msgs: Msg[], flow: PublicFlowRecord): Msg[] {
-  const intro = readChatIntro(flow)
-  if (!intro || msgs.length === 0) return msgs
+  const text = resolvePublicFlowChatOpening(flow).trim()
+  if (!text || msgs.length === 0) return msgs
   const i = msgs.findIndex((m) => m.role === 'assistant')
   if (i < 0) return msgs
-  const cur = msgs[i].content
-  if (cur.startsWith(intro)) return msgs
-  const copy = msgs.map((m) => ({ ...m }))
-  copy[i] = { ...copy[i], content: `${intro}\n\n${cur}` }
+  const copy = [...msgs]
+  copy.splice(i, 0, { id: uid(), role: 'assistant', content: text, isOpening: true })
   return copy
 }
 
@@ -235,6 +284,7 @@ function FlowChatHeader({
   isTyping,
   isDone,
   onBack,
+  embedded,
 }: {
   flow: PublicFlowRecord
   stepIdx: number
@@ -242,7 +292,9 @@ function FlowChatHeader({
   isTyping: boolean
   isDone: boolean
   onBack: () => void
+  embedded?: boolean
 }) {
+  if (embedded) return null
   const idx = Math.max(0, stepIdx)
   const n = totalSteps > 0 ? Math.min(idx + 1, totalSteps) : 0
   const pct = totalSteps > 0 ? Math.round((n / totalSteps) * 100) : 0
@@ -392,6 +444,7 @@ function FlowDoneCelebration({
   completion,
   showSummary,
   onToggleSummary,
+  isEmbed,
 }: {
   flow: PublicFlowRecord
   steps: PublicFlowStep[]
@@ -399,6 +452,7 @@ function FlowDoneCelebration({
   completion: string | null
   showSummary: boolean
   onToggleSummary: () => void
+  isEmbed?: boolean
 }) {
   const rows = steps.filter((s) => stepIsAnswered(s, answers))
   return (
@@ -425,9 +479,11 @@ function FlowDoneCelebration({
         <div className="absolute -top-20 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[#9C77F5]/25 blur-[100px]" />
         <div className="absolute bottom-0 right-0 h-[320px] w-[320px] rounded-full bg-[#00d4b0]/15 blur-[90px]" />
       </div>
-      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-        <ThemeToggle />
-      </div>
+      {!isEmbed ? (
+        <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+          <ThemeToggle />
+        </div>
+      ) : null}
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-10">
         <div
           className="w-full max-w-md text-center"
@@ -473,12 +529,9 @@ function FlowDoneCelebration({
               </ul>
             </div>
           ) : null}
-          <p className="mt-10 text-sm font-medium text-[#6B7280] dark:text-[#9CA3AF]">
-            <span className="opacity-80">Hecho con </span>
-            <span className="bg-linear-to-r from-[#9C77F5] to-[#00d4b0] bg-clip-text font-bold text-transparent">Dilo</span>
-          </p>
         </div>
       </div>
+      <PublicFlowBrandingFooter flow={flow} />
     </div>
   )
 }
@@ -504,7 +557,8 @@ function WelcomeScreen({
 }) {
   const w = welcomeCopy(flow, stepCount)
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center px-5 py-10 text-center">
+    <div className="flex min-h-dvh flex-col px-5 py-10 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center">
       <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#7B5BD4] opacity-90 dark:text-[#D4C4FC]">
         {w.label}
       </p>
@@ -514,6 +568,11 @@ function WelcomeScreen({
           — conversación guiada
         </span>
       </h1>
+      {flow.description?.trim() ? (
+        <p className="mb-4 max-w-md text-left text-[15px] leading-relaxed text-[#4B5563] dark:text-[#B8BCC9] whitespace-pre-wrap">
+          {flow.description.trim()}
+        </p>
+      ) : null}
       <p className="mb-8 max-w-md text-base leading-relaxed text-[#5B5670] dark:text-[#9CA3AF]">{w.tagline}</p>
       <div className="mb-9 flex flex-wrap justify-center gap-2">
         {[`⏱️ ${w.timeLabel}`, `💬 ~${stepCount} pasos`, `🎯 ${w.tonePill}`].map((tag) => (
@@ -582,6 +641,8 @@ function WelcomeScreen({
           </>
         )}
       </div>
+      </div>
+      <PublicFlowBrandingFooter flow={flow} />
     </div>
   )
 }
@@ -589,9 +650,11 @@ function WelcomeScreen({
 export function PublicFlowRunner({
   flowId,
   initialPayload,
+  isEmbed = false,
 }: {
   flowId: string
   initialPayload: PublicFlowInitialPayload
+  isEmbed?: boolean
 }) {
   const { flow, steps } = initialPayload
 
@@ -622,12 +685,15 @@ export function PublicFlowRunner({
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [fileErr, setFileErr] = useState('')
   const [fileBusy, setFileBusy] = useState(false)
+  const [phoneFooterIso, setPhoneFooterIso] = useState('co')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const answersRef = useRef(answers)
   const stepIdxRef = useRef(stepIdx)
   const phaseRef = useRef(phase)
   const editingStepIdRef = useRef<string | null>(null)
+  const tokenRef = useRef<string | null>(null)
+  const advancingRef = useRef(false)
   useEffect(() => {
     answersRef.current = answers
   }, [answers])
@@ -640,6 +706,22 @@ export function PublicFlowRunner({
   useEffect(() => {
     editingStepIdRef.current = editingStepId
   }, [editingStepId])
+  useEffect(() => {
+    tokenRef.current = token
+  }, [token])
+
+  useEffect(() => {
+    if (!isEmbed) return
+    const id = window.requestAnimationFrame(() => {
+      try {
+        const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, 320)
+        window.parent.postMessage({ type: 'dilo:resize', flowId: flow.id, height: h }, '*')
+      } catch {
+        /* noop */
+      }
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [isEmbed, flow.id, messages, phase, stepIdx, isTyping, answers, showDoneSummary])
 
   const putSession = useCallback(async () => {
     const t = token
@@ -905,6 +987,15 @@ export function PublicFlowRunner({
     [editingStepId, steps, stepIdx, current],
   )
 
+  const inputFooterHint =
+    activeStep?.type === 'phone'
+      ? buildPhoneStepFooterHint(activeStep.hint, phoneFooterIso)
+      : (activeStep?.hint ?? null)
+
+  useEffect(() => {
+    if (activeStep?.type === 'phone') setPhoneFooterIso('co')
+  }, [activeStep?.id, activeStep?.type])
+
   useEffect(() => {
     if (!editingStepId) return
     const st = steps.find((s) => s.id === editingStepId)
@@ -978,6 +1069,9 @@ export function PublicFlowRunner({
         return
       }
 
+      if (advancingRef.current) return
+      advancingRef.current = true
+
       const nextAnswers = { ...answersRef.current, [sid]: value }
       setAnswers(nextAnswers)
       const userLine = displayOverride ?? bubbleText(cur, value)
@@ -989,21 +1083,59 @@ export function PublicFlowRunner({
           void flushCompleteSession().finally(() => {
             setPhase('done')
             setIsTyping(false)
+            advancingRef.current = false
           })
         }, 400)
         return
       }
+
       setIsTyping(true)
       setTextInput('')
       setSelected([])
-      setTimeout(() => {
-        setStepIdx(nextIdx)
-        const msgs = rebuildMessages(nextIdx, steps, nextAnswers)
-        setMessages(withOpeningLine(msgs, flow))
-        setIsTyping(false)
-      }, 520)
+
+      const run = async () => {
+        try {
+          const { style } = readTransitionSettings(flow)
+          const sessionTok = tokenRef.current
+          const nextStep = steps[nextIdx]
+          let ackMessage = ''
+          if (style === 'ai' && sessionTok) {
+            const collected = buildLead(steps, nextAnswers)
+            const ack = await fetchAcknowledge({
+              flowId,
+              sessionToken: sessionTok,
+              stepId: sid,
+              answeredStepQuestion: cur.question,
+              answer: value,
+              variableName: cur.variableName,
+              nextQuestion: nextStep?.question ?? '',
+              collectedData: collected,
+            })
+            ackMessage = ack?.message?.trim() ?? ''
+          }
+          await new Promise((r) => setTimeout(r, 400))
+          setStepIdx(nextIdx)
+          let msgs = withOpeningLine(rebuildMessages(nextIdx, steps, nextAnswers), flow)
+          if (ackMessage && nextIdx >= 1) {
+            const lastAsst = msgs.map((m) => m.role).lastIndexOf('assistant')
+            if (lastAsst >= 0) {
+              msgs = [
+                ...msgs.slice(0, lastAsst),
+                { id: uid(), role: 'assistant', content: ackMessage, isTransition: true },
+                ...msgs.slice(lastAsst),
+              ]
+            }
+          }
+          setMessages(msgs)
+        } finally {
+          setIsTyping(false)
+          advancingRef.current = false
+        }
+      }
+
+      void run()
     },
-    [steps, flow, flushCompleteSession],
+    [steps, flow, flushCompleteSession, flowId],
   )
 
   const submitText = () => {
@@ -1142,9 +1274,11 @@ export function PublicFlowRunner({
           <div className="absolute -right-24 -top-28 h-[420px] w-[420px] rounded-full bg-[#9C77F5]/18 blur-[100px]" />
           <div className="absolute -left-20 top-1/3 h-[360px] w-[360px] rounded-full bg-[#00d4b0]/10 blur-[90px]" />
         </div>
-        <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-          <ThemeToggle />
-        </div>
+        {!isEmbed ? (
+          <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+            <ThemeToggle />
+          </div>
+        ) : null}
         <WelcomeScreen
           flow={flow}
           stepCount={steps.length}
@@ -1168,6 +1302,7 @@ export function PublicFlowRunner({
         completion={completion}
         showSummary={showDoneSummary}
         onToggleSummary={() => setShowDoneSummary((s) => !s)}
+        isEmbed={isEmbed}
       />
     )
   }
@@ -1199,6 +1334,7 @@ export function PublicFlowRunner({
         isTyping={isTyping}
         isDone={false}
         onBack={handleBack}
+        embedded={isEmbed}
       />
 
       <div
@@ -1214,7 +1350,14 @@ export function PublicFlowRunner({
               >
                 D
               </div>
-              <div className="max-w-[min(78%,22rem)] rounded-tl-sm rounded-br-[1.25rem] rounded-tr-[1.25rem] rounded-bl-[1.25rem] border border-[#9C77F5]/14 bg-white/95 px-[18px] py-[14px] text-[15px] leading-[1.65] text-[#1A1A1A] shadow-[0_10px_40px_rgba(15,11,26,0.07)] backdrop-blur-sm dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#F8F9FB] dark:shadow-[0_12px_40px_rgba(0,0,0,0.28)]">
+              <div
+                className={cn(
+                  'max-w-[min(78%,22rem)] rounded-tl-sm rounded-br-[1.25rem] rounded-tr-[1.25rem] rounded-bl-[1.25rem] border px-[18px] py-[14px] text-[15px] leading-[1.65] text-[#1A1A1A] shadow-[0_10px_40px_rgba(15,11,26,0.07)] backdrop-blur-sm dark:text-[#F8F9FB] dark:shadow-[0_12px_40px_rgba(0,0,0,0.28)]',
+                  m.isOpening
+                    ? 'border-[#9C77F5]/24 bg-[#FAF7FF]/98 dark:border-[#3d3558] dark:bg-[#232638]/98'
+                    : 'border-[#9C77F5]/14 bg-white/95 dark:border-[#2A2F3F] dark:bg-[#1A1D29]',
+                )}
+              >
                 <div className="whitespace-pre-wrap">{parseBold(m.content)}</div>
               </div>
             </div>
@@ -1263,7 +1406,7 @@ export function PublicFlowRunner({
       {phase === 'chat' && activeStep ? (
         <>
           {activeStep.type === 'file' ? (
-            <InputFooterShell hint={activeStep.hint} topSlot={editBanner}>
+            <InputFooterShell hint={inputFooterHint} topSlot={editBanner}>
               <input
                 id={`pf-upload-${activeStep.id}`}
                 type="file"
@@ -1337,7 +1480,7 @@ export function PublicFlowRunner({
               </div>
             </InputFooterShell>
           ) : (
-            <InputFooterShell hint={activeStep.hint} topSlot={editBanner}>
+            <InputFooterShell hint={inputFooterHint} topSlot={editBanner}>
               {activeStep.type === 'yes_no' ? (
                 <div className="flex flex-wrap gap-2">
                   <Pill
@@ -1433,6 +1576,7 @@ export function PublicFlowRunner({
                         variant="publicFlow"
                         value={textInput}
                         onChange={setTextInput}
+                        onActiveCountryChange={setPhoneFooterIso}
                         placeholder={activeStep.placeholder ?? 'Número de teléfono'}
                       />
                     </div>
@@ -1485,6 +1629,7 @@ export function PublicFlowRunner({
           )}
         </>
       ) : null}
+      <PublicFlowBrandingFooter flow={flow} />
     </div>
   )
 }

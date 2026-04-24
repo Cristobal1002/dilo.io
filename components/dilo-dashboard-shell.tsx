@@ -259,6 +259,8 @@ export default function DiloDashboardShell({ children }: { children: React.React
   }, [])
 
   const flowId = flowIdFromPath(pathname)
+  /** Solo el editor raíz necesita `overflow-hidden`; rutas como results/connectors deben hacer scroll en `main`. */
+  const isFlowEditorWorkspace = Boolean(flowId && pathname === `/dashboard/flows/${flowId}`)
   const panelOpen = Boolean(flowId && tool && ['ia', 'elements'].includes(tool))
 
   useEffect(() => {
@@ -536,7 +538,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
         <main
           className={cn(
             'flex-1 scrollbar-hide bg-white dark:bg-[#0F1117]',
-            flowId
+            isFlowEditorWorkspace
               ? 'flex min-h-0 flex-col overflow-hidden'
               : 'overflow-y-auto p-4 md:p-6',
           )}

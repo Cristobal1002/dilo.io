@@ -10,15 +10,28 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('flows/[flowId]')
 
+const SettingsPatchSchema = z
+  .object({
+    transition_style: z.enum(['ai', 'none']).optional(),
+    tone: z.string().max(220).optional(),
+    chat_intro: z.string().max(4000).optional(),
+    hide_branding: z.boolean().optional(),
+  })
+  .strict()
+
 const UpdateSchema = z
   .object({
     status: z.enum(['draft', 'published', 'archived']).optional(),
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional().nullable(),
+    settings: SettingsPatchSchema.optional(),
   })
   .refine(
     (data) =>
-      data.status !== undefined || data.name !== undefined || data.description !== undefined,
+      data.status !== undefined ||
+      data.name !== undefined ||
+      data.description !== undefined ||
+      (data.settings !== undefined && Object.keys(data.settings).length > 0),
     { message: 'Debe proporcionar al menos un campo para actualizar' },
   )
 
@@ -31,6 +44,11 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) =
   if (!parsed.success) {
     throw new ValidationError('Datos de actualización inválidos', parsed.error.flatten().fieldErrors)
   }
+
+  const existing = await db.query.flows.findFirst({
+    where: and(eq(flows.id, flowId), eq(flows.organizationId, org.id)),
+  })
+  if (!existing) throw new NotFoundError('Flow')
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() }
 
@@ -47,6 +65,14 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) =
     if (parsed.data.status === 'published') {
       updateData.publishedAt = new Date()
     }
+  }
+
+  if (parsed.data.settings !== undefined) {
+    const cur =
+      existing.settings && typeof existing.settings === 'object'
+        ? { ...(existing.settings as Record<string, unknown>) }
+        : {}
+    updateData.settings = { ...cur, ...parsed.data.settings }
   }
 
   const [updated] = await db
