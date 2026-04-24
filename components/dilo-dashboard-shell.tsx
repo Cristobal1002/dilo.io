@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { PLAN_LABELS, PLAN_COLORS, isPlan } from '@/lib/plan-limits'
 import { SparklesIcon as SparklesIconSolid } from '@heroicons/react/24/solid'
+import { DiloBrandLockup } from '@/components/dilo-brand-lockup'
 import { cn } from '@/lib/utils'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
 
@@ -59,7 +60,6 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.startsWith('/dashboard/account')) return 'Mi cuenta'
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
-  if (pathname.startsWith('/dashboard/settings/profile')) return 'Perfil'
   if (pathname.startsWith('/dashboard/settings/plan')) return 'Plan & Uso'
   if (pathname.startsWith('/dashboard/settings/team')) return 'Equipo'
   if (pathname.startsWith('/dashboard/settings')) return 'Configuración'
@@ -186,7 +186,7 @@ function SidebarUserCard({
   return (
     <div className="shrink-0 border-t border-[#E5E7EB] dark:border-[#2A2F3F] p-3">
       <Link
-        href="/dashboard/settings/profile"
+        href="/dashboard/account"
         onClick={onNavigate}
         className={`
           flex items-center gap-3 rounded-xl p-2 transition-colors
@@ -282,7 +282,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const createIaHref = flowId ? `/dashboard/flows/${flowId}?tool=ia` : '/dashboard/flows/new'
   const createIaActive = newFlowActive || editorTool === 'ia'
 
-  const settingsProfileActive = pathname.startsWith('/dashboard/settings/profile')
+  const accountNavActive = pathname.startsWith('/dashboard/account')
   const settingsPlanActive = pathname.startsWith('/dashboard/settings/plan')
   const settingsTeamActive = pathname.startsWith('/dashboard/settings/team')
 
@@ -317,20 +317,31 @@ export default function DiloDashboardShell({ children }: { children: React.React
       >
         <div className="h-16 border-b border-[#E5E7EB] dark:border-[#2A2F3F] flex items-center justify-center w-full relative px-3">
           <div className="h-full w-full flex flex-col items-center justify-center min-h-0 py-2">
-            {!isSidebarCollapsed ? (
-              <>
-                <span className="text-lg font-bold tracking-tight bg-linear-to-r from-[#9C77F5] to-[#00d4b0] bg-clip-text text-transparent">
-                  Dilo
-                </span>
-                <span className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF] text-center leading-tight mt-0.5">
-                  Prompts en conversaciones con IA
-                </span>
-              </>
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#9C77F5] to-[#9C77F5]/60 flex items-center justify-center text-white font-bold text-lg">
-                D
-              </div>
-            )}
+            <Link
+              href="/dashboard"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                'flex min-w-0 items-center text-left',
+                isSidebarCollapsed ? 'justify-center' : 'flex-col gap-0.5',
+              )}
+              aria-label="Dilo — Mis flows"
+            >
+              {isSidebarCollapsed ? (
+                <DiloBrandLockup showWordmark={false} imageHeight={36} className="justify-center" />
+              ) : (
+                <>
+                  <DiloBrandLockup
+                    imageHeight={28}
+                    gapClassName="gap-[10px]"
+                    wordmarkClassName="text-lg font-bold tracking-tight text-[#111827] dark:text-[#F9FAFB]"
+                    className="min-w-0 justify-center"
+                  />
+                  <span className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF] text-center leading-tight">
+                    Prompts en conversaciones con IA
+                  </span>
+                </>
+              )}
+            </Link>
           </div>
           <button
             type="button"
@@ -450,12 +461,12 @@ export default function DiloDashboardShell({ children }: { children: React.React
           <ul className="space-y-1">
             <li>
               <Link
-                href="/dashboard/settings/profile"
+                href="/dashboard/account"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={navBtn(settingsProfileActive, isSidebarCollapsed)}
+                className={navBtn(accountNavActive, isSidebarCollapsed)}
               >
                 <UserCircleIcon className="w-5 h-5 shrink-0" />
-                {!isSidebarCollapsed && <span className="flex-1 text-left">Perfil</span>}
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Mi cuenta</span>}
               </Link>
             </li>
             <li>

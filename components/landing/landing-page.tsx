@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import ChatMockAuto from './chat-mock-auto'
+import { DiloBrandLockup } from '@/components/dilo-brand-lockup'
+import { DiloPhoneField, formatPhoneNumberIntl, isValidPhoneNumber } from '@/components/dilo-phone-field'
 
 /* ── Design tokens ──────────────────────────────────────────── */
 const P = '#7C3AED'
@@ -195,12 +197,12 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
       {/* Main bar */}
       <div style={{ maxWidth: 1140, margin: '0 auto', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: P, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="chat" size={16} color="#fff" />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 20, color: t.text, letterSpacing: '-.5px' }}>dilo</span>
-        </div>
+        <DiloBrandLockup
+          imageHeight={40}
+          gapClassName="gap-[10px]"
+          wordmarkClassName="font-bold"
+          wordmarkStyle={{ fontSize: 30, color: t.text, letterSpacing: '-.5px' }}
+        />
 
         {/* Desktop links */}
         <div className="landing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -691,6 +693,33 @@ function DemoSection({ t }: { t: ThemeTokens }) {
                     </div>
                   )
                 }
+                const textStep = isText ? (curStep as Extract<FlowStep, { kind: 'text' }>) : null
+                const isPhoneDemo = Boolean(textStep?.field === 'phone')
+                if (isPhoneDemo && textStep) {
+                  return (
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid #F0EBFF', background: '#FAFAFA', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <DiloPhoneField
+                          variant="landing"
+                          value={val}
+                          onChange={setVal}
+                          placeholder={textStep.ph}
+                          disabled={!isText}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!val.trim() || !isValidPhoneNumber(val)) return
+                          const display = formatPhoneNumberIntl(val) || val
+                          submit(display, val)
+                        }}
+                        disabled={!val.trim() || !isText || !isValidPhoneNumber(val)}
+                        style={{ background: val.trim() && isText && isValidPhoneNumber(val) ? P : '#E5E7EB', color: val.trim() && isText && isValidPhoneNumber(val) ? '#fff' : '#9CA3AF', border: 'none', borderRadius: 100, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: val.trim() && isText && isValidPhoneNumber(val) ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background .2s', whiteSpace: 'nowrap' }}
+                      >Enviar →</button>
+                    </div>
+                  )
+                }
                 return (
                   <div style={{ padding: '12px 14px', borderTop: '1px solid #F0EBFF', background: '#FAFAFA', display: 'flex', gap: 8 }}>
                     <input value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit(val)} disabled={!isText}
@@ -815,11 +844,13 @@ function Footer({ t }: { t: ThemeTokens }) {
       <div style={{ maxWidth: 1140, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 40, marginBottom: 48 }}>
           <div style={{ maxWidth: 220 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: P, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="chat" size={14} color="#fff" />
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 18, color: '#fff', letterSpacing: '-.5px' }}>dilo</span>
+            <div style={{ marginBottom: 16 }}>
+              <DiloBrandLockup
+                imageHeight={35}
+                gapClassName="gap-[10px]"
+                wordmarkClassName="font-bold"
+                wordmarkStyle={{ fontSize: 27.5, color: '#fff', letterSpacing: '-.5px' }}
+              />
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', lineHeight: 1.7 }}>Flows conversacionales que convierten más, con menos fricción.</p>
           </div>

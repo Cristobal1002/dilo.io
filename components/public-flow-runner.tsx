@@ -5,6 +5,7 @@ import { ChevronLeftIcon, MoonIcon, PencilSquareIcon, PhotoIcon, SunIcon } from 
 import { readApiResult } from '@/lib/read-api-result'
 import type { PublicFlowRecord, PublicFlowStep } from '@/lib/load-published-flow'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
+import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field'
 import { cn } from '@/lib/utils'
 import {
   buildFileItemsFromFiles,
@@ -1010,6 +1011,7 @@ export function PublicFlowRunner({
     const v = textInput.trim()
     if (!v && activeStep.required) return
     if (activeStep.type === 'email' && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return
+    if (activeStep.type === 'phone' && v && !isValidPhoneNumber(v)) return
     advance(v)
   }
 
@@ -1425,16 +1427,23 @@ export function PublicFlowRunner({
                       rows={3}
                       className="min-h-22 w-full flex-1 resize-none rounded-2xl border border-[#9C77F5]/20 bg-white/95 px-4 py-3 text-sm text-[#1A1A1A] shadow-[0_2px_10px_rgba(15,11,26,0.04)] outline-none ring-0 placeholder:text-[#9CA3AF] focus:border-[#9C77F5]/45 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB] dark:placeholder:text-[#6B7280]"
                     />
+                  ) : activeStep.type === 'phone' ? (
+                    <div className="w-full min-w-0 flex-1">
+                      <DiloPhoneField
+                        variant="publicFlow"
+                        value={textInput}
+                        onChange={setTextInput}
+                        placeholder={activeStep.placeholder ?? 'Número de teléfono'}
+                      />
+                    </div>
                   ) : (
                     <input
                       type={
                         activeStep.type === 'email'
                           ? 'email'
-                          : activeStep.type === 'phone'
-                            ? 'tel'
-                            : activeStep.type === 'number'
-                              ? 'number'
-                              : 'text'
+                          : activeStep.type === 'number'
+                            ? 'number'
+                            : 'text'
                       }
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
@@ -1454,6 +1463,13 @@ export function PublicFlowRunner({
                     className="shrink-0 rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-6 py-3 text-sm font-bold text-white shadow-[0_4px_18px_rgba(156,119,245,0.4)] disabled:opacity-40"
                     disabled={
                       (activeStep.required && !textInput.trim()) ||
+                      (activeStep.type === 'phone' &&
+                        activeStep.required &&
+                        (!textInput.trim() || !isValidPhoneNumber(textInput))) ||
+                      (activeStep.type === 'phone' &&
+                        !activeStep.required &&
+                        Boolean(textInput.trim()) &&
+                        !isValidPhoneNumber(textInput)) ||
                       (activeStep.type === 'email' &&
                         Boolean(textInput.trim()) &&
                         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(textInput.trim()))

@@ -23,20 +23,19 @@ const log = createLogger('webhooks/clerk')
 
 type ClerkEmailAddress = { email_address: string; id: string }
 
-type ClerkUserCreatedEvent = {
-  type: 'user.created'
-  data: {
-    id: string
-    first_name: string | null
-    last_name: string | null
-    email_addresses: ClerkEmailAddress[]
-    primary_email_address_id: string | null
-    image_url: string | null
-    created_at: number
-  }
+/** Payload inside `user.created` — verified at runtime by Clerk + svix, typed here for TS. */
+type ClerkUserCreatedData = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  email_addresses: ClerkEmailAddress[]
+  primary_email_address_id: string | null
+  image_url: string | null
+  created_at: number
 }
 
-type ClerkWebhookEvent = ClerkUserCreatedEvent | { type: string; data: unknown }
+/** Svix verify returns `unknown`-shaped data; do not union with `{ data: unknown }` or `data` becomes `unknown`. */
+type ClerkWebhookEvent = { type: string; data: unknown }
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
@@ -76,7 +75,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  const { id: clerkId, first_name, last_name, email_addresses, primary_email_address_id } = event.data
+  const { id: clerkId, first_name, last_name, email_addresses, primary_email_address_id } =
+    event.data as ClerkUserCreatedData
 
   const primaryEmail = email_addresses.find(
     (e) => e.id === primary_email_address_id,

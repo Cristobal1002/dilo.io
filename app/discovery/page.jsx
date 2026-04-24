@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { discoveryPublicSessionPath } from '@/lib/discovery-stub';
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event';
+import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field';
 
 // ─── Brand (alineado con tokens Dilo en globals.css) ─────────────────────────
 const P = '#9C77F5';
@@ -1169,7 +1170,28 @@ function InputArea({
     </InputShell>
   );
 
-  // Text / email / tel
+  if (step.type === 'tel') {
+    const canTel = step.optional
+      ? !inputValue.trim() || isValidPhoneNumber(inputValue)
+      : isValidPhoneNumber(inputValue);
+    return (
+      <InputShell hint={step.hint} topSlot={editBanner}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <DiloPhoneField
+              variant="discovery"
+              value={inputValue}
+              onChange={setInputValue}
+              placeholder={step.placeholder || 'Número de teléfono'}
+            />
+          </div>
+          <SubmitBtn label="Enviar →" disabled={!canTel} onClick={onSubmit} />
+        </div>
+      </InputShell>
+    );
+  }
+
+  // Text / email
   return (
     <InputShell hint={step.hint} topSlot={editBanner}>
       <div style={{ display: 'flex', gap: 8 }}>

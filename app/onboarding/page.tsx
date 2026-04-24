@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser, useClerk } from '@clerk/nextjs'
 import { ArrowRightIcon } from '@heroicons/react/24/outline'
+import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field'
 
 /* ── Design tokens ── */
 const P = '#7C3AED'
@@ -235,6 +236,7 @@ export default function OnboardingPage() {
   const handleAnswer = useCallback((value: string) => {
     const s = STEPS[currentStep]
     if (!s || !value.trim()) return
+    if (s.type === 'tel' && !isValidPhoneNumber(value.trim())) return
     const label = s.type === 'select'
       ? s.options.find(o => o.value === value)?.label ?? value
       : value
@@ -369,6 +371,30 @@ export default function OnboardingPage() {
                     {opt.label}
                   </button>
                 ))}
+              </div>
+            ) : step.type === 'tel' ? (
+              <div style={{ paddingLeft: 44, display: 'flex', gap: 10, alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <DiloPhoneField
+                    variant="onboarding"
+                    value={inputValue}
+                    onChange={setInputValue}
+                    placeholder={step.placeholder}
+                    disabled={submitting}
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAnswer(inputValue)}
+                  disabled={submitting || !inputValue.trim() || !isValidPhoneNumber(inputValue)}
+                  style={{ width: 48, height: 48, borderRadius: '50%', background: inputValue.trim() && isValidPhoneNumber(inputValue) ? P : 'rgba(255,255,255,.1)', border: 'none', cursor: inputValue.trim() && isValidPhoneNumber(inputValue) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s', flexShrink: 0 }}
+                >
+                  {submitting
+                    ? <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', display: 'block', animation: 'spin .8s linear infinite' }} />
+                    : <ArrowRightIcon style={{ width: 18, height: 18, color: inputValue.trim() && isValidPhoneNumber(inputValue) ? '#fff' : 'rgba(255,255,255,.3)' } as React.CSSProperties} strokeWidth={2.5} />
+                  }
+                </button>
               </div>
             ) : (
               <div style={{ paddingLeft: 44, display: 'flex', gap: 10 }}>

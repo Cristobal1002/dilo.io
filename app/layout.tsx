@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Space_Grotesk } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { esES } from '@clerk/localizations'
+import { diloClerkAppearance } from '@/lib/clerk-appearance'
 import { ToastProvider } from '@/components/ui/toast'
 import './globals.css'
 
@@ -14,6 +15,9 @@ const diloSans = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Dilo',
   description: 'Convierte texto en flujos conversacionales inteligentes',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
@@ -22,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider localization={esES}>
+    <ClerkProvider localization={esES} appearance={diloClerkAppearance}>
       <html lang="es">
         <body className={`${diloSans.variable} font-sans antialiased`}>
           <ToastProvider>

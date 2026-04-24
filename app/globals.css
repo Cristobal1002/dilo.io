@@ -205,6 +205,14 @@ button[aria-disabled='true'],
   border: 1px solid #2a2f3f;
   border-radius: 8px;
   overflow: visible;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-input-container .react-international-phone-input {
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
 }
 
 .mordecai-phone-input-wrapper .react-international-phone-country-selector {
@@ -213,7 +221,7 @@ button[aria-disabled='true'],
 
 .mordecai-phone-input-wrapper .react-international-phone-input-container:focus-within {
   border-color: #9c77f5;
-  box-shadow: 0 0 0 2px rgba(156, 119, 245, 0.2);
+  box-shadow: none !important;
 }
 
 .mordecai-phone-input-wrapper .react-international-phone-input-container input {
@@ -221,6 +229,13 @@ button[aria-disabled='true'],
   color: #f8f9fb !important;
   border: none !important;
   padding: 0.625rem 1rem;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.mordecai-phone-input-wrapper .react-international-phone-input-container input:focus,
+.mordecai-phone-input-wrapper .react-international-phone-input-container input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .mordecai-phone-input-wrapper .react-international-phone-input-container input::placeholder {
@@ -233,18 +248,41 @@ button[aria-disabled='true'],
   border-right: 1px solid #2a2f3f !important;
   color: #f8f9fb !important;
   padding: 0 0.75rem;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
-/* Dropdown: fondo oscuro para que el texto claro se vea */
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-button:focus,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Dropdown: hacia arriba (footer / pie de formulario) para no empujar ni “romper” el layout en móvil y desktop */
 .mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown {
+  top: auto !important;
+  bottom: 100% !important;
+  left: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 6px !important;
+  width: min(300px, calc(100vw - 2rem)) !important;
+  max-height: min(40dvh, 220px) !important;
+  min-height: 0 !important;
   background-color: #1a1d29 !important;
   border: 1px solid #2a2f3f !important;
   border-radius: 8px !important;
   z-index: 99999 !important;
   overflow-y: auto !important;
-  max-height: 240px !important;
-  min-height: 120px !important;
+  overflow-x: hidden !important;
   color: #f8f9fb !important;
+  outline: none !important;
+  box-shadow: 0 -6px 28px rgba(15, 11, 26, 0.18) !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown:focus,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown:focus-within {
+  outline: none !important;
 }
 
 /* List items: texto claro sobre fondo oscuro */
@@ -278,17 +316,416 @@ button[aria-disabled='true'],
 .mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input {
   background-color: #252936 !important;
   color: #f8f9fb !important;
-  border-color: #2a2f3f !important;
+  border: 1px solid #2a2f3f !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input:focus,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: rgba(156, 119, 245, 0.45) !important;
 }
 
 .mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown input::placeholder {
   color: #6b7280 !important;
 }
 
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item:focus,
+.mordecai-phone-input-wrapper .react-international-phone-country-selector-dropdown__list-item:focus-visible {
+  outline: none !important;
+}
+
 /* Error state for phone input */
 .mordecai-phone-input-wrapper.mordecai-phone-input-error .react-international-phone-input-container {
-  border-color: rgba(239, 68, 68, 0.6) !important;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.75) !important;
+  box-shadow: none !important;
+}
+
+/* Variantes claras (landing, perfil): mismo patrón Mordecai con foco violeta, sin ring azul */
+.mordecai-phone-input-wrapper.mordecai-phone-input--light {
+  --react-international-phone-height: 42px;
+  --react-international-phone-background-color: #ffffff;
+  --react-international-phone-text-color: #1a1a1a;
+  --react-international-phone-font-size: 14px;
+  --react-international-phone-border-radius: 12px;
+  --react-international-phone-border-color: rgba(156, 119, 245, 0.22);
+  --react-international-phone-dropdown-item-background-color: #ffffff;
+  --react-international-phone-dropdown-item-text-color: #1a1a1a;
+  --react-international-phone-dropdown-item-dial-code-color: #6b7280;
+  --react-international-phone-selected-dropdown-item-background-color: #f3eeff;
+  --react-international-phone-selected-dropdown-item-text-color: #1a1a1a;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-input-container {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(156, 119, 245, 0.22) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-input-container input {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-button {
+  background-color: #ffffff !important;
+  border: none !important;
+  border-right: 1px solid rgba(156, 119, 245, 0.18) !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(156, 119, 245, 0.22) !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  box-shadow: 0 -6px 28px rgba(15, 11, 26, 0.08) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item {
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item:hover,
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item--focused,
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #f3eeff !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #6b7280 !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown input {
+  background-color: #f9fafb !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown input:focus,
+.mordecai-phone-input-wrapper.mordecai-phone-input--light .react-international-phone-country-selector-dropdown input:focus-visible {
+  border-color: rgba(156, 119, 245, 0.45) !important;
+}
+
+/* Perfil / ajustes: claro por defecto, oscuro con .dark en html */
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-input-container,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-input-container input,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-button {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-input-container {
+  border-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-button {
+  border-right-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown {
+  background-color: #1a1d29 !important;
+  border: 1px solid #2a2f3f !important;
+  color: #f8f9fb !important;
+  outline: none !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown__list-item,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown__list-item:hover,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown__list-item--focused,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--dashboard .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #2a2f3f !important;
+  color: #f8f9fb !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--dashboard.mordecai-phone-input--light .react-international-phone-input-container {
+  border-radius: 0.75rem !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--dashboard.mordecai-phone-input--light
+  .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #6b7280 !important;
+}
+
+/* Onboarding: pill sobre fondo oscuro */
+.mordecai-phone-input-wrapper.mordecai-phone-input--onboarding .react-international-phone-input-container {
+  border-radius: 999px !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--onboarding .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--onboarding .react-international-phone-input-container input {
+  background-color: transparent !important;
+  color: #ffffff !important;
+  font-size: 0.9375rem !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--onboarding .react-international-phone-country-selector-button {
+  background-color: transparent !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--onboarding .react-international-phone-country-selector-button:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Landing demo: mismo peso de borde que el input de texto del paso (1.5px #E5E7EB) */
+.mordecai-phone-input-wrapper.mordecai-phone-input--landing .react-international-phone-input-container {
+  border-radius: 999px !important;
+  border: 1.5px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--landing .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--landing .react-international-phone-country-selector-button {
+  border-right: 1px solid #e5e7eb !important;
+}
+
+/* Discovery: superficie clara por defecto; tema oscuro con .dark (toggle discovery) */
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container {
+  border-radius: 999px !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(156, 119, 245, 0.22) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container input {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-button {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #1a1a1a !important;
+  border-right: 1px solid rgba(156, 119, 245, 0.18) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(156, 119, 245, 0.22) !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  box-shadow: 0 -6px 28px rgba(15, 11, 26, 0.08) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item,
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item:hover,
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item--focused,
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #f3eeff !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #6b7280 !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown input {
+  background-color: #f9fafb !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container input,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-button {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container {
+  border-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-button {
+  border-right-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown {
+  background-color: #1a1d29 !important;
+  border: 1px solid #2a2f3f !important;
+  color: #f8f9fb !important;
+  outline: none !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item:hover,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item--focused,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #2a2f3f !important;
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #9ca3af !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-country-selector-dropdown input {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+  border-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--discovery .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+/* Flow público: mismo criterio que discovery */
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container {
+  border-radius: 1rem !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(156, 119, 245, 0.2) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container input {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-button {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #1a1a1a !important;
+  border-right: 1px solid rgba(156, 119, 245, 0.18) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(156, 119, 245, 0.22) !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  box-shadow: 0 -6px 28px rgba(15, 11, 26, 0.08) !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item,
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item:hover,
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item--focused,
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #f3eeff !important;
+  color: #1a1a1a !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #6b7280 !important;
+}
+
+.mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown input {
+  background-color: #f9fafb !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container input,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-button {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container {
+  border-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-button {
+  border-right-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown {
+  background-color: #1a1d29 !important;
+  border: 1px solid #2a2f3f !important;
+  color: #f8f9fb !important;
+  outline: none !important;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item-country-name {
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item:hover,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item--focused,
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: #2a2f3f !important;
+  color: #f8f9fb !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown__list-item-dial-code {
+  color: #9ca3af !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-country-selector-dropdown input {
+  background-color: #252936 !important;
+  color: #f8f9fb !important;
+  border-color: #2a2f3f !important;
+}
+
+.dark .mordecai-phone-input-wrapper.mordecai-phone-input--publicFlow .react-international-phone-input-container:focus-within {
+  border-color: #9c77f5 !important;
+  box-shadow: none !important;
+}
+
+/* Error por encima del foco violeta (perfil, etc.) */
+.mordecai-phone-input-wrapper.mordecai-phone-input-error .react-international-phone-input-container:focus-within {
+  border-color: rgba(239, 68, 68, 0.85) !important;
+  box-shadow: none !important;
 }
 
 /* Checkbox - white checkmark in light & dark, green accent */
@@ -542,3 +979,4 @@ input[type="checkbox"].mordecai-checkbox:focus {
     animation: none !important;
   }
 }
+

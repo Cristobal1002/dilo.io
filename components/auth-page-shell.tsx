@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { MoonIcon, SunIcon } from '@heroicons/react/24/outline'
+import { DiloBrandLockup } from '@/components/dilo-brand-lockup'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
 
 const THEME_STORAGE_KEY = 'theme'
@@ -103,11 +104,17 @@ export function AuthPageShell({
       <main className="relative z-10 flex flex-1 flex-col items-center px-4 pb-16 pt-2 sm:px-6 sm:pt-0">
         <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center">
           <div className="mb-8 text-center">
-            <p className="select-none text-[1.75rem] font-black leading-none tracking-tight">
-              <span className="bg-linear-to-r from-[#9C77F5] via-[#8B5CF6] to-[#00d4b0] bg-clip-text text-transparent">
-                DILO
-              </span>
-            </p>
+            <div
+              className="relative mx-auto flex w-fit justify-center"
+              style={{ filter: 'drop-shadow(0 10px 28px rgba(156,119,245,.22))' }}
+            >
+              <DiloBrandLockup
+                imageHeight={38}
+                className="justify-center"
+                gapClassName="gap-[10px]"
+                wordmarkClassName="text-[28px] font-bold tracking-tight text-[#111827] dark:text-[#F9FAFB]"
+              />
+            </div>
             <div
               className="mx-auto mt-3 h-1 w-10 rounded-full bg-linear-to-r from-[#9C77F5] to-[#00d4b0]"
               aria-hidden
