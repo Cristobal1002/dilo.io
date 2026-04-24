@@ -14,11 +14,31 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
 
-  // OpenAI
-  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
+  /**
+   * Solo rutas que llaman a OpenAI la necesitan; no puede bloquear el resto de la API
+   * (p. ej. settings/me) porque `logger` importa este módulo en todas las rutas.
+   */
+  OPENAI_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() ? v.trim() : undefined)),
 
-  // App
-  NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
+  /**
+   * En Vercel a veces queda definida pero vacía; `z.string().url().default()` no aplica si llega "".
+   */
+  NEXT_PUBLIC_APP_URL: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const fallback = 'http://localhost:3000'
+      const t = v?.trim()
+      if (!t) return fallback
+      try {
+        return new URL(t).toString()
+      } catch {
+        return fallback
+      }
+    }),
 
   // Optional
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -30,7 +50,7 @@ const parsed = EnvSchema.safeParse(process.env)
 if (!parsed.success) {
   console.error('❌ Invalid environment variables:')
   console.error(parsed.error.flatten().fieldErrors)
-  throw new Error('Invalid environment variables — check your .env.local')
+  throw new Error('Invalid environment variables — check .env.local or Vercel project env')
 }
 
 export const env = parsed.data

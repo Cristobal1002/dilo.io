@@ -43,6 +43,11 @@ const RequestSchema = z.object({
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   const { org, userId } = auth
 
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    log.error({ orgId: org.id, userId }, 'OPENAI_API_KEY is not set')
+    throw new InternalError()
+  }
+
   // Validate input
   const body = await req.json()
   const parsed = RequestSchema.safeParse(body)

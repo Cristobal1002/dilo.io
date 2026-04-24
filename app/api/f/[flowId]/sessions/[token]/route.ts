@@ -1,4 +1,4 @@
-import { NextRequest, after } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -212,20 +212,14 @@ export const PUT = withApiHandler(
     )
 
     if (completed && !wasAlreadyCompleted) {
-      // En producción, after() encola el trabajo (Vercel waitUntil) sin alargar la respuesta al visitante.
-      // En desarrollo, after() no es fiable con `next dev`; await aquí acepta ~10–15s extra en el PUT.
-      if (process.env.NODE_ENV === 'production') {
-        after(() => {
-          void processSessionCompletion(sessionRow.id).catch((err) => {
-            log.error({ err, sessionId: sessionRow.id }, 'processSessionCompletion failed')
-          })
-        })
-      } else {
-        try {
-          await processSessionCompletion(sessionRow.id)
-        } catch (err) {
-          log.error({ err, sessionId: sessionRow.id }, 'processSessionCompletion failed')
-        }
+      // Importante: en Vercel el trabajo dentro de `after()` a veces no alcanza a terminar (GPT + DB)
+      // antes de congelar la función, y la fila `results` nunca se crea → "sin resumen de IA" en el panel.
+      // Hacemos await aquí; `maxDuration` del segmento ya es 120s. El visitante puede esperar unos
+      // segundos más en el último envío, pero el scoring queda garantizado.
+      try {
+        await processSessionCompletion(sessionRow.id)
+      } catch (err) {
+        log.error({ err, sessionId: sessionRow.id }, 'processSessionCompletion failed')
       }
     }
 
