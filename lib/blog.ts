@@ -5,6 +5,11 @@ import { z } from 'zod'
 
 const BLOG_DIR = path.join(process.cwd(), 'content', 'blog')
 
+const faqItemSchema = z.object({
+  q: z.string().min(1).max(500),
+  a: z.string().min(1).max(5000),
+})
+
 export const BlogFrontmatterSchema = z.object({
   title: z.string().min(1).max(120),
   description: z.string().min(1).max(200),
@@ -15,6 +20,8 @@ export const BlogFrontmatterSchema = z.object({
     .refine((d) => !Number.isNaN(d.getTime()), 'Invalid date'),
   canonical: z.string().url().optional(),
   draft: z.boolean().optional().default(false),
+  /** Preguntas frecuentes → JSON-LD FAQPage (opcional, por post). */
+  faq: z.array(faqItemSchema).optional(),
 })
 
 export type BlogFrontmatter = z.infer<typeof BlogFrontmatterSchema>

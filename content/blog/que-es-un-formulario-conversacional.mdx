@@ -1,31 +1,83 @@
 ---
 title: "Qué es un formulario conversacional (y por qué convierte más)"
-description: "Definición clara, ejemplos y cuándo conviene usar un flow conversacional en lugar de un formulario tradicional."
+description: "Definición clara, ejemplos reales y cuándo conviene usar un flow conversacional en lugar de un formulario tradicional."
 date: "2026-04-27"
 canonical: "https://getdilo.io/blog/que-es-un-formulario-conversacional"
+faq:
+  - q: "¿Qué es un formulario conversacional?"
+    a: "Un formulario conversacional presenta las preguntas una a la vez, en formato chat. En lugar de ver muchos campos al mismo tiempo, la persona responde de forma guiada, como en una conversación. Esto reduce la fricción, mejora la experiencia en móvil y permite hacer preguntas de seguimiento según lo que el usuario responde."
+  - q: "¿Un formulario conversacional convierte más que uno tradicional?"
+    a: "Sí, en la mayoría de los casos. Los formularios conversacionales reducen la carga cognitiva al mostrar una sola pregunta por pantalla, generan mayor sensación de trato personalizado y tienen tasas de abandono más bajas en mobile. Son especialmente efectivos en discovery de proyectos, calificación de leads y onboarding."
+  - q: "¿Cuándo NO usar un formulario conversacional?"
+    a: "Si el usuario necesita ver todos los campos juntos para comparar o editar (por ejemplo, un presupuesto detallado con muchas líneas), un formulario tradicional puede ser más cómodo. Los flows conversacionales brillan cuando hay más de 4 preguntas y el contexto lo permite."
 ---
 
-Un **formulario conversacional** presenta las preguntas **una a la vez**, en formato chat. En lugar de ver 10 campos al mismo tiempo, la persona responde de forma guiada, como si hablara con alguien.
+Un **formulario conversacional** es una forma de capturar información que presenta las preguntas **una a la vez**, en formato chat. En lugar de mostrar 10 campos simultáneos, guía a la persona como si fuera una conversación: pregunta, respuesta, siguiente pregunta.
+
+El resultado: menos abandono, mejores datos y una experiencia que se siente humana incluso cuando es completamente automática.
 
 ![Formulario tradicional vs conversacional](/blog/que-es-un-formulario-conversacional/before-after-forms.png)
 
-## Por qué convierte más que un formulario tradicional
+## Formulario tradicional vs. conversacional
 
-- **Menos fricción**: una pregunta por pantalla reduce carga cognitiva.
-- **Mejor en móvil**: es más natural en pantallas pequeñas.
-- **Más contexto**: puedes hacer preguntas de seguimiento sin “romper” la experiencia.
+| | Formulario tradicional | Formulario conversacional |
+|---|---|---|
+| Cómo se ve | Todos los campos en una sola pantalla | Una pregunta a la vez, formato chat |
+| Fricción cognitiva | Alta (el usuario ve todo de golpe) | Baja (foco en una cosa a la vez) |
+| Experiencia móvil | Incómoda (scroll, campos pequeños) | Fluida (diseñada para táctil) |
+| Lógica condicional | Difícil de implementar sin UX compleja | Natural (la siguiente pregunta depende de la anterior) |
+| Conversión típica | Baja en formularios largos (>4 campos) | Mayor en casi todos los contextos |
 
-## Casos de uso típicos
+La diferencia no es solo visual. Es cognitiva: cuando alguien ve un formulario con 12 campos, su primer instinto es buscar el botón de cerrar.
 
-- Discovery de proyectos (web, branding, consultoría)
-- Calificación de leads (intención, plazo, presupuesto en rangos)
-- Onboarding de clientes (requisitos, activos, accesos)
+## Por qué convierte más
+
+**1. Una pregunta = un foco**
+Cada pantalla tiene un solo objetivo. La persona no decide qué completar primero ni siente el peso del formulario completo.
+
+**2. Progreso visible**
+Una barra o contador de pasos ("3 de 7") activa el efecto de progreso: una vez que empezaste, quieres terminar.
+
+**3. Lógica condicional sin fricción**
+Si alguien elige "presupuesto menor a $2,000", puedes saltarte la pregunta sobre funcionalidades avanzadas. En un formulario tradicional, ese salto es invisible o confuso. En un flow conversacional, simplemente no aparece.
+
+**4. Mejor en móvil**
+Más del 60% del tráfico web es desde celular. Los campos pequeños, el scroll infinito y el teclado que tapa el formulario destruyen la conversión. Un flow conversacional es nativamente táctil.
+
+## Casos de uso donde funcionan mejor
+
+**Discovery de proyectos (agencias, freelancers)**
+En lugar de una reunión de 30 minutos para entender qué necesita un cliente, un flow conversacional captura tipo de proyecto, presupuesto, plazo y funcionalidades clave en menos de 3 minutos — con la información estructurada lista para cotizar.
+
+**Calificación de leads**
+Un lead que completa un flow ya se pre-calificó solo: declaró su intención, su presupuesto y su urgencia. El equipo comercial llega a la llamada con contexto real, no con suposiciones.
+
+**Onboarding de clientes**
+Solicitar accesos, activos, requisitos técnicos o preferencias de comunicación en formato conversacional es más rápido y genera menos confusión que un PDF editable o un email con lista de pendientes.
+
+**Encuestas internas**
+Los empleados completan más encuestas cuando son cortas y conversacionales. La tasa de respuesta sube cuando el formato no se siente como "rellenar un formulario de RRHH".
+
+## Cuándo NO usar un formulario conversacional
+
+No todo es mejor en formato chat. Hay contextos donde el formulario tradicional gana:
+
+- **Formularios de muchos campos dependientes entre sí** (ej: pedidos complejos donde el usuario necesita ver todo para comparar)
+- **Usuarios que ya conocen el proceso** y solo quieren llenarlo rápido (ej: un formulario de impuestos que completan cada año)
+- **Contextos donde la velocidad importa más que la experiencia** (ej: filtros de búsqueda en e-commerce)
+
+La regla simple: si tienes más de 4 preguntas y el usuario no necesita ver el cuadro completo, el flow conversacional casi siempre gana.
 
 ## Cómo crear uno con Dilo
 
-En Dilo describes lo que necesitas en texto y la IA genera el flow completo (preguntas, tipos de campo y scoring).
+En Dilo describes lo que necesitas en texto plano y la IA genera el flow completo: preguntas, tipos de campo (texto libre, selección, escala), lógica condicional básica y scoring automático.
 
-> Tip: si preguntas por dinero, usa rangos (select) en vez de número libre.
+Ejemplo de input:
+
+> "Necesito calificar leads para mi agencia: tipo de proyecto, presupuesto en rangos, plazo y si ya tienen diseño."
+
+Dilo genera el flow listo para compartir — sin código, sin configuración manual.
+
+> **Tip:** si preguntas por dinero, usa rangos con `select` en lugar de campo numérico libre. Las personas responden más cuando no tienen que justificar un número exacto.
 
 <Cta href="/sign-up">Crear mi primer flow gratis</Cta>
-

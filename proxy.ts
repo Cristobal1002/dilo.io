@@ -14,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   '/discovery(.*)',
   '/privacy',             // política de privacidad — pública
   '/terms',               // términos de servicio — públicos
+  '/blog(.*)',            // blog — contenido público (índice y posts)
 ])
 
 export default clerkMiddleware(async (auth, request) => {

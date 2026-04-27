@@ -69,7 +69,11 @@ body {
 .dilo-prose > :first-child { margin-top: 0; }
 .dilo-prose > :last-child { margin-bottom: 0; }
 .dilo-prose p { margin: 14px 0; }
-.dilo-prose a { color: var(--dilo-primary); text-decoration: underline; text-underline-offset: 3px; }
+.dilo-prose a:not(.dilo-mdx-cta) {
+  color: var(--dilo-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .dilo-prose strong { color: var(--foreground); font-weight: 700; }
 .dilo-prose code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
@@ -122,6 +126,70 @@ body {
 }
 .dark .dilo-prose img {
   border-color: rgba(156, 119, 245, 0.22);
+}
+
+/* Tablas GFM (remark-gfm) — scroll horizontal solo en contenedor blog */
+.dilo-prose--blog {
+  overflow-x: auto;
+}
+.dilo-prose :where(table) {
+  width: 100%;
+  min-width: min(100%, 36rem);
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.dark .dilo-prose :where(table) {
+  background: rgba(26, 29, 41, 0.6);
+}
+.dilo-prose :where(thead th) {
+  text-align: left;
+  font-weight: 700;
+  color: var(--foreground);
+  background: rgba(156, 119, 245, 0.08);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+.dark .dilo-prose :where(thead th) {
+  background: rgba(124, 58, 237, 0.18);
+}
+.dilo-prose :where(tbody td),
+.dilo-prose :where(tbody th) {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  color: var(--text-secondary);
+}
+.dark .dilo-prose :where(tbody td),
+.dark .dilo-prose :where(tbody th) {
+  color: #d1d5db;
+}
+.dilo-prose :where(tbody tr:last-child td),
+.dilo-prose :where(tbody tr:last-child th) {
+  border-bottom: none;
+}
+/* Primera columna: etiquetas de fila (comparativas) */
+.dilo-prose :where(tbody th:first-child),
+.dilo-prose :where(tbody td:first-child) {
+  font-weight: 600;
+  color: var(--foreground);
+  background: rgba(156, 119, 245, 0.04);
+  min-width: 7.5rem;
+  max-width: 11rem;
+}
+.dark .dilo-prose :where(tbody th:first-child),
+.dark .dilo-prose :where(tbody td:first-child) {
+  background: rgba(124, 58, 237, 0.08);
+}
+.dilo-prose :where(thead th:first-child) {
+  min-width: 5rem;
 }
 
 button:not(:disabled):not([aria-disabled='true']),

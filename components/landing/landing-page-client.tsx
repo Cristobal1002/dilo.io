@@ -116,6 +116,7 @@ const ICONS = {
   db:     'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 2.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125',
   sun:    'M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z',
   moon:   'M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z',
+  user:   'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z',
 }
 
 type IconKey = keyof typeof ICONS
@@ -188,6 +189,8 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
   const navBdr   = scrolled || menuOpen ? `1px solid ${t.navBorder}` : 'none'
   const blur     = scrolled || menuOpen ? 'blur(20px)' : 'none'
 
+  const signInBorderIdle = t.dark ? 'rgba(255,255,255,.15)' : t.border
+
   const HamburgerIcon = () => menuOpen
     ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
     : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -205,17 +208,13 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
         />
 
         {/* Desktop links */}
-        <div className="landing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="landing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {(['Cómo funciona', 'Precios'] as const).map(l => (
             <a key={l} href={l === 'Precios' ? '#pricing' : '#como-funciona'} style={{ color: t.navLink, fontSize: 14, fontWeight: 500, textDecoration: 'none', padding: '6px 14px', borderRadius: 8, transition: 'color .2s' }}
               onMouseEnter={e => { (e.target as HTMLElement).style.color = t.text }}
               onMouseLeave={e => { (e.target as HTMLElement).style.color = t.navLink }}
             >{l}</a>
           ))}
-          <Link href="/sign-in" style={{ color: t.navLink, fontSize: 14, fontWeight: 500, textDecoration: 'none', padding: '6px 14px', borderRadius: 8, transition: 'color .2s' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = t.text }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = t.navLink }}
-          >Iniciar sesión</Link>
           <button onClick={toggleTheme} title={isDark ? 'Modo claro' : 'Modo oscuro'} style={{ width: 38, height: 38, borderRadius: 12, background: t.toggleBg, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
             <Icon name={isDark ? 'sun' : 'moon'} size={18} color={t.toggleIcon} />
           </button>
@@ -223,6 +222,37 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '.85' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
           >Crea tu flow gratis</Link>
+          <Link
+            href="/sign-in"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              marginLeft: 4,
+              background: 'transparent',
+              color: t.textSub,
+              border: `1.5px solid ${signInBorderIdle}`,
+              borderRadius: 100,
+              padding: '9px 16px',
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: 'none',
+              transition: 'border-color .2s,color .2s',
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.borderColor = P
+              el.style.color = t.text
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.borderColor = signInBorderIdle
+              el.style.color = t.textSub
+            }}
+          >
+            <Icon name="user" size={17} color="currentColor" />
+            Sign in
+          </Link>
         </div>
 
         {/* Mobile right: theme toggle + hamburger */}
@@ -246,13 +276,42 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
         >Precios</a>
-        <Link href="/sign-in" onClick={closeMenu} style={{ display: 'block', padding: '13px 16px', borderRadius: 12, color: t.text, fontSize: 16, fontWeight: 500, textDecoration: 'none', background: 'transparent', transition: 'background .15s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-        >Iniciar sesión</Link>
         <div style={{ height: 1, background: t.border, margin: '8px 0' }} />
         <Link href="/sign-up" onClick={closeMenu} style={{ display: 'block', background: P, color: '#fff', borderRadius: 14, padding: '14px 20px', fontSize: 16, fontWeight: 700, textDecoration: 'none', textAlign: 'center', boxShadow: `0 4px 16px ${P}40` }}>
           Crea tu flow gratis →
+        </Link>
+        <Link
+          href="/sign-in"
+          onClick={closeMenu}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            margin: '12px 16px 0',
+            background: 'transparent',
+            color: t.textSub,
+            border: `1.5px solid ${signInBorderIdle}`,
+            borderRadius: 100,
+            padding: '14px 22px',
+            fontSize: 15,
+            fontWeight: 600,
+            textDecoration: 'none',
+            transition: 'border-color .2s,color .2s',
+          }}
+          onMouseEnter={(e) => {
+            const el = e.currentTarget as HTMLElement
+            el.style.borderColor = P
+            el.style.color = t.text
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLElement
+            el.style.borderColor = signInBorderIdle
+            el.style.color = t.textSub
+          }}
+        >
+          <Icon name="user" size={18} color="currentColor" />
+          Sign in
         </Link>
       </div>
     </nav>
