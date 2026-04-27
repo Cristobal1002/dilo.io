@@ -2,7 +2,11 @@ import type { MetadataRoute } from 'next'
 import { listBlogPosts } from '@/lib/blog'
 import { absoluteSiteOrigin } from '@/lib/site-url'
 
-/** Rutas estáticas públicas que existen en `app/` (sin /dashboard, /api, auth). */
+/**
+ * URLs indexables para Google Search (y otros).
+ * Incluye: home, comparativa vs, casos de uso, blog + posts publicados, discovery, legales.
+ * Fuera a propósito: /dashboard, /api, /sign-in, /sign-up, /onboarding, /f/[id] (infinitos).
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = absoluteSiteOrigin()
   const now = new Date()

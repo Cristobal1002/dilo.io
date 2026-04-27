@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/dashboard/', '/api/', '/onboarding/'],
       },
     ],
+    host: new URL(base).hostname,
     sitemap: `${base}/sitemap.xml`,
   }
 }
