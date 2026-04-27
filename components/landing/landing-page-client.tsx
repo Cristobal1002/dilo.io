@@ -215,6 +215,10 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
               onMouseLeave={e => { (e.target as HTMLElement).style.color = t.navLink }}
             >{l}</a>
           ))}
+          <Link href="/blog" style={{ color: t.navLink, fontSize: 14, fontWeight: 500, textDecoration: 'none', padding: '6px 14px', borderRadius: 8, transition: 'color .2s' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = t.text }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = t.navLink }}
+          >Blog</Link>
           <button onClick={toggleTheme} title={isDark ? 'Modo claro' : 'Modo oscuro'} style={{ width: 38, height: 38, borderRadius: 12, background: t.toggleBg, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
             <Icon name={isDark ? 'sun' : 'moon'} size={18} color={t.toggleIcon} />
           </button>
@@ -276,6 +280,10 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
         >Precios</a>
+        <Link href="/blog" onClick={closeMenu} style={{ display: 'block', padding: '13px 16px', borderRadius: 12, color: t.text, fontSize: 16, fontWeight: 500, textDecoration: 'none', background: 'transparent', transition: 'background .15s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.toggleBg }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+        >Blog</Link>
         <div style={{ height: 1, background: t.border, margin: '8px 0' }} />
         <Link href="/sign-up" onClick={closeMenu} style={{ display: 'block', background: P, color: '#fff', borderRadius: 14, padding: '14px 20px', fontSize: 16, fontWeight: 700, textDecoration: 'none', textAlign: 'center', boxShadow: `0 4px 16px ${P}40` }}>
           Crea tu flow gratis →
@@ -496,7 +504,7 @@ function ComoFunciona({ t }: { t: ThemeTokens }) {
           </div>
         </div>
         <Fade delay={.4}>
-          <div style={{ marginTop: 48, padding: '24px 32px', background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, boxShadow: t.dark ? 'none' : `0 2px 12px rgba(124,58,237,.05)` }}>
+          <div id="integraciones" style={{ marginTop: 48, padding: '24px 32px', background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, boxShadow: t.dark ? 'none' : `0 2px 12px rgba(124,58,237,.05)` }}>
             <div style={{ fontSize: 13, color: t.textMuted, fontWeight: 500 }}>Se conecta con tus herramientas</div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {['HubSpot', 'Notion', 'Airtable', 'Slack', 'Zapier', 'Make'].map(tx => (
@@ -904,8 +912,46 @@ function CTAFinal({ t }: { t: ThemeTokens }) {
   )
 }
 
+type FooterLink = { label: string; href: string; external?: boolean }
+
+const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
+  {
+    title: 'Producto',
+    links: [
+      { label: 'Cómo funciona', href: '/#como-funciona' },
+      { label: 'Precios', href: '/#pricing' },
+      { label: 'Demo', href: '/#demo' },
+      { label: 'Integraciones', href: '/#integraciones' },
+      { label: 'Changelog', href: '/blog' },
+    ],
+  },
+  {
+    title: 'Empresa',
+    links: [
+      { label: 'Sobre nosotros', href: '/#como-funciona' },
+      { label: 'Blog', href: '/blog' },
+      {
+        label: 'Contacto',
+        href: 'mailto:legal@modecaitech.com?subject=Consulta%20desde%20getdilo.io',
+        external: true,
+      },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Términos', href: '/terms' },
+      { label: 'Privacidad', href: '/privacy' },
+    ],
+  },
+]
+
 /* ── Footer ─────────────────────────────────────────────────── */
 function Footer({ t }: { t: ThemeTokens }) {
+  const linkStyle = { fontSize: 14, color: 'rgba(255,255,255,.4)', textDecoration: 'none', transition: 'color .2s' } as const
+  const onLinkEnter = (e: React.MouseEvent<HTMLElement>) => { (e.currentTarget as HTMLElement).style.color = '#fff' }
+  const onLinkLeave = (e: React.MouseEvent<HTMLElement>) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,.4)' }
+
   return (
     <footer style={{ background: t.footerBg, padding: '56px 24px 32px', borderTop: `1px solid ${t.footerBorder}` }}>
       <div style={{ maxWidth: 1140, margin: '0 auto' }}>
@@ -921,20 +967,21 @@ function Footer({ t }: { t: ThemeTokens }) {
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', lineHeight: 1.7 }}>Flows conversacionales que convierten más, con menos fricción.</p>
           </div>
-          {[
-            { title: 'Producto', links: [{ label: 'Cómo funciona', href: '#' }, { label: 'Precios', href: '#' }, { label: 'Integraciones', href: '#' }, { label: 'Changelog', href: '#' }] },
-            { title: 'Empresa',  links: [{ label: 'Sobre nosotros', href: '#' }, { label: 'Blog', href: '#' }, { label: 'Contacto', href: '#' }] },
-            { title: 'Legal',    links: [{ label: 'Términos', href: '/terms' }, { label: 'Privacidad', href: '/privacy' }] },
-          ].map(col => (
+          {FOOTER_COLUMNS.map((col) => (
             <div key={col.title}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.2)', letterSpacing: '.1em', marginBottom: 16, textTransform: 'uppercase' }}>{col.title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {col.links.map(l => (
-                  <Link key={l.label} href={l.href} style={{ fontSize: 14, color: 'rgba(255,255,255,.4)', textDecoration: 'none', transition: 'color .2s' }}
-                    onMouseEnter={e => { (e.target as HTMLElement).style.color = '#fff' }}
-                    onMouseLeave={e => { (e.target as HTMLElement).style.color = 'rgba(255,255,255,.4)' }}
-                  >{l.label}</Link>
-                ))}
+                {col.links.map((l) =>
+                  l.external ? (
+                    <a key={l.label} href={l.href} style={linkStyle} onMouseEnter={onLinkEnter} onMouseLeave={onLinkLeave}>
+                      {l.label}
+                    </a>
+                  ) : (
+                    <Link key={l.label} href={l.href} style={linkStyle} onMouseEnter={onLinkEnter} onMouseLeave={onLinkLeave}>
+                      {l.label}
+                    </Link>
+                  ),
+                )}
               </div>
             </div>
           ))}
