@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -8,6 +7,7 @@ import { flows, steps, stepOptions } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError, NotFoundError } from '@/lib/errors'
+import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('flows/[flowId]/chat')
@@ -167,7 +167,7 @@ export const POST = withApiHandler(
     log.info({ flowId, historyLen: history.length, msgLen: message.length }, 'Chat request')
 
     const { object } = await generateObject({
-      model: openai('gpt-4o'),
+      model: getStructuredOutputModel(),
       schema: ChatResponseSchema,
       system: systemPrompt,
       messages: [

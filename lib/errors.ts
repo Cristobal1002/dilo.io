@@ -72,6 +72,23 @@ export class InternalError extends AppError {
   }
 }
 
+/**
+ * 502 — Llamada a OpenAI/Anthropic falló (modelo inválido, caída, etc.).
+ * El cliente puede mostrar `message` y ramificar con `code`.
+ */
+export class UpstreamAiError extends AppError {
+  constructor(message: string, details?: unknown) {
+    super(message, 502, 'UPSTREAM_AI_ERROR', details)
+  }
+}
+
+/** 503 — Falta API key o configuración del proveedor activo */
+export class AiConfigurationError extends AppError {
+  constructor(message: string) {
+    super(message, 503, 'AI_NOT_CONFIGURED')
+  }
+}
+
 /** Type guard */
 export const isAppError = (err: unknown): err is AppError =>
   err instanceof AppError

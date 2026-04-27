@@ -23,6 +23,31 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => (v?.trim() ? v.trim() : undefined)),
 
+  /** API key de Anthropic; obligatoria si `AI_PROVIDER=anthropic`. */
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() ? v.trim() : undefined)),
+
+  /**
+   * `openai` (default) o `anthropic` (Claude). Requiere la clave del proveedor activo.
+   * También acepta el alias `claude`.
+   */
+  AI_PROVIDER: z
+    .string()
+    .optional()
+    .transform((v): 'openai' | 'anthropic' => {
+      const t = v?.trim().toLowerCase()
+      if (t === 'anthropic' || t === 'claude') return 'anthropic'
+      return 'openai'
+    }),
+
+  /** Overrides opcionales de id de modelo (p. ej. `gpt-4o`, `claude-sonnet-4-20250514`). */
+  AI_OPENAI_STRUCTURED_MODEL: z.string().optional().transform((v) => (v?.trim() ? v.trim() : undefined)),
+  AI_OPENAI_FAST_MODEL: z.string().optional().transform((v) => (v?.trim() ? v.trim() : undefined)),
+  AI_ANTHROPIC_STRUCTURED_MODEL: z.string().optional().transform((v) => (v?.trim() ? v.trim() : undefined)),
+  AI_ANTHROPIC_FAST_MODEL: z.string().optional().transform((v) => (v?.trim() ? v.trim() : undefined)),
+
   /**
    * En Vercel a veces queda definida pero vacía; `z.string().url().default()` no aplica si llega "".
    */

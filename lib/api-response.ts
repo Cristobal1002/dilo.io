@@ -14,6 +14,7 @@
  * and makes error handling in the frontend a single utility function.
  */
 import { NextResponse } from 'next/server'
+import { upstreamErrorFromAiSdk, configurationErrorFromUnknown } from './ai-api-errors'
 import { AppError, isAppError, InternalError } from './errors'
 import { createLogger } from './logger'
 
@@ -61,6 +62,18 @@ export function handleApiError(err: unknown, context?: string): NextResponse {
       log.warn({ code: err.code, context }, err.message)
     }
     return apiError(err)
+  }
+
+  const configErr = configurationErrorFromUnknown(err)
+  if (configErr) {
+    log.warn({ code: configErr.code, context }, configErr.message)
+    return apiError(configErr)
+  }
+
+  const upstream = upstreamErrorFromAiSdk(err)
+  if (upstream) {
+    log.warn({ code: upstream.code, context, cause: err }, upstream.message)
+    return apiError(upstream)
   }
 
   // Unknown errors: log full details

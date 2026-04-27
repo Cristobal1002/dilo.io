@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -15,6 +14,7 @@ import {
   FLOW_GENERATE_PROMPT_MAX_CHARS,
   FLOW_GENERATE_SCORING_GOAL_MAX_CHARS,
 } from '@/lib/flow-generate-input-limits'
+import { assertGenerativeAiConfigured, getStructuredOutputModel } from '@/lib/ai-model'
 
 const log = createLogger('flows/generate')
 
@@ -43,10 +43,7 @@ const RequestSchema = z.object({
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   const { org, userId } = auth
 
-  if (!process.env.OPENAI_API_KEY?.trim()) {
-    log.error({ orgId: org.id, userId }, 'OPENAI_API_KEY is not set')
-    throw new InternalError()
-  }
+  assertGenerativeAiConfigured()
 
   // Validate input
   const body = await req.json()
@@ -69,7 +66,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
 
   // Generate flow with AI
   const { object: generated } = await generateObject({
-    model: openai('gpt-4o'),
+    model: getStructuredOutputModel(),
     schema: FlowGenerationSchema,
     system: FLOW_GENERATOR_SYSTEM,
     prompt: buildFlowGeneratorPrompt(prompt, scoringGoal, extras),

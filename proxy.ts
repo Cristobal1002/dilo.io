@@ -4,6 +4,8 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/robots.txt',
+  '/sitemap.xml',
   '/f/(.*)',               // flows públicos — el usuario final no necesita login
   '/api/f/(.*)',          // API de flows públicos
   '/onboarding',          // accesible para usuarios autenticados sin perfil completo

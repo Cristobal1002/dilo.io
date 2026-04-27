@@ -1,6 +1,5 @@
 import { createHmac } from 'node:crypto'
 import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
@@ -14,6 +13,7 @@ import {
   webhookDeliveries,
   webhooks,
 } from '@/db/schema'
+import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
 import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
@@ -243,7 +243,7 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
   let analysis: z.infer<typeof SessionAnalysisSchema> | null = null
   try {
     const { object } = await generateObject({
-      model: openai('gpt-4o'),
+      model: getStructuredOutputModel(),
       schema: SessionAnalysisSchema,
       system: [
         'Eres un analista que evalúa respuestas de formularios conversacionales.',

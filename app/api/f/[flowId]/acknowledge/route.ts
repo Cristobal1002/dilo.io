@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { generateText } from 'ai'
-import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -8,6 +7,7 @@ import { sessions } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { NotFoundError, ValidationError } from '@/lib/errors'
+import { getFastTextModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { loadPublishedFlowWithSteps } from '@/lib/load-published-flow'
 
@@ -102,7 +102,7 @@ export const POST = withApiHandler(
 
     try {
       const { text } = await generateText({
-        model: openai('gpt-4o-mini'),
+        model: getFastTextModel(),
         system,
         prompt: userMsg,
         maxOutputTokens: 48,
