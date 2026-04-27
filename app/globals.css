@@ -57,6 +57,73 @@ body {
   font-family: var(--font-sans);
 }
 
+/* ── Blog/MDX typography (sin plugin) ─────────────────────────────────────── */
+.dilo-prose {
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.8;
+}
+.dark .dilo-prose {
+  color: #D1D5DB; /* gray-300 */
+}
+.dilo-prose > :first-child { margin-top: 0; }
+.dilo-prose > :last-child { margin-bottom: 0; }
+.dilo-prose p { margin: 14px 0; }
+.dilo-prose a { color: var(--dilo-primary); text-decoration: underline; text-underline-offset: 3px; }
+.dilo-prose strong { color: var(--foreground); font-weight: 700; }
+.dilo-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.92em;
+  padding: 0.15em 0.35em;
+  border-radius: 0.4em;
+  background: rgba(156,119,245,0.10);
+  color: rgba(91,63,201,1);
+}
+.dark .dilo-prose code {
+  background: rgba(156,119,245,0.18);
+  color: #E9D5FF;
+}
+.dilo-prose pre {
+  margin: 16px 0;
+  padding: 14px 14px;
+  overflow: auto;
+  border-radius: 14px;
+  background: #0F1117;
+  color: #F9FAFB;
+}
+.dilo-prose pre code { background: transparent; color: inherit; padding: 0; }
+.dilo-prose h2, .dilo-prose h3 {
+  margin-top: 26px;
+  margin-bottom: 8px;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+.dilo-prose h2 { font-size: 22px; font-weight: 800; }
+.dilo-prose h3 { font-size: 18px; font-weight: 800; }
+.dilo-prose ul, .dilo-prose ol { margin: 14px 0 14px 20px; }
+.dilo-prose li { margin: 6px 0; }
+.dilo-prose blockquote {
+  margin: 16px 0;
+  padding: 10px 12px;
+  border-left: 3px solid rgba(156,119,245,0.55);
+  background: rgba(156,119,245,0.06);
+  border-radius: 10px;
+}
+.dark .dilo-prose blockquote {
+  background: rgba(156,119,245,0.10);
+}
+
+.dilo-prose img {
+  max-width: 100%;
+  height: auto;
+  margin: 18px 0;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.12);
+}
+.dark .dilo-prose img {
+  border-color: rgba(156, 119, 245, 0.22);
+}
+
 button:not(:disabled):not([aria-disabled='true']),
 [role='button']:not([aria-disabled='true']),
 a[href] {
