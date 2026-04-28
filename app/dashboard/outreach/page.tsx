@@ -4,8 +4,19 @@ import { outreachEmails, outreachLeads } from '@/db/schema'
 import { getAuthContext } from '@/lib/auth'
 import OutreachTable, { type OutreachLeadOverview } from './outreach-table'
 
-function toIso(d: Date | null | undefined): string | null {
-  return d ? d.toISOString() : null
+function toIso(d: unknown): string | null {
+  if (!d) return null
+  if (d instanceof Date) return d.toISOString()
+  if (typeof d === 'string') {
+    const dt = new Date(d)
+    return Number.isFinite(dt.getTime()) ? dt.toISOString() : null
+  }
+  return null
+}
+
+function toIsoRequired(d: unknown): string {
+  const v = toIso(d)
+  return v ?? new Date(0).toISOString()
 }
 
 export default async function OutreachPage() {
@@ -46,8 +57,8 @@ export default async function OutreachPage() {
       status: l.status,
       notes: l.notes,
       lastActivityAt: toIso(l.lastActivityAt),
-      createdAt: l.createdAt.toISOString(),
-      updatedAt: l.updatedAt.toISOString(),
+      createdAt: toIsoRequired(l.createdAt),
+      updatedAt: toIsoRequired(l.updatedAt),
       emailCount: a?.emailCount ?? 0,
       totalOpens: a?.totalOpens ?? 0,
       totalClicks: a?.totalClicks ?? 0,
