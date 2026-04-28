@@ -177,3 +177,55 @@ import {
     attempts:   integer('attempts').notNull().default(0),
     createdAt:  timestamp('created_at').notNull().defaultNow(),
   })
+
+  // ─── Outreach (cold email CRM + tracking) ─────────────────
+  /**
+   * Leads propios por organización. `emailKey` = lower(trim(email)) para unicidad;
+   * al archivar (soft delete) se reasigna para liberar el slot.
+   * Status: pending | sent | opened | clicked | replied | meeting | closed | lost
+   */
+  export const outreachLeads = pgTable(
+    'outreach_leads',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      name:           text('name').notNull(),
+      email:          text('email').notNull(),
+      emailKey:       text('email_key').notNull(),
+      company:        text('company'),
+      role:           text('role'),
+      status:         text('status').notNull().default('pending'),
+      notes:          text('notes'),
+      lastActivityAt: timestamp('last_activity_at'),
+      deletedAt:      timestamp('deleted_at'),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+      updatedAt:      timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('outreach_leads_org_status_idx').on(t.organizationId, t.status),
+      index('outreach_leads_org_activity_idx').on(t.organizationId, t.lastActivityAt),
+      index('outreach_leads_org_deleted_idx').on(t.organizationId, t.deletedAt),
+      uniqueIndex('outreach_leads_org_emailkey_uidx').on(t.organizationId, t.emailKey),
+    ],
+  )
+
+  /** Un registro por envío; URLs públicas usan `trackingToken` (no el UUID). */
+  export const outreachEmails = pgTable(
+    'outreach_emails',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      leadId:         uuid('lead_id').notNull().references(() => outreachLeads.id, { onDelete: 'cascade' }),
+      trackingToken:  text('tracking_token').notNull().unique(),
+      subject:        text('subject').notNull(),
+      sentAt:         timestamp('sent_at').notNull().defaultNow(),
+      firstOpenedAt:  timestamp('first_opened_at'),
+      openCount:      integer('open_count').notNull().default(0),
+      firstClickedAt: timestamp('first_clicked_at'),
+      clickCount:     integer('click_count').notNull().default(0),
+      lastClickedUrl: text('last_clicked_url'),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+    },
+    (t) => [index('outreach_emails_lead_idx').on(t.leadId)],
+  )

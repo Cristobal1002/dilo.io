@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/sitemap.xml',
   '/f/(.*)',               // flows públicos — el usuario final no necesita login
   '/api/f/(.*)',          // API de flows públicos
+  '/api/track/(.*)',      // tracking de aperturas y clics — sin auth (pixels + redirects)
   '/onboarding',          // accesible para usuarios autenticados sin perfil completo
   '/api/onboarding',
   '/api/webhooks/(.*)',   // webhooks — sin sesión de usuario
