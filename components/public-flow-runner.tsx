@@ -17,6 +17,18 @@ import {
 } from '@/lib/public-flow-file-helpers'
 import { PublicFlowBrandingFooter } from '@/components/public-flow-branding'
 import { resolvePublicFlowChatOpening } from '@/lib/public-flow-chat-opening'
+import {
+  buildMultiOtherStored,
+  buildSelectOtherStored,
+  formatMultiAnswerForDisplay,
+  formatSelectAnswerForDisplay,
+  normalizeMultiStored,
+  optionTriggersOtherDetail,
+  parseSelectStored,
+  selectStoredPrimaryValue,
+  selectionNeedsOtherDetail,
+} from '@/lib/step-choice-helpers'
+import { isStepSkippedByRules, nextStepIndexAfterAnswer } from '@/lib/step-skip'
 
 const THEME_KEY = 'theme'
 
@@ -94,18 +106,6 @@ function parseBold(text: string) {
   )
 }
 
-function labelsForMulti(step: PublicFlowStep, stored: string): string {
-  try {
-    const arr = JSON.parse(stored) as unknown
-    if (!Array.isArray(arr)) return stored
-    return arr
-      .map((val) => step.options.find((o) => o.value === val)?.label ?? String(val))
-      .join(', ')
-  } catch {
-    return stored
-  }
-}
-
 function bubbleText(step: PublicFlowStep, stored: string) {
   if (step.type === 'file') {
     if (stored === '') return 'Sin adjunto'
@@ -117,8 +117,8 @@ function bubbleText(step: PublicFlowStep, stored: string) {
     }
     return stored
   }
-  if (step.type === 'multi_select') return labelsForMulti(step, stored)
-  if (step.type === 'select') return step.options.find((o) => o.value === stored)?.label ?? stored
+  if (step.type === 'multi_select') return formatMultiAnswerForDisplay(stored, step.options)
+  if (step.type === 'select') return formatSelectAnswerForDisplay(stored, step.options)
   if (step.type === 'yes_no') return stored === 'yes' ? 'Sí' : stored === 'no' ? 'No' : stored
   return stored
 }
@@ -157,11 +157,26 @@ function stepIsAnswered(step: PublicFlowStep, answers: Record<string, string>) {
     return false
   }
   const v = answers[step.id]
-  return v != null && v !== ''
+  if (v == null || v === '') return false
+  if (step.type === 'select') {
+    const p = parseSelectStored(v)
+    if (typeof p === 'object') return p.detail.trim().length > 0
+    return true
+  }
+  if (step.type === 'multi_select') {
+    const { values, otherDetail } = normalizeMultiStored(v)
+    if (values.length === 0 && !(otherDetail && otherDetail.trim())) return false
+    if (selectionNeedsOtherDetail(values, step.options)) {
+      return (otherDetail?.trim() ?? '').length > 0
+    }
+    return values.length > 0
+  }
+  return true
 }
 
 function firstOpenStep(steps: PublicFlowStep[], answers: Record<string, string>) {
   for (let i = 0; i < steps.length; i++) {
+    if (isStepSkippedByRules(steps[i], answers, steps)) continue
     if (!stepIsAnswered(steps[i], answers)) return i
   }
   return steps.length
@@ -218,6 +233,7 @@ function rebuildMessages(currentStepIdx: number, steps: PublicFlowStep[], answer
   const out: Msg[] = []
   for (let i = 0; i < currentStepIdx; i++) {
     const s = steps[i]
+    if (isStepSkippedByRules(s, answers, steps)) continue
     out.push({ id: uid(), role: 'assistant', content: interpolate(s.question, lead) })
     if (stepIsAnswered(s, answers)) {
       const stored = answers[s.id] ?? ''
@@ -225,7 +241,7 @@ function rebuildMessages(currentStepIdx: number, steps: PublicFlowStep[], answer
     }
   }
   const cur = steps[currentStepIdx]
-  if (cur) {
+  if (cur && !isStepSkippedByRules(cur, answers, steps)) {
     out.push({ id: uid(), role: 'assistant', content: interpolate(cur.question, lead) })
   }
   return out
@@ -236,6 +252,7 @@ function buildFullThread(steps: PublicFlowStep[], answers: Record<string, string
   const out: Msg[] = []
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i]
+    if (isStepSkippedByRules(s, answers, steps)) continue
     out.push({ id: uid(), role: 'assistant', content: interpolate(s.question, lead) })
     if (stepIsAnswered(s, answers)) {
       const stored = answers[s.id] ?? ''
@@ -686,6 +703,11 @@ export function PublicFlowRunner({
   const [fileErr, setFileErr] = useState('')
   const [fileBusy, setFileBusy] = useState(false)
   const [phoneFooterIso, setPhoneFooterIso] = useState('co')
+  /** Select con opción "Otro": pedir detalle antes de avanzar. */
+  const [pendingSelectOther, setPendingSelectOther] = useState<{ stepId: string; value: string } | null>(null)
+  const [otherDetailInput, setOtherDetailInput] = useState('')
+  const [multiOtherDetail, setMultiOtherDetail] = useState('')
+  const [multiOtherErr, setMultiOtherErr] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const answersRef = useRef(answers)
@@ -987,6 +1009,15 @@ export function PublicFlowRunner({
     [editingStepId, steps, stepIdx, current],
   )
 
+  /** Al avanzar de paso (no en modo edición), limpiar estado de «Otro». */
+  useEffect(() => {
+    if (editingStepId) return
+    setPendingSelectOther(null)
+    setOtherDetailInput('')
+    setMultiOtherDetail('')
+    setMultiOtherErr('')
+  }, [stepIdx, editingStepId])
+
   const inputFooterHint =
     activeStep?.type === 'phone'
       ? buildPhoneStepFooterHint(activeStep.hint, phoneFooterIso)
@@ -1003,13 +1034,23 @@ export function PublicFlowRunner({
     const raw = answers[editingStepId] ?? ''
     setFileErr('')
     if (st.type === 'multi_select') {
-      try {
-        const arr = JSON.parse(raw) as unknown
-        setSelected(Array.isArray(arr) ? arr.map(String) : [])
-      } catch {
-        setSelected([])
+      const { values, otherDetail } = normalizeMultiStored(raw)
+      setSelected(values)
+      setMultiOtherDetail(otherDetail ?? '')
+      setTextInput('')
+      return
+    }
+    if (st.type === 'select') {
+      const p = parseSelectStored(raw)
+      if (typeof p === 'object') {
+        setPendingSelectOther({ stepId: st.id, value: p.value })
+        setOtherDetailInput(p.detail)
+      } else {
+        setPendingSelectOther(null)
+        setOtherDetailInput('')
       }
       setTextInput('')
+      setSelected([])
       return
     }
     if (['text', 'long_text', 'email', 'phone', 'number'].includes(st.type)) {
@@ -1032,14 +1073,12 @@ export function PublicFlowRunner({
     const raw = answers[activeStep.id]
     if (!raw) {
       setSelected([])
+      setMultiOtherDetail('')
       return
     }
-    try {
-      const arr = JSON.parse(raw) as unknown
-      setSelected(Array.isArray(arr) ? arr.map(String) : [])
-    } catch {
-      setSelected([])
-    }
+    const { values, otherDetail } = normalizeMultiStored(raw)
+    setSelected(values)
+    setMultiOtherDetail(otherDetail ?? '')
   }, [activeStep?.id, activeStep?.type, answers, editingStepId])
 
   useEffect(() => {
@@ -1066,6 +1105,10 @@ export function PublicFlowRunner({
         setTextInput('')
         setSelected([])
         setPendingFiles([])
+        setPendingSelectOther(null)
+        setOtherDetailInput('')
+        setMultiOtherDetail('')
+        setMultiOtherErr('')
         return
       }
 
@@ -1076,7 +1119,7 @@ export function PublicFlowRunner({
       setAnswers(nextAnswers)
       const userLine = displayOverride ?? bubbleText(cur, value)
       setMessages((prev) => [...prev, { id: uid(), role: 'user', content: userLine, stepId: sid }])
-      const nextIdx = stepIdxRef.current + 1
+      const nextIdx = nextStepIndexAfterAnswer(stepIdxRef.current, steps, nextAnswers)
       if (nextIdx >= steps.length) {
         setIsTyping(true)
         setTimeout(() => {
@@ -1150,12 +1193,37 @@ export function PublicFlowRunner({
   const submitMulti = () => {
     if (!activeStep || activeStep.type !== 'multi_select') return
     if (selected.length === 0 && activeStep.required) return
+    if (selectionNeedsOtherDetail(selected, activeStep.options)) {
+      const d = multiOtherDetail.trim()
+      if (!d) {
+        setMultiOtherErr('Describe la opción «Otro» para continuar.')
+        return
+      }
+      setMultiOtherErr('')
+      advance(buildMultiOtherStored(selected, d))
+      return
+    }
+    setMultiOtherErr('')
     advance(JSON.stringify(selected))
   }
 
-  const submitSelectValue = (value: string) => {
-    if (!activeStep) return
+  const pickSelectOption = (value: string) => {
+    if (!activeStep || activeStep.type !== 'select') return
+    const opt = activeStep.options.find((o) => o.value === value)
+    if (opt && optionTriggersOtherDetail(opt)) {
+      setPendingSelectOther({ stepId: activeStep.id, value })
+      setOtherDetailInput('')
+      return
+    }
     advance(value)
+  }
+
+  const confirmSelectOther = () => {
+    if (!activeStep || activeStep.type !== 'select') return
+    if (!pendingSelectOther || pendingSelectOther.stepId !== activeStep.id) return
+    const d = otherDetailInput.trim()
+    if (!d) return
+    advance(buildSelectOtherStored(pendingSelectOther.value, d))
   }
 
   const submitFileRow = useCallback(async () => {
@@ -1192,6 +1260,10 @@ export function PublicFlowRunner({
     setSelected([])
     setPendingFiles([])
     setFileErr('')
+    setPendingSelectOther(null)
+    setOtherDetailInput('')
+    setMultiOtherDetail('')
+    setMultiOtherErr('')
   }, [])
 
   const handleEditAnswer = useCallback(
@@ -1514,49 +1586,127 @@ export function PublicFlowRunner({
               ) : null}
 
               {activeStep.type === 'select' ? (
-                <div className="flex max-h-[42vh] flex-wrap gap-2 overflow-y-auto">
-                  {activeStep.options.map((o) => (
-                    <Pill
-                      key={o.id}
-                      label={[o.emoji, o.label].filter(Boolean).join(' ')}
-                      active={Boolean(
-                        editingStepId === activeStep.id && o.value === (answers[activeStep.id] ?? ''),
-                      )}
-                      onClick={() => submitSelectValue(o.value)}
-                    />
-                  ))}
-                </div>
+                <>
+                  {activeStep.options.length === 0 ? (
+                    <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+                      Esta pregunta no tiene opciones configuradas. Avísale a quien te envió el formulario para que
+                      las añada en el editor.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex max-h-[42vh] flex-wrap gap-2 overflow-y-auto">
+                        {activeStep.options.map((o) => {
+                          const stored = answers[activeStep.id] ?? ''
+                          const primary = selectStoredPrimaryValue(stored)
+                          const pending =
+                            pendingSelectOther?.stepId === activeStep.id ? pendingSelectOther : null
+                          const pillActive = o.value === primary || (pending && pending.value === o.value)
+                          return (
+                            <Pill
+                              key={o.id}
+                              label={[o.emoji, o.label].filter(Boolean).join(' ')}
+                              active={Boolean(pillActive)}
+                              onClick={() => pickSelectOption(o.value)}
+                            />
+                          )
+                        })}
+                      </div>
+                      {pendingSelectOther?.stepId === activeStep.id ? (
+                        <div className="mt-4 space-y-2 rounded-2xl border border-[#9C77F5]/25 bg-[#9C77F5]/6 p-4 dark:border-[#9C77F5]/30 dark:bg-[#9C77F5]/10">
+                          <p className="text-sm font-medium text-foreground">Especifica tu respuesta</p>
+                          <textarea
+                            value={otherDetailInput}
+                            onChange={(e) => setOtherDetailInput(e.target.value)}
+                            rows={3}
+                            placeholder="Ej. otro sector, otra herramienta que usan…"
+                            className="w-full resize-none rounded-xl border border-[#9C77F5]/20 bg-white/95 px-3 py-2 text-sm outline-none focus:border-[#9C77F5]/45 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
+                          />
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPendingSelectOther(null)
+                                setOtherDetailInput('')
+                              }}
+                              className="rounded-full border border-[#E5E7EB] px-4 py-2 text-xs font-semibold text-[#64748B] dark:border-[#2A2F3F] dark:text-[#94A3B8]"
+                            >
+                              Cambiar opción
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!otherDetailInput.trim()}
+                              onClick={() => confirmSelectOther()}
+                              className="rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-5 py-2 text-xs font-bold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Continuar
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </>
               ) : null}
 
               {activeStep.type === 'multi_select' ? (
                 <>
-                  <div className="mb-3 flex max-h-[38vh] flex-wrap gap-2 overflow-y-auto">
-                    {activeStep.options.map((o) => {
-                      const on = selected.includes(o.value)
-                      return (
-                        <Pill
-                          key={o.id}
-                          label={[o.emoji, o.label].filter(Boolean).join(' ')}
-                          active={on}
-                          onClick={() =>
-                            setSelected((prev) =>
-                              on ? prev.filter((x) => x !== o.value) : [...prev, o.value],
-                            )
-                          }
-                        />
-                      )
-                    })}
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={submitMulti}
-                      disabled={selected.length === 0 && activeStep.required}
-                      className="rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-6 py-3 text-sm font-bold text-white shadow-[0_4px_18px_rgba(156,119,245,0.4)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Continuar →{selected.length ? ` (${selected.length})` : ''}
-                    </button>
-                  </div>
+                  {activeStep.options.length === 0 ? (
+                    <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+                      Esta pregunta no tiene opciones configuradas. Avísale a quien te envió el formulario para que
+                      las añada en el editor.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mb-3 flex max-h-[38vh] flex-wrap gap-2 overflow-y-auto">
+                        {activeStep.options.map((o) => {
+                          const on = selected.includes(o.value)
+                          return (
+                            <Pill
+                              key={o.id}
+                              label={[o.emoji, o.label].filter(Boolean).join(' ')}
+                              active={on}
+                              onClick={() => {
+                                setMultiOtherErr('')
+                                setSelected((prev) =>
+                                  on ? prev.filter((x) => x !== o.value) : [...prev, o.value],
+                                )
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                      {selectionNeedsOtherDetail(selected, activeStep.options) ? (
+                        <div className="mb-3 space-y-2">
+                          <p className="text-xs font-medium text-[#64748B] dark:text-[#94A3B8]">
+                            Detalle para «Otro» (obligatorio si la marcaste)
+                          </p>
+                          <textarea
+                            value={multiOtherDetail}
+                            onChange={(e) => {
+                              setMultiOtherDetail(e.target.value)
+                              setMultiOtherErr('')
+                            }}
+                            rows={2}
+                            placeholder="Describe qué más aplica…"
+                            className="w-full resize-none rounded-xl border border-[#9C77F5]/20 bg-white/95 px-3 py-2 text-sm outline-none focus:border-[#9C77F5]/45 dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
+                          />
+                        </div>
+                      ) : null}
+                      {multiOtherErr ? (
+                        <p className="mb-2 text-xs font-medium text-red-600 dark:text-red-400">{multiOtherErr}</p>
+                      ) : null}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={submitMulti}
+                          disabled={selected.length === 0 && activeStep.required}
+                          className="rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-6 py-3 text-sm font-bold text-white shadow-[0_4px_18px_rgba(156,119,245,0.4)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Continuar →{selected.length ? ` (${selected.length})` : ''}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : null}
 

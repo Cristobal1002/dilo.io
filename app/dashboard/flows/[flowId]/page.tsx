@@ -79,6 +79,9 @@ export default async function FlowDetailPage({
     hint: s.hint,
     variableName: s.variableName,
     required: s.required,
+    conditions: s.conditions ?? null,
+    branchLabel: s.branchLabel ?? null,
+    branchColor: s.branchColor ?? null,
     options: s.options.map((o) => ({
       id: o.id,
       label: o.label,

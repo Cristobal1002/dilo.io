@@ -7,11 +7,14 @@ const StepOptionSchema = z.object({
   order: z.number(),
 })
 
-const ConditionSchema = z.object({
+const SingleConditionSchema = z.object({
   if: z.string(),
   equals: z.string(),
   skip_to: z.number(),
-}).nullable()
+})
+
+/** Una regla o varias (OR): si la respuesta coincide con `equals`, se salta el paso hacia `skip_to`). */
+const ConditionSchema = z.union([SingleConditionSchema, z.array(SingleConditionSchema)]).nullable()
 
 const FileConfigSchema = z.object({
   accept: z.array(z.string()),
@@ -32,6 +35,9 @@ export const StepSchema = z.object({
   required: z.boolean(),
   conditions: ConditionSchema,
   file_config: FileConfigSchema,
+  /** Opcional: solo panel Dilo (plantillas / edición manual). */
+  branch_label: z.string().max(80).nullable().optional(),
+  branch_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
   options: z.array(StepOptionSchema).nullable(),
 })
 

@@ -1,4 +1,5 @@
 import { asc, eq, inArray } from 'drizzle-orm'
+import { selectValueForAnalyticsCount } from '@/lib/step-choice-helpers'
 import { db } from '@/db'
 import { answers, sessions, stepOptions, steps } from '@/db/schema'
 
@@ -76,6 +77,14 @@ function parseMultiValues(value: string): string[] {
   try {
     const p = JSON.parse(value) as unknown
     if (Array.isArray(p)) return p.map(String)
+    if (
+      p &&
+      typeof p === 'object' &&
+      (p as { __dilo_multi_other?: boolean }).__dilo_multi_other === true &&
+      Array.isArray((p as { values?: unknown }).values)
+    ) {
+      return (p as { values: unknown[] }).values.map(String)
+    }
   } catch {
     /* ignore */
   }
@@ -206,7 +215,10 @@ export async function getFlowResultsAnalytics(
         continue
       }
 
-      const key = (row.value ?? '').trim()
+      const key =
+        st.type === 'select' && row.value
+          ? selectValueForAnalyticsCount(row.value)
+          : (row.value ?? '').trim()
       valueCounts.set(key, (valueCounts.get(key) ?? 0) + 1)
     }
 

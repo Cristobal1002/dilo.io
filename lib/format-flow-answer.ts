@@ -1,3 +1,5 @@
+import { formatMultiAnswerForDisplay, formatSelectAnswerForDisplay } from '@/lib/step-choice-helpers'
+
 /** Formatea el valor guardado de una respuesta para UI (tablas, detalle de sesión). */
 export function formatFlowAnswerDisplay(
   type: string,
@@ -15,15 +17,8 @@ export function formatFlowAnswerDisplay(
     }
     return raw
   }
-  if (type === 'multi_select') {
-    try {
-      const arr = JSON.parse(raw) as string[]
-      return arr.map((v) => opts.find((o) => o.value === v)?.label ?? v).join(', ')
-    } catch {
-      return raw
-    }
-  }
-  if (type === 'select') return opts.find((o) => o.value === raw)?.label ?? raw
+  if (type === 'multi_select') return formatMultiAnswerForDisplay(raw, opts)
+  if (type === 'select') return formatSelectAnswerForDisplay(raw, opts)
   if (type === 'yes_no') return raw === 'yes' ? 'Sí' : raw === 'no' ? 'No' : raw
   return raw
 }

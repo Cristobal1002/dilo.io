@@ -54,8 +54,9 @@ TIPOS DISPONIBLES:
 - file: carga de archivos (logos, documentos, imágenes de referencia, manuales de marca)
 
 LÓGICA CONDICIONAL (solo cuando aporta valor real):
-Si una respuesta hace irrelevante una pregunta posterior, usa conditions.
-Formato: { "if": "variable_name", "equals": "value", "skip_to": order_number }
+Si una respuesta hace irrelevante una pregunta posterior, usa conditions en ESE paso posterior.
+Formato: un objeto { "if": "variable_name", "equals": "value", "skip_to": order_number } o un array de esas reglas (si CUALQUIERA coincide, se salta el paso hacia ese order).
+skip_to es el número de campo order del paso destino en la base de datos (no el índice 0-based del array de steps).
 `
 
 export type FlowGeneratorExtras = {

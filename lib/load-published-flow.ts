@@ -24,6 +24,8 @@ export type PublicFlowStep = {
   options: PublicFlowStepOption[]
   /** Solo pasos `file`: accept, maxFiles, maxBytesPerFile, etc. */
   fileConfig: unknown | null
+  /** Reglas de salto: si respuesta de `if` === `equals`, se salta al paso con `order === skip_to`. */
+  conditions: unknown | null
 }
 
 export type PublicFlowRecord = {
@@ -79,6 +81,7 @@ export async function loadPublishedFlowWithSteps(flowId: string): Promise<{
           order: o.order,
         })),
         fileConfig: step.fileConfig ?? null,
+        conditions: step.conditions ?? null,
       }
     }),
   )

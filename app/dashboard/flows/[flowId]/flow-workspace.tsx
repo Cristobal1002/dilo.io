@@ -26,6 +26,8 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import { STEP_BRANCH_COLOR_PRESETS } from '@/lib/branch-colors'
+import { StepConditionsEditor } from '@/components/step-conditions-editor'
 import { SavingSpinner } from '@/components/spinners'
 import { cn } from '@/lib/utils'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
@@ -67,6 +69,11 @@ export type FlowWorkspaceStep = {
   hint: string | null
   variableName: string
   required: boolean
+  /** Reglas de salto (`if` / `equals` / `skip_to`); null si no hay. */
+  conditions?: unknown | null
+  /** Solo panel: identificar ramas al editar condicionales. */
+  branchLabel?: string | null
+  branchColor?: string | null
   options: { id: string; label: string; emoji: string | null; value: string; order: number }[]
   fileConfig: unknown
 }
@@ -591,6 +598,7 @@ const HAS_OPTIONS = new Set(['select', 'multi_select'])
 function EditableStepCard({
   flowId,
   step,
+  allSteps,
   isFirst,
   isLast,
   onUpdate,
@@ -601,6 +609,7 @@ function EditableStepCard({
 }: {
   flowId: string
   step: FlowWorkspaceStep
+  allSteps: FlowWorkspaceStep[]
   isFirst: boolean
   isLast: boolean
   onUpdate: (stepId: string, fields: Record<string, unknown>) => Promise<void>
@@ -612,6 +621,7 @@ function EditableStepCard({
   const [stepType, setStepType] = useState(step.type)
   const [question, setQuestion] = useState(step.question)
   const [variableName, setVariableName] = useState(step.variableName)
+  const [branchLabel, setBranchLabel] = useState(step.branchLabel ?? '')
   const [required, setRequired] = useState(step.required)
 
   type LocalOption = { id: string; label: string; order: number; temp?: boolean }
@@ -626,6 +636,7 @@ function EditableStepCard({
   useEffect(() => { setStepType(step.type) }, [step.type])
   useEffect(() => { setQuestion(step.question) }, [step.question])
   useEffect(() => { setVariableName(step.variableName) }, [step.variableName])
+  useEffect(() => { setBranchLabel(step.branchLabel ?? '') }, [step.branchLabel])
   useEffect(() => { setRequired(step.required) }, [step.required])
   useEffect(() => {
     // Only sync real (non-temp) options from server
@@ -658,6 +669,20 @@ function EditableStepCard({
     const next = !required
     setRequired(next)
     await onUpdate(step.id, { required: next })
+  }
+
+  const handleBlurBranchLabel = async () => {
+    const t = branchLabel.trim()
+    const prev = (step.branchLabel ?? '').trim()
+    if (t === prev) return
+    await onUpdate(step.id, { branchLabel: t === '' ? null : t.slice(0, 80) })
+  }
+
+  const handleBranchColor = async (hex: string | null) => {
+    const next = hex
+    const prev = step.branchColor ?? null
+    if (next === prev) return
+    await onUpdate(step.id, { branchColor: next })
   }
 
   // ── Options CRUD ───────────────────────────────────────────────────────────
@@ -725,8 +750,21 @@ function EditableStepCard({
     >
       {/* Header: order + type selector + saving + move arrows + delete */}
       <div className="flex items-center gap-2 border-b border-[#F1F5F9] px-3.5 py-2.5 dark:border-[#252936]">
-        {/* Order */}
+        {/* Order + optional branch chip */}
         <span className="shrink-0 text-[11px] font-bold text-[#9C77F5]">#{step.order + 1}</span>
+        {step.branchLabel?.trim() ? (
+          <span
+            className="max-w-26 truncate rounded-md border border-[#E8EAEF] bg-[#F8F9FB] px-1.5 py-0.5 text-[9px] font-semibold text-[#475569] dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#CBD5E1]"
+            style={{
+              borderLeftWidth: 3,
+              borderLeftColor:
+                step.branchColor && /^#[0-9A-Fa-f]{6}$/i.test(step.branchColor) ? step.branchColor : '#9C77F5',
+            }}
+            title={step.branchLabel.trim()}
+          >
+            {step.branchLabel.trim()}
+          </span>
+        ) : null}
 
         {/* Type selector */}
         <select
@@ -884,6 +922,84 @@ function EditableStepCard({
             {required ? '✓ Requerido' : 'Opcional'}
           </button>
         </div>
+
+        {/* Marca de rama: solo panel (condicionales / escaneo) */}
+        <div className="mt-2.5 rounded-lg border border-dashed border-[#E8EAEF] bg-[#FAFBFC]/80 px-2.5 py-2 dark:border-[#2A2F3F] dark:bg-[#151820]/50">
+          <p className="text-[9px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+            Marca de rama (solo editor — no la ve el visitante)
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span
+              className="h-6 w-1 shrink-0 rounded-full border border-black/5 dark:border-white/10"
+              style={{
+                backgroundColor: step.branchColor && /^#[0-9A-Fa-f]{6}$/.test(step.branchColor) ? step.branchColor : '#E2E8F0',
+              }}
+              title="Color actual"
+              aria-hidden
+            />
+            <input
+              type="text"
+              value={branchLabel}
+              onChange={(e) => setBranchLabel(e.target.value)}
+              onBlur={() => void handleBlurBranchLabel()}
+              maxLength={80}
+              placeholder="ej. Compradores, Arriendo…"
+              title="Aparece en «Saltar a orden» y al revisar pasos"
+              className="min-w-32 flex-1 rounded-lg border border-transparent bg-white/90 px-2 py-1 text-[11px] text-[#475569] placeholder:text-[#94A3B8] focus:border-[#9C77F5]/25 focus:outline-none dark:bg-[#1A1D29]/90 dark:text-[#E2E8F0] dark:placeholder:text-[#64748B]"
+            />
+            <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Color de marca">
+              {STEP_BRANCH_COLOR_PRESETS.map((c) => {
+                const active = step.branchColor === c.hex
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    title={c.id}
+                    onClick={() => void handleBranchColor(c.hex)}
+                    className={cn(
+                      'h-5 w-5 shrink-0 rounded-full border-2 transition-transform hover:scale-110',
+                      active ? 'border-[#1A1A1A] dark:border-white' : 'border-transparent ring-1 ring-black/10 dark:ring-white/15',
+                    )}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => void handleBranchColor(null)}
+                className="rounded-md px-1.5 py-0.5 text-[9px] font-medium text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#252936]"
+                title="Quitar color"
+              >
+                Sin color
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <StepConditionsEditor
+          step={{
+            id: step.id,
+            order: step.order,
+            variableName: step.variableName,
+            question: step.question,
+            conditions: step.conditions ?? null,
+            branchLabel: step.branchLabel ?? null,
+            branchColor: step.branchColor ?? null,
+          }}
+          allSteps={allSteps.map((s) => ({
+            id: s.id,
+            order: s.order,
+            variableName: s.variableName,
+            question: s.question,
+            conditions: s.conditions ?? null,
+            branchLabel: s.branchLabel ?? null,
+            branchColor: s.branchColor ?? null,
+          }))}
+          saving={saving}
+          onSave={async (conditions) => {
+            await onUpdate(step.id, { conditions })
+          }}
+        />
       </div>
     </div>
   )
@@ -1390,6 +1506,7 @@ export default function FlowWorkspace({
                         key={step.id}
                         flowId={flow.id}
                         step={step}
+                        allSteps={localSteps}
                         isFirst={idx === 0}
                         isLast={idx === localSteps.length - 1}
                         onUpdate={handleUpdateStep}

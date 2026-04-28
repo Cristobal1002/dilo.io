@@ -17,6 +17,7 @@ import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
 import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
+import { formatMultiAnswerForDisplay, formatSelectAnswerForDisplay } from '@/lib/step-choice-helpers'
 
 const log = createLogger('session-completion')
 
@@ -24,9 +25,15 @@ const log = createLogger('session-completion')
 const SessionAnalysisSchema = z.object({
   summary: z.string(),
   classification: z.enum(['hot', 'warm', 'cold']),
-  score: z.number().int().min(0).max(100).nullable(),
+  /** Sin .min/.max: Anthropic structured outputs no admite minimum/maximum en integer. */
+  score: z.number().nullable(),
   suggested_action: z.string().nullable(),
 })
+
+function normalizeAnalysisScore(score: number | null): number | null {
+  if (score === null || Number.isNaN(score)) return null
+  return Math.max(0, Math.min(100, Math.round(score)))
+}
 
 type StepRow = {
   id: string
@@ -70,18 +77,10 @@ function displayAnswer(step: StepRow, raw: string | null): string {
     return raw
   }
   if (step.type === 'multi_select') {
-    try {
-      const arr = JSON.parse(raw) as unknown
-      if (!Array.isArray(arr)) return raw
-      return arr
-        .map((val) => step.options.find((o) => o.value === String(val))?.label ?? String(val))
-        .join(', ')
-    } catch {
-      return raw
-    }
+    return formatMultiAnswerForDisplay(raw, step.options)
   }
   if (step.type === 'select') {
-    return step.options.find((o) => o.value === raw)?.label ?? raw
+    return formatSelectAnswerForDisplay(raw, step.options)
   }
   if (step.type === 'yes_no') {
     if (raw === 'yes') return 'Sí'
@@ -198,18 +197,35 @@ async function deliverOneWebhook(args: {
   })
 }
 
+export type ProcessSessionCompletionOptions = {
+  /**
+   * Borra el `results` actual y vuelve a ejecutar el análisis con IA.
+   * No reenvía webhooks ni alertas instantáneas (evita duplicados al corregir fallos del modelo).
+   */
+  replaceExisting?: boolean
+}
+
 /**
- * Tras la primera transición a sesión completada: análisis con GPT-4o, fila en `results`,
+ * Tras la primera transición a sesión completada: análisis con IA, fila en `results`,
  * y envío de webhooks activos del flow (cada intento queda en `webhook_deliveries`).
- * Idempotente si ya existe `results` para la sesión.
+ * Idempotente si ya existe `results` para la sesión, salvo que pases `replaceExisting: true`.
  */
-export async function processSessionCompletion(sessionId: string): Promise<void> {
-  const existing = await db.query.results.findFirst({
-    where: eq(results.sessionId, sessionId),
-  })
-  if (existing) {
-    log.debug({ sessionId }, 'Session completion skipped: result already exists')
-    return
+export async function processSessionCompletion(
+  sessionId: string,
+  opts?: ProcessSessionCompletionOptions,
+): Promise<void> {
+  const replace = opts?.replaceExisting === true
+
+  if (replace) {
+    await db.delete(results).where(eq(results.sessionId, sessionId))
+  } else {
+    const existing = await db.query.results.findFirst({
+      where: eq(results.sessionId, sessionId),
+    })
+    if (existing) {
+      log.debug({ sessionId }, 'Session completion skipped: result already exists')
+      return
+    }
   }
 
   const sessionRow = await db.query.sessions.findFirst({
@@ -272,7 +288,10 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
         .filter(Boolean)
         .join('\n'),
     })
-    analysis = object
+    analysis = {
+      ...object,
+      score: normalizeAnalysisScore(object.score),
+    }
   } catch (e) {
     log.error({ err: e, sessionId }, 'GPT session analysis failed; storing fallback result')
   }
@@ -325,18 +344,22 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
       : null,
   }
 
-  for (const h of hooks) {
-    await deliverOneWebhook({
-      webhookId: h.id,
-      url: h.url,
-      secret: h.secret ?? null,
-      sessionId: sessionRow.id,
-      flowId: flowRow.id,
-      payload,
-    })
+  if (!replace) {
+    for (const h of hooks) {
+      await deliverOneWebhook({
+        webhookId: h.id,
+        url: h.url,
+        secret: h.secret ?? null,
+        sessionId: sessionRow.id,
+        flowId: flowRow.id,
+        payload,
+      })
+    }
+  } else {
+    log.info({ sessionId, flowId: flowRow.id }, 'Session analysis recalculated: webhooks skipped')
   }
 
-  if (resultRow) {
+  if (resultRow && !replace) {
     const contact = extractLeadContact(stepRows, answerByStep)
     void notifyOrgUsersInstantLeadAlerts({
       organizationId: flowRow.organizationId,
@@ -353,5 +376,8 @@ export async function processSessionCompletion(sessionId: string): Promise<void>
     })
   }
 
-  log.info({ sessionId, flowId: flowRow.id, webhooks: hooks.length }, 'Session completion processed')
+  log.info(
+    { sessionId, flowId: flowRow.id, webhooks: replace ? 0 : hooks.length, replace },
+    'Session completion processed',
+  )
 }

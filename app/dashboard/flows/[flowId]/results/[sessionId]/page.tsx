@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { answers, results, sessions, stepOptions, steps } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
+import { RecalculateSessionAnalysisButton } from '@/components/recalculate-session-analysis-button'
 import { formatFlowAnswerDisplay } from '@/lib/format-flow-answer'
 
 const classificationConfig = {
@@ -111,9 +112,9 @@ export default async function SessionDetailPage({
       {/* Scoring hero */}
       {result && cfg ? (
         <div className={`rounded-2xl border p-5 ${cfg.bg} ${cfg.border}`}>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className={`h-3 w-3 rounded-full ${cfg.dot}`} aria-hidden />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <span className={`h-3 w-3 shrink-0 rounded-full ${cfg.dot}`} aria-hidden />
               <span className={`rounded-full px-3 py-1 text-sm font-bold ${cfg.badge}`}>
                 {cfg.label}
               </span>
@@ -123,6 +124,7 @@ export default async function SessionDetailPage({
                 </span>
               )}
             </div>
+            <RecalculateSessionAnalysisButton flowId={flowId} sessionId={sessionId} />
           </div>
 
           {result.summary && (
@@ -141,8 +143,11 @@ export default async function SessionDetailPage({
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-5 py-4 text-sm text-[#6B7280] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]">
-          El resumen de IA aún no está disponible para esta sesión.
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] px-5 py-4 dark:border-[#2A2F3F] dark:bg-[#161821]">
+          <p className="text-sm text-[#6B7280] dark:text-[#94A3B8]">
+            El resumen de IA aún no está disponible para esta sesión.
+          </p>
+          <RecalculateSessionAnalysisButton flowId={flowId} sessionId={sessionId} />
         </div>
       )}
 

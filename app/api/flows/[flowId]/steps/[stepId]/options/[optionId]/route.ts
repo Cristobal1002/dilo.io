@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, count, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { flows, steps, stepOptions } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
@@ -83,6 +83,22 @@ export const DELETE = withApiHandler(
     const { flowId, stepId, optionId } = params
 
     const option = await verifyOwnership(flowId, stepId, optionId, org.id)
+
+    const step = await db.query.steps.findFirst({
+      where: and(eq(steps.id, stepId), eq(steps.flowId, flowId)),
+    })
+    if (step && (step.type === 'select' || step.type === 'multi_select')) {
+      const [cntRow] = await db
+        .select({ c: count() })
+        .from(stepOptions)
+        .where(eq(stepOptions.stepId, stepId))
+      const total = cntRow?.c ?? 0
+      if (total <= 1) {
+        throw new ValidationError(
+          'Una pregunta de selección debe tener al menos una opción. Añade otra opción antes de borrar esta.',
+        )
+      }
+    }
 
     await db.delete(stepOptions).where(eq(stepOptions.id, optionId))
 

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, eq, max } from 'drizzle-orm'
 import { db } from '@/db'
-import { flows, steps } from '@/db/schema'
+import { flows, stepOptions, steps } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiCreated } from '@/lib/api-response'
 import { ValidationError, NotFoundError } from '@/lib/errors'
@@ -103,6 +103,16 @@ export const POST = withApiHandler(
         required: true,
       })
       .returning()
+
+    if (type === 'select' || type === 'multi_select') {
+      await db.insert(stepOptions).values({
+        stepId: created.id,
+        label: 'Opción 1',
+        value: 'opcion_1',
+        emoji: null,
+        order: 0,
+      })
+    }
 
     log.info({ flowId, stepId: created.id, type, order }, 'Step created')
 

@@ -132,6 +132,8 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
           required: step.required,
           conditions: step.conditions ?? null,
           fileConfig: step.file_config ?? null,
+          branchLabel: step.branch_label ?? null,
+          branchColor: step.branch_color ?? null,
         })
         .returning()
 

@@ -97,6 +97,10 @@ import {
     required:     boolean('required').notNull().default(true),
     conditions:   jsonb('conditions'),
     fileConfig:   jsonb('file_config'),
+    /** Etiqueta corta solo para el editor (p. ej. rama «Compradores»). */
+    branchLabel:  text('branch_label'),
+    /** Hex #RRGGBB; solo panel. */
+    branchColor:  text('branch_color'),
     createdAt:    timestamp('created_at').notNull().defaultNow(),
   }, (t) => [
     index('steps_flow_idx').on(t.flowId),
