@@ -14,6 +14,7 @@ import {
   EnvelopeOpenIcon,
   FolderOpenIcon,
   MoonIcon,
+  PuzzlePieceIcon,
   SparklesIcon,
   Squares2X2Icon,
   SunIcon,
@@ -63,6 +64,7 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
   if (pathname.startsWith('/dashboard/settings/plan')) return 'Plan & Uso'
+  if (pathname.startsWith('/dashboard/settings/integrations')) return 'Integraciones'
   if (pathname.startsWith('/dashboard/settings/team')) return 'Equipo'
   if (pathname.startsWith('/dashboard/settings')) return 'Configuración'
   return 'Dashboard'
@@ -250,12 +252,18 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const isDark = theme === 'dark'
 
   const [plan, setPlan] = useState<string>('')
+  const [orgRole, setOrgRole] = useState<string | null>(null)
   const [meLoaded, setMeLoaded] = useState(false)
 
   useEffect(() => {
     fetch('/api/settings/me')
       .then((r) => r.json())
-      .then((res) => { if (res.success) setPlan(res.data.plan ?? 'free') })
+      .then((res) => {
+        if (res.success) {
+          setPlan(res.data.plan ?? 'free')
+          setOrgRole(typeof res.data.role === 'string' ? res.data.role : null)
+        }
+      })
       .catch(() => setPlan('free'))
       .finally(() => setMeLoaded(true))
   }, [])
@@ -289,7 +297,9 @@ export default function DiloDashboardShell({ children }: { children: React.React
 
   const accountNavActive = pathname.startsWith('/dashboard/account')
   const settingsPlanActive = pathname.startsWith('/dashboard/settings/plan')
+  const settingsIntegrationsActive = pathname.startsWith('/dashboard/settings/integrations')
   const settingsTeamActive = pathname.startsWith('/dashboard/settings/team')
+  const canManageIntegrationsNav = orgRole === 'owner' || orgRole === 'admin'
 
   const navBtn = (active: boolean, collapsed: boolean, extra?: string) =>
     cn(
@@ -494,6 +504,18 @@ export default function DiloDashboardShell({ children }: { children: React.React
                 {!isSidebarCollapsed && <span className="flex-1 text-left">Plan & Uso</span>}
               </Link>
             </li>
+            {meLoaded && canManageIntegrationsNav ? (
+              <li>
+                <Link
+                  href="/dashboard/settings/integrations"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={navBtn(settingsIntegrationsActive, isSidebarCollapsed)}
+                >
+                  <PuzzlePieceIcon className="w-5 h-5 shrink-0" />
+                  {!isSidebarCollapsed && <span className="flex-1 text-left">Integraciones</span>}
+                </Link>
+              </li>
+            ) : null}
             <li>
               <Link
                 href="/dashboard/settings/team"

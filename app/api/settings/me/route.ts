@@ -19,6 +19,7 @@ export const GET = withApiHandler(
       name: user?.name ?? null,
       email: user?.email ?? '',
       plan: org.plan,
+      role: auth.orgRole,
     })
   },
   { requireAuth: true },

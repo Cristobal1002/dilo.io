@@ -16,6 +16,8 @@ import { withApiHandler } from '@/lib/with-api-handler'
 
 const BodySchema = z.object({
   subject: z.string().trim().min(1).max(300),
+  /** URL final del CTA (https). Se guarda para volver a mostrar el link trackeado. */
+  ctaDestinationUrl: z.string().trim().url().max(2000).optional(),
 })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth, params }) => {
@@ -39,6 +41,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
 
   const token = newOutreachTrackingToken()
   const now = new Date()
+  const ctaDest = parsed.data.ctaDestinationUrl?.trim()
 
   const [emailRow] = await db
     .insert(outreachEmails)
@@ -47,6 +50,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
       trackingToken: token,
       subject: parsed.data.subject,
       sentAt: now,
+      ctaDestinationUrl: ctaDest ?? null,
     })
     .returning()
 
@@ -63,12 +67,16 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
     .where(eq(outreachLeads.id, leadId))
 
   const openPixelUrl = buildOpenPixelUrl(token)
+  const trackedCtaUrl = ctaDest
+    ? buildTrackedClickUrl(token, ctaDest)
+    : buildTrackedClickUrl(token, 'https://getdilo.io')
 
   return apiCreated({
     email: emailRow,
     trackingToken: token,
     openPixelUrl,
-    /** Ejemplo: sustituye por tu CTA final en https. */
-    trackedUrlExample: buildTrackedClickUrl(token, 'https://getdilo.io'),
+    trackedCtaUrl,
+    /** Si no mandaste ctaDestinationUrl, es el ejemplo con getdilo.io. */
+    trackedUrlExample: trackedCtaUrl,
   })
 }, { requireAuth: true })

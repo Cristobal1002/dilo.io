@@ -10,6 +10,17 @@ import {
 } from '@/lib/outreach'
 import { cn } from '@/lib/utils'
 
+const TRACKING_APP_BASE =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')) || 'https://getdilo.io'
+
+function openPixelHref(token: string): string {
+  return `${TRACKING_APP_BASE}/api/track/o/${encodeURIComponent(token)}`
+}
+
+function trackedClickHref(token: string, destinationHttps: string): string {
+  return `${TRACKING_APP_BASE}/api/track/c/${encodeURIComponent(token)}?url=${encodeURIComponent(destinationHttps)}`
+}
+
 const STATUS_LABEL: Record<OutreachStatus, string> = {
   pending: 'Pendiente',
   sent: 'Enviado',
@@ -75,6 +86,7 @@ type EmailRow = {
   firstClickedAt: string | null
   clickCount: number
   lastClickedUrl: string | null
+  ctaDestinationUrl: string | null
   createdAt: string
 }
 
@@ -101,6 +113,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
   const [panelEmails, setPanelEmails] = useState<EmailRow[] | null>(null)
   const [panelLoading, setPanelLoading] = useState(false)
   const [registerSubject, setRegisterSubject] = useState('')
+  const [registerCtaUrl, setRegisterCtaUrl] = useState('https://getdilo.io')
   const [registerBusy, setRegisterBusy] = useState(false)
   const [registerResult, setRegisterResult] = useState<string | null>(null)
 
@@ -123,6 +136,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
     setPanelLeadId(leadId)
     setPanelEmails(null)
     setRegisterSubject('')
+    setRegisterCtaUrl('https://getdilo.io')
     setRegisterResult(null)
     setPanelLoading(true)
     try {
@@ -196,14 +210,18 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
     setRegisterBusy(true)
     setRegisterResult(null)
     try {
+      const cta = registerCtaUrl.trim()
       const res = await fetch(`/api/outreach/leads/${panelLeadId}/emails`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: registerSubject.trim() }),
+        body: JSON.stringify({
+          subject: registerSubject.trim(),
+          ...(cta ? { ctaDestinationUrl: cta } : {}),
+        }),
       })
       const result = await readApiResult<{
         openPixelUrl: string
-        trackedUrlExample: string
+        trackedCtaUrl: string
         trackingToken: string
       }>(res)
       if (!result.ok) {
@@ -211,7 +229,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
         return
       }
       setRegisterResult(
-        `Pixel (img en el HTML):\n${result.data.openPixelUrl}\n\nEjemplo link CTA trackeado:\n${result.data.trackedUrlExample}\n\nToken: ${result.data.trackingToken}`,
+        `Pixel (img en el HTML):\n${result.data.openPixelUrl}\n\nLink CTA trackeado:\n${result.data.trackedCtaUrl}\n\nToken: ${result.data.trackingToken}`,
       )
       const detail = await fetch(`/api/outreach/leads/${panelLeadId}`)
       const d = await readApiResult<{ emails: EmailRow[] }>(detail)
@@ -456,6 +474,19 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                       >
                         <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">{e.subject}</p>
                         <p className="text-xs text-[#64748B]">Enviado {formatDate(e.sentAt)}</p>
+                        <p className="mt-1 break-all font-mono text-[10px] leading-snug text-[#64748B]">
+                          Pixel: {openPixelHref(e.trackingToken)}
+                        </p>
+                        {e.ctaDestinationUrl ? (
+                          <p className="mt-1 break-all font-mono text-[10px] leading-snug text-[#64748B]">
+                            CTA trackeado: {trackedClickHref(e.trackingToken, e.ctaDestinationUrl)}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[10px] leading-snug text-[#94A3B8]">
+                            CTA trackeado: este envío no guardó destino (registros viejos). El pixel sigue arriba; para
+                            clics, registra un envío nuevo indicando la URL del CTA.
+                          </p>
+                        )}
                         <p className="mt-1 text-xs text-[#64748B]">
                           Aperturas: {e.openCount}
                           {e.firstOpenedAt ? ` · primera ${formatDate(e.firstOpenedAt)}` : ''}
@@ -476,9 +507,19 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                   <div className="mt-6 rounded-xl border border-dashed border-[#9C77F5]/35 bg-[#9C77F5]/5 p-3 dark:bg-[#9C77F5]/10">
                     <p className="text-xs font-semibold text-[#6B4DD4]">Registrar envío (antes de Resend)</p>
                     <p className="mt-1 text-[11px] leading-snug text-[#64748B]">
-                      Crea el registro, copia el pixel y envuelve tus links con la URL de clic. Luego envía el HTML con
-                      Resend.
+                      Crea el registro, copia el pixel y el link trackeado del CTA (se guardan para recuperarlos
+                      después). Luego envía el HTML con Resend.
                     </p>
+                    <label className="mt-2 block text-[10px] font-medium text-[#64748B]">
+                      URL del CTA (https) — opcional; por defecto getdilo.io
+                      <input
+                        type="url"
+                        value={registerCtaUrl}
+                        onChange={(e) => setRegisterCtaUrl(e.target.value)}
+                        placeholder="https://…"
+                        className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 font-mono text-xs dark:border-[#2A2F3F] dark:bg-[#252936]"
+                      />
+                    </label>
                     <input
                       value={registerSubject}
                       onChange={(e) => setRegisterSubject(e.target.value)}

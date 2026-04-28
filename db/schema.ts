@@ -53,7 +53,7 @@ import {
     email:          text('email').notNull(),
     name:           text('name'),
     phone:          text('phone'),
-    role:           text('role').notNull().default('owner'), // 'owner' | 'member'
+    role:           text('role').notNull().default('owner'), // owner | admin | member
     /** Preferencias de email: digest (off|daily|weekly), alertas por lead caliente / score. */
     emailNotificationSettings: jsonb('email_notification_settings').notNull().default({
       digest: 'weekly',
@@ -225,7 +225,29 @@ import {
       firstClickedAt: timestamp('first_clicked_at'),
       clickCount:     integer('click_count').notNull().default(0),
       lastClickedUrl: text('last_clicked_url'),
+      /** Destino HTTPS del CTA al registrar el envío (para reconstruir el link trackeado). */
+      ctaDestinationUrl: text('cta_destination_url'),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
     },
     (t) => [index('outreach_emails_lead_idx').on(t.leadId)],
+  )
+
+  /** Credenciales de integraciones por workspace (Resend, etc.) — payload cifrado en app. */
+  export const orgIntegrationCredentials = pgTable(
+    'org_integration_credentials',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      /** Ej.: resend */
+      provider:         text('provider').notNull(),
+      encryptedPayload: text('encrypted_payload').notNull(),
+      createdAt:        timestamp('created_at').notNull().defaultNow(),
+      updatedAt:        timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('org_integration_org_idx').on(t.organizationId),
+      uniqueIndex('org_integration_org_provider_uidx').on(t.organizationId, t.provider),
+    ],
   )

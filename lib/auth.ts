@@ -9,6 +9,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { organizations, users } from '@/db/schema'
+import { normalizeOrgRole, type OrgRole } from '@/lib/org-role'
 import { UnauthorizedError } from './errors'
 import { createLogger } from './logger'
 
@@ -18,6 +19,8 @@ export type AuthContext = {
   userId: string
   orgId: string
   org: typeof organizations.$inferSelect
+  /** Rol del usuario autenticado dentro de `org` (tabla `users.role`). */
+  orgRole: OrgRole
 }
 
 /**
@@ -74,5 +77,11 @@ export async function getAuthContext(): Promise<AuthContext> {
       .onConflictDoNothing()
   }
 
-  return { userId, orgId: identifier, org }
+  const userRow = await db.query.users.findFirst({
+    where: eq(users.clerkId, userId),
+    columns: { role: true },
+  })
+  const orgRole = normalizeOrgRole(userRow?.role)
+
+  return { userId, orgId: identifier, org, orgRole }
 }

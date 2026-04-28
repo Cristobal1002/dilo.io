@@ -13,16 +13,19 @@ type Member = {
 
 function RoleBadge({ role }: { role: string }) {
   const isOwner = role === 'owner'
+  const isAdmin = role === 'admin'
+  const label = isOwner ? 'Owner' : isAdmin ? 'Admin' : 'Miembro'
+  const elevated = isOwner || isAdmin
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-        isOwner
+        elevated
           ? 'bg-[#EDE9FE] text-[#6D28D9] dark:bg-[#2D1F6E] dark:text-[#C4B5FD]'
           : 'bg-[#F3F4F6] text-[#6B7280] dark:bg-[#252936] dark:text-[#9CA3AF]'
       }`}
     >
-      {isOwner && <ShieldCheckIcon className="h-2.5 w-2.5" />}
-      {isOwner ? 'Owner' : 'Miembro'}
+      {elevated && <ShieldCheckIcon className="h-2.5 w-2.5" />}
+      {label}
     </span>
   )
 }

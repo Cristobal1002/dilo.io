@@ -1,9 +1,9 @@
 import { auth } from '@clerk/nextjs/server'
 import Link from 'next/link'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
-import { webhooks } from '@/db/schema'
+import { orgIntegrationCredentials, webhooks } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { ConnectorsForm } from './connectors-form'
 
@@ -20,6 +20,15 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
     orderBy: [desc(webhooks.createdAt)],
   })
 
+  const resendRow = await db.query.orgIntegrationCredentials.findFirst({
+    where: and(
+      eq(orgIntegrationCredentials.organizationId, access.org.id),
+      eq(orgIntegrationCredentials.provider, 'resend'),
+    ),
+    columns: { id: true },
+  })
+  const resendConnected = Boolean(resendRow)
+
   return (
     <div className="mx-auto flex min-h-0 max-w-2xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -27,8 +36,8 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
           <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Conectores</p>
           <h1 className="mt-1 text-xl font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">{access.flow.name}</h1>
           <p className="mt-1 text-sm text-[#6B7280] dark:text-[#9CA3AF]">
-            Webhooks cuando un visitante completa el flow público. Los intentos quedan registrados en el sistema de
-            entregas.
+            Resend a nivel workspace y webhooks por flow cuando un visitante completa el público. Las entregas de
+            webhooks quedan registradas en el sistema.
           </p>
         </div>
         <Link
@@ -39,7 +48,7 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
         </Link>
       </div>
 
-      <ConnectorsForm flowId={flowId} />
+      <ConnectorsForm flowId={flowId} resendConnected={resendConnected} />
 
       <div>
         <h2 className="text-sm font-semibold text-[#1A1A1A] dark:text-[#F8F9FB]">Webhooks configurados</h2>
