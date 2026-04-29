@@ -90,7 +90,12 @@ export function ResendIntegrationForm() {
       <h2 className="mt-1 text-lg font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Correo transaccional</h2>
       <p className="mt-2 text-sm leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
         Conecta la API key de tu cuenta Resend <strong>una sola vez</strong> para todo el workspace. Luego cada flow
-        podrá usarla en conectores (sin volver a pegar secretos).
+        podrá usarla en conectores (sin volver a pegar secretos). Usa una clave con permiso{' '}
+        <strong>Full access</strong> en resend.com/api-keys (las de solo envío a veces no pasan la verificación).
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+        El remitente <span className="font-mono">from</span> debe usar un dominio que hayas verificado en Resend →
+        Dominios; eso aplica al <em>enviar</em> correos, no a guardar la integración aquí.
       </p>
 
       {loading ? (
@@ -151,10 +156,6 @@ export function ResendIntegrationForm() {
                 className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
               />
             </label>
-            <p className="text-[10px] leading-snug text-[#94A3B8]">
-              Requisitos en servidor: <span className="font-mono">DILO_INTEGRATION_SECRETS_KEY</span> (string largo;
-              usamos SHA-256 internamente). En Vercel, añádela al proyecto antes de guardar keys.
-            </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
