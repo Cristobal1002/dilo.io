@@ -2,6 +2,7 @@ import {
   DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN,
   renderOutreachColdBodyMarkdown,
 } from '@/lib/outreach-cold-email-body'
+import { escapeHtml } from '@/lib/email-templates/utils'
 
 export type ColdEmailParams = {
   recipientName: string
@@ -17,14 +18,6 @@ export type ColdEmailParams = {
   ctaLabel?: string | null
   /** Enlace del pie (HTTPS); null → getdilo.io */
   footerLinkUrl?: string | null
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 function safeFooterHref(url: string | null | undefined): string {
@@ -80,7 +73,9 @@ export function buildColdEmail({
   const cta = escapeHtml(ctaUrl)
   const md = bodyMarkdown?.trim() ? bodyMarkdown : DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN
   const bodyHtml = renderOutreachColdBodyMarkdown(md, recipientName)
-  const btnLabelRaw = (ctaLabel?.trim() || 'Abrir formulario →').slice(0, 80)
+  const providedLabel = ctaLabel?.trim() ?? ''
+  const labelLooksLikeUrl = /^https?:\/\//i.test(providedLabel) || providedLabel.includes('://')
+  const btnLabelRaw = (labelLooksLikeUrl ? '' : providedLabel || 'Abrir formulario →').slice(0, 80)
   const btnLabel = escapeHtml(btnLabelRaw)
   const footHref = safeFooterHref(footerLinkUrl ?? null)
   const footHrefEsc = escapeHtml(footHref)

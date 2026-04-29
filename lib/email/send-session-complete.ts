@@ -1,6 +1,11 @@
+import { eq } from 'drizzle-orm'
 import { Resend } from 'resend'
+import { db } from '@/db'
+import { organizations } from '@/db/schema'
 import { resolveResendSendConfig } from '@/lib/email/org-resend'
+import { buildSessionCompleteEmail } from '@/lib/email-templates/session-complete'
 import { createLogger } from '@/lib/logger'
+import { publicAppBaseUrl } from '@/lib/outreach'
 
 const log = createLogger('email/session-complete')
 
@@ -21,20 +26,6 @@ export type SessionCompleteEmailInput = {
   }
 }
 
-function classificationLabel(c: string | null): string {
-  if (c === 'hot') return '🔥 Hot'
-  if (c === 'warm') return '🟡 Warm'
-  if (c === 'cold') return '🔵 Cold'
-  return '–'
-}
-
-function scoreBar(score: number | null): string {
-  if (score == null) return '–'
-  const n = Math.max(0, Math.min(100, Math.round(score)))
-  const filled = Math.round(n / 10)
-  return `${'█'.repeat(filled)}${'░'.repeat(10 - filled)} ${n}/100`
-}
-
 export async function sendSessionCompleteEmail(data: SessionCompleteEmailInput): Promise<void> {
   const cfg = await resolveResendSendConfig(data.organizationId)
   if (!cfg) {
@@ -45,16 +36,14 @@ export async function sendSessionCompleteEmail(data: SessionCompleteEmailInput):
     return
   }
 
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  const base = publicAppBaseUrl()
   const dashboardUrl = `${base}/dashboard/flows/${data.flowId}/results/${data.sessionId}`
 
-  const contactLines = [
-    data.contact.name ? `Nombre: ${data.contact.name}` : '',
-    data.contact.email ? `Email: ${data.contact.email}` : '',
-    data.contact.phone ? `Teléfono: ${data.contact.phone}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
+  const [orgRow] = await db
+    .select({ logoUrl: organizations.logoUrl, websiteUrl: organizations.websiteUrl })
+    .from(organizations)
+    .where(eq(organizations.id, data.organizationId))
+    .limit(1)
 
   const resend = new Resend(cfg.apiKey)
   const hot = data.classification === 'hot' ? ' 🔥' : ''
@@ -63,26 +52,17 @@ export async function sendSessionCompleteEmail(data: SessionCompleteEmailInput):
     from: `Dilo <${cfg.from}>`,
     to: data.toEmail,
     subject: `Nueva respuesta en "${data.flowName}"${hot}`,
-    text: [
-      `Nueva respuesta recibida en: ${data.flowName}`,
-      '',
-      'LEAD',
-      contactLines || 'Sin datos de contacto',
-      '',
-      'RESUMEN IA',
-      data.summary ?? 'Sin resumen',
-      '',
-      'SCORING',
-      `Clasificación: ${classificationLabel(data.classification)}`,
-      `Score: ${scoreBar(data.score)}`,
-      `Acción sugerida: ${data.suggestedAction ?? '–'}`,
-      '',
-      'Ver respuesta completa:',
+    html: buildSessionCompleteEmail({
+      flowName: data.flowName,
+      summary: data.summary,
+      score: data.score,
+      classification: data.classification,
+      suggestedAction: data.suggestedAction,
+      contact: data.contact,
       dashboardUrl,
-      '',
-      '---',
-      `Dilo · ${base.replace(/^https?:\/\//, '')}`,
-    ].join('\n'),
+      logoUrl: orgRow?.logoUrl ?? null,
+      footerLinkUrl: orgRow?.websiteUrl ?? null,
+    }),
   })
 
   if (error) {

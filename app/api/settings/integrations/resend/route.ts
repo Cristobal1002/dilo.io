@@ -20,7 +20,7 @@ const INTEGRATIONS_TABLE = 'org_integration_credentials'
 
 const PatchBody = z.object({
   apiKey: z.string().trim().min(8).max(256),
-  fromEmail: z.string().trim().email().max(320).optional().nullable(),
+  fromEmail: z.string().trim().email().max(320),
 })
 
 export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
@@ -41,6 +41,7 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
   if (!row) {
     return apiSuccess({
       connected: false,
+      sendReady: false,
       fromEmail: null as string | null,
       apiKeyLast4: null as string | null,
     })
@@ -48,14 +49,18 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
 
   try {
     const dec = decryptIntegrationPayload(row.encryptedPayload)
+    const fromEmail = dec.fromEmail?.trim() || null
+    const sendReady = Boolean(dec.apiKey?.trim()) && Boolean(fromEmail)
     return apiSuccess({
       connected: true,
-      fromEmail: dec.fromEmail ?? null,
+      sendReady,
+      fromEmail,
       apiKeyLast4: apiKeyLast4(dec.apiKey),
     })
   } catch {
     return apiSuccess({
       connected: true,
+      sendReady: false,
       corrupt: true,
       fromEmail: null as string | null,
       apiKeyLast4: null as string | null,
@@ -72,8 +77,7 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Datos inválidos', parsed.error.flatten().fieldErrors)
   }
 
-  const fromEmail =
-    parsed.data.fromEmail && parsed.data.fromEmail.trim() ? parsed.data.fromEmail.trim() : null
+  const fromEmail = parsed.data.fromEmail.trim()
 
   const check = await verifyResendApiKey(parsed.data.apiKey)
   if (!check.ok) {
@@ -122,6 +126,7 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
 
   return apiSuccess({
     connected: true,
+    sendReady: true,
     fromEmail,
     apiKeyLast4: apiKeyLast4(parsed.data.apiKey.trim()),
   })

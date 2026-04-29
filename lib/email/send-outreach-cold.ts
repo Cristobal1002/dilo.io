@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 import { db } from '@/db'
 import { organizations } from '@/db/schema'
 import { buildColdEmail } from '@/lib/email-templates/cold-outreach'
-import { resolveResendSendConfig } from '@/lib/email/org-resend'
+import type { ResolvedResendConfig } from '@/lib/email/org-resend'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/outreach-cold')
@@ -17,16 +17,16 @@ export type SendOutreachColdEmailParams = {
   subject: string
   trackingPixelUrl: string
   trackedCtaUrl: string
+  resendConfig: ResolvedResendConfig
+  /** Permite reusar un cliente por request. */
+  resendClient?: Resend
 }
 
 /**
  * Envía el HTML de cold outreach con Resend (integración del workspace o `RESEND_*` en servidor).
  */
 export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams): Promise<void> {
-  const cfg = await resolveResendSendConfig(params.organizationId)
-  if (!cfg) {
-    throw new Error('No hay credenciales Resend para este workspace.')
-  }
+  const cfg = params.resendConfig
 
   const [orgRow] = await db
     .select({
@@ -51,7 +51,7 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
     footerLinkUrl: orgRow?.websiteUrl ?? null,
   })
 
-  const resend = new Resend(cfg.apiKey)
+  const resend = params.resendClient ?? new Resend(cfg.apiKey)
   const { error } = await resend.emails.send({
     from: `${display} <${cfg.from}>`,
     to: params.toEmail.trim(),

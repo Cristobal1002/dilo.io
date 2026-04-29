@@ -15,6 +15,7 @@ import {
   type OutreachStatus,
 } from '@/lib/outreach'
 import { withApiHandler } from '@/lib/with-api-handler'
+import { Resend } from 'resend'
 
 const BodySchema = z.object({
   subject: z.string().trim().min(1).max(300),
@@ -26,6 +27,26 @@ const BodySchema = z.object({
    */
   sendWithResend: z.boolean().optional(),
 })
+
+function normalizeCtaDestinationUrl(input: string | undefined): string | null {
+  if (!input) return null
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  // Si pegaron encima y quedó concatenado, tomar la última URL completa.
+  const lower = trimmed.toLowerCase()
+  const idx = Math.max(lower.lastIndexOf('https://'), lower.lastIndexOf('http://'))
+  const candidate = idx > 0 ? trimmed.slice(idx) : trimmed
+
+  // Validación extra: evitar hostnames "pegados" tipo getdilo.iohttps
+  try {
+    const u = new URL(candidate)
+    if (u.hostname.toLowerCase().includes('http')) return null
+    return u.toString().slice(0, 2000)
+  } catch {
+    return null
+  }
+}
 
 export const POST = withApiHandler(async (req: NextRequest, { auth, params }) => {
   const { org } = auth
@@ -47,9 +68,9 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
   }
 
   const sendWithResend = parsed.data.sendWithResend === true
+  const resendCfg = sendWithResend ? await resolveResendSendConfig(org.id) : null
   if (sendWithResend) {
-    const cfg = await resolveResendSendConfig(org.id)
-    if (!cfg) {
+    if (!resendCfg) {
       throw new ValidationError(
         'Para enviar desde Dilo hace falta Resend en Integraciones (API key y remitente) o las variables RESEND_API_KEY y RESEND_FROM_EMAIL en el servidor.',
       )
@@ -58,7 +79,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
 
   const token = newOutreachTrackingToken()
   const now = new Date()
-  const ctaDest = parsed.data.ctaDestinationUrl?.trim()
+  const ctaDest = normalizeCtaDestinationUrl(parsed.data.ctaDestinationUrl)
 
   const leadSnapshot = {
     status: lead.status,
@@ -66,16 +87,27 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
     updatedAt: lead.updatedAt,
   }
 
-  const [emailRow] = await db
-    .insert(outreachEmails)
-    .values({
-      leadId,
-      trackingToken: token,
-      subject: parsed.data.subject,
-      sentAt: now,
-      ctaDestinationUrl: ctaDest ?? null,
-    })
-    .returning()
+  let emailRow: (typeof outreachEmails.$inferSelect) | undefined
+  try {
+    ;[emailRow] = await db
+      .insert(outreachEmails)
+      .values({
+        leadId,
+        trackingToken: token,
+        subject: parsed.data.subject,
+        sentAt: now,
+        ctaDestinationUrl: ctaDest ?? null,
+      })
+      .returning()
+  } catch (e: unknown) {
+    const code =
+      e && typeof e === 'object' && 'code' in e ? String((e as { code: unknown }).code) : ''
+    if (code === '23505') {
+      throw new ValidationError('No se pudo registrar el envío (duplicado). Inténtalo de nuevo.')
+    }
+    const msg = e instanceof Error ? e.message : 'Error desconocido'
+    throw new ValidationError(`No se pudo registrar el envío: ${msg}`)
+  }
 
   if (!emailRow) {
     throw new ValidationError('No se pudo crear el registro de envío')
@@ -84,14 +116,21 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
   const preserveStatus =
     OUTREACH_MANUAL_PRIORITY_STATUSES.has(lead.status as OutreachStatus)
 
-  await db
-    .update(outreachLeads)
-    .set({
-      ...(preserveStatus ? {} : { status: 'sent' as const }),
-      lastActivityAt: now,
-      updatedAt: now,
-    })
-    .where(eq(outreachLeads.id, leadId))
+  try {
+    await db
+      .update(outreachLeads)
+      .set({
+        ...(preserveStatus ? {} : { status: 'sent' as const }),
+        lastActivityAt: now,
+        updatedAt: now,
+      })
+      .where(eq(outreachLeads.id, leadId))
+  } catch (e: unknown) {
+    // Si no se pudo actualizar el lead, revertimos el insert para no dejar un "envío" colgando.
+    await db.delete(outreachEmails).where(eq(outreachEmails.id, emailRow.id))
+    const msg = e instanceof Error ? e.message : 'Error desconocido'
+    throw new ValidationError(`No se pudo actualizar el lead: ${msg}`)
+  }
 
   const openPixelUrl = buildOpenPixelUrl(token)
   const trackedCtaUrl = ctaDest
@@ -100,6 +139,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
 
   if (sendWithResend) {
     try {
+      const resendClient = new Resend(resendCfg!.apiKey)
       await sendOutreachColdEmail({
         organizationId: org.id,
         senderDisplayName: org.name?.trim() || 'Dilo',
@@ -108,6 +148,8 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         subject: parsed.data.subject,
         trackingPixelUrl: openPixelUrl,
         trackedCtaUrl,
+        resendConfig: resendCfg!,
+        resendClient,
       })
     } catch (err) {
       await db.delete(outreachEmails).where(eq(outreachEmails.id, emailRow.id))

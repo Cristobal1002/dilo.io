@@ -5,6 +5,7 @@ import { readApiResult } from '@/lib/read-api-result'
 
 type Status = {
   connected: boolean
+  sendReady?: boolean
   fromEmail: string | null
   apiKeyLast4: string | null
   corrupt?: boolean
@@ -17,6 +18,8 @@ export function ResendIntegrationForm() {
   const [fromEmail, setFromEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,7 +52,7 @@ export function ResendIntegrationForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           apiKey: apiKey.trim(),
-          fromEmail: fromEmail.trim() || null,
+          fromEmail: fromEmail.trim(),
         }),
       })
       const r = await readApiResult<Status>(res)
@@ -66,7 +69,10 @@ export function ResendIntegrationForm() {
   }
 
   const disconnect = async () => {
-    if (!confirm('¿Quitar la integración con Resend de esta organización?')) return
+    setConfirmDisconnect(true)
+  }
+
+  const doDisconnect = async () => {
     setBusy(true)
     setMsg(null)
     try {
@@ -74,6 +80,7 @@ export function ResendIntegrationForm() {
       if (res.status === 204) {
         setApiKey('')
         setFromEmail('')
+        setConfirmDisconnect(false)
         await load()
         return
       }
@@ -81,6 +88,26 @@ export function ResendIntegrationForm() {
       if (!r.ok) setMsg(r.message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const sendTest = async () => {
+    setTestBusy(true)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/settings/integrations/resend/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const r = await readApiResult<{ toEmail: string }>(res)
+      if (!r.ok) {
+        setMsg(r.message)
+        return
+      }
+      setMsg(`Email de prueba enviado a ${r.data.toEmail}. Revisa inbox/promociones.`)
+    } finally {
+      setTestBusy(false)
     }
   }
 
@@ -105,8 +132,14 @@ export function ResendIntegrationForm() {
       ) : (
         <>
           {status?.connected ? (
-            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
-              <p className="font-semibold">Conectado</p>
+            <div
+              className={`mt-4 rounded-xl px-3 py-2 text-sm ${
+                status.sendReady
+                  ? 'border border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+                  : 'border border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200'
+              }`}
+            >
+              <p className="font-semibold">{status.sendReady ? 'Conectado' : 'Guardado (incompleto)'}</p>
               {status.corrupt ? (
                 <p className="mt-1 text-xs opacity-90">
                   Hay datos guardados pero no se pudieron leer (clave de cifrado distinta o datos corruptos). Guarda de
@@ -120,7 +153,12 @@ export function ResendIntegrationForm() {
                       {' '}
                       · remitente por defecto <span className="font-mono">{status.fromEmail}</span>
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      {' '}
+                      · falta el remitente <span className="font-mono">from</span> (no podrás enviar hasta guardarlo)
+                    </>
+                  )}
                 </p>
               )}
             </div>
@@ -149,23 +187,34 @@ export function ResendIntegrationForm() {
               />
             </label>
             <label className="block text-xs font-medium text-[#64748B] dark:text-[#94A3B8]">
-              Email remitente por defecto (opcional)
+              Email remitente por defecto (requerido para enviar)
               <input
                 type="email"
                 value={fromEmail}
                 onChange={(e) => setFromEmail(e.target.value)}
                 placeholder="notificaciones@tudominio.com"
+                required
                 className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936] dark:text-[#F8F9FB]"
               />
             </label>
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
-                disabled={busy || !apiKey.trim()}
+                disabled={busy || !apiKey.trim() || !fromEmail.trim()}
                 className="rounded-xl bg-[#0f172a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40 dark:bg-[#334155]"
               >
                 {busy ? 'Guardando…' : status?.connected ? 'Actualizar credenciales' : 'Conectar Resend'}
               </button>
+              {status?.connected && status.sendReady ? (
+                <button
+                  type="button"
+                  disabled={busy || testBusy}
+                  onClick={() => void sendTest()}
+                  className="rounded-xl border border-[#E8EAEF] bg-white px-4 py-2.5 text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC] disabled:opacity-40 dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#CBD5E1] dark:hover:bg-[#252936]"
+                >
+                  {testBusy ? 'Enviando…' : 'Enviar email de prueba'}
+                </button>
+              ) : null}
               {status?.connected ? (
                 <button
                   type="button"
@@ -180,6 +229,35 @@ export function ResendIntegrationForm() {
           </form>
         </>
       )}
+
+      {confirmDisconnect ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#E8EAEF] bg-white p-4 shadow-2xl dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+            <p className="text-sm font-bold text-[#111827] dark:text-[#F8F9FB]">Desconectar Resend</p>
+            <p className="mt-2 text-sm text-[#64748B] dark:text-[#94A3B8]">
+              ¿Quitar la integración con Resend de esta organización? Esto no borra nada en Resend.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmDisconnect(false)}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-[#64748B] hover:bg-[#F1F5F9] disabled:opacity-40 dark:hover:bg-[#252936]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void doDisconnect()}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {busy ? 'Desconectando…' : 'Desconectar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

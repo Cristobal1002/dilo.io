@@ -110,13 +110,33 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
   const [creating, setCreating] = useState(false)
 
   const [panelLeadId, setPanelLeadId] = useState<string | null>(null)
+  const [panelLead, setPanelLead] = useState<OutreachLeadOverview | null>(null)
   const [panelEmails, setPanelEmails] = useState<EmailRow[] | null>(null)
   const [panelLoading, setPanelLoading] = useState(false)
+  const [editLeadOpen, setEditLeadOpen] = useState(false)
+  const [editLeadBusy, setEditLeadBusy] = useState(false)
+  const [editLeadMsg, setEditLeadMsg] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editCompany, setEditCompany] = useState('')
+  const [editRole, setEditRole] = useState('')
+  const [editNotes, setEditNotes] = useState('')
   const [registerSubject, setRegisterSubject] = useState('')
-  const [registerCtaUrl, setRegisterCtaUrl] = useState('https://getdilo.io')
+  const [registerCtaUrl, setRegisterCtaUrl] = useState('')
   const [sendWithResend, setSendWithResend] = useState(true)
   const [registerBusy, setRegisterBusy] = useState(false)
   const [registerResult, setRegisterResult] = useState<string | null>(null)
+
+  function normalizeCtaUrlInput(input: string): string {
+    const raw = input.trim()
+    if (!raw) return ''
+    // Si pegaron encima de algo y quedó concatenado, quedarnos con la última URL completa.
+    const lastHttps = raw.toLowerCase().lastIndexOf('https://')
+    const lastHttp = raw.toLowerCase().lastIndexOf('http://')
+    const idx = Math.max(lastHttps, lastHttp)
+    if (idx > 0) return raw.slice(idx)
+    return raw
+  }
 
   const filtered = useMemo(() => {
     if (filter === 'all') return leads
@@ -135,16 +155,26 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
 
   const openPanel = useCallback(async (leadId: string) => {
     setPanelLeadId(leadId)
+    setPanelLead(null)
     setPanelEmails(null)
+    setEditLeadOpen(false)
+    setEditLeadBusy(false)
+    setEditLeadMsg(null)
     setRegisterSubject('')
-    setRegisterCtaUrl('https://getdilo.io')
+    setRegisterCtaUrl('')
     setSendWithResend(true)
     setRegisterResult(null)
     setPanelLoading(true)
     try {
       const res = await fetch(`/api/outreach/leads/${leadId}`)
-      const result = await readApiResult<{ lead: { id: string }; emails: EmailRow[] }>(res)
+      const result = await readApiResult<{ lead: OutreachLeadOverview; emails: EmailRow[] }>(res)
       if (result.ok) {
+        setPanelLead(result.data.lead)
+        setEditName(result.data.lead.name ?? '')
+        setEditEmail(result.data.lead.email ?? '')
+        setEditCompany(result.data.lead.company ?? '')
+        setEditRole(result.data.lead.role ?? '')
+        setEditNotes(result.data.lead.notes ?? '')
         setPanelEmails(result.data.emails)
       } else {
         setMsg(result.message)
@@ -154,6 +184,35 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
       setPanelLoading(false)
     }
   }, [])
+
+  const saveLeadEdits = async () => {
+    if (!panelLeadId || !panelLead) return
+    setEditLeadBusy(true)
+    setEditLeadMsg(null)
+    try {
+      const res = await fetch(`/api/outreach/leads/${panelLeadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          email: editEmail.trim(),
+          company: editCompany.trim() === '' ? null : editCompany.trim(),
+          role: editRole.trim() === '' ? null : editRole.trim(),
+          notes: editNotes.trim() === '' ? null : editNotes.trim(),
+        }),
+      })
+      const result = await readApiResult<{ lead: OutreachLeadOverview }>(res)
+      if (!result.ok) {
+        setEditLeadMsg(result.message)
+        return
+      }
+      setPanelLead(result.data.lead)
+      setEditLeadOpen(false)
+      await refreshList()
+    } finally {
+      setEditLeadBusy(false)
+    }
+  }
 
   const patchStatus = async (leadId: string, status: string) => {
     setBusyId(leadId)
@@ -479,6 +538,115 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                 <p className="text-sm text-[#64748B]">Cargando…</p>
               ) : (
                 <>
+                  {panelLead ? (
+                    <div className="mb-5 rounded-xl border border-[#E8EAEF] p-3 dark:border-[#2A2F3F]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[#1A1A1A] dark:text-[#F8F9FB]">
+                            {panelLead.name}
+                          </p>
+                          <p className="truncate text-xs text-[#64748B] dark:text-[#94A3B8]">{panelLead.email}</p>
+                          {panelLead.company ? (
+                            <p className="mt-1 truncate text-xs text-[#64748B] dark:text-[#94A3B8]">
+                              {panelLead.company}
+                              {panelLead.role ? ` · ${panelLead.role}` : ''}
+                            </p>
+                          ) : panelLead.role ? (
+                            <p className="mt-1 truncate text-xs text-[#64748B] dark:text-[#94A3B8]">{panelLead.role}</p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditLeadOpen((v) => !v)}
+                          className="shrink-0 rounded-lg border border-[#E8EAEF] bg-white px-2 py-1 text-xs font-semibold text-[#64748B] hover:bg-[#F8FAFC] dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:hover:bg-[#252936]"
+                        >
+                          {editLeadOpen ? 'Cerrar edición' : 'Editar'}
+                        </button>
+                      </div>
+
+                      {editLeadOpen ? (
+                        <div className="mt-3 space-y-2">
+                          {editLeadMsg ? (
+                            <p className="rounded-lg bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                              {editLeadMsg}
+                            </p>
+                          ) : null}
+                          <label className="block text-[10px] font-medium text-[#64748B]">
+                            Nombre
+                            <input
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+                            />
+                          </label>
+                          <label className="block text-[10px] font-medium text-[#64748B]">
+                            Email
+                            <input
+                              type="email"
+                              inputMode="email"
+                              value={editEmail}
+                              onChange={(e) => setEditEmail(e.target.value)}
+                              className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+                            />
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="block text-[10px] font-medium text-[#64748B]">
+                              Empresa
+                              <input
+                                value={editCompany}
+                                onChange={(e) => setEditCompany(e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+                              />
+                            </label>
+                            <label className="block text-[10px] font-medium text-[#64748B]">
+                              Rol
+                              <input
+                                value={editRole}
+                                onChange={(e) => setEditRole(e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+                              />
+                            </label>
+                          </div>
+                          <label className="block text-[10px] font-medium text-[#64748B]">
+                            Notas
+                            <textarea
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              rows={3}
+                              className="mt-1 w-full resize-y rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+                            />
+                          </label>
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={editLeadBusy}
+                              onClick={() => {
+                                setEditLeadOpen(false)
+                                setEditLeadMsg(null)
+                                setEditName(panelLead.name ?? '')
+                                setEditEmail(panelLead.email ?? '')
+                                setEditCompany(panelLead.company ?? '')
+                                setEditRole(panelLead.role ?? '')
+                                setEditNotes(panelLead.notes ?? '')
+                              }}
+                              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#64748B] hover:bg-[#F1F5F9] disabled:opacity-50 dark:hover:bg-[#252936]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={editLeadBusy || !editName.trim() || !editEmail.trim()}
+                              onClick={() => void saveLeadEdits()}
+                              className="rounded-lg bg-[#9C77F5] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                            >
+                              {editLeadBusy ? 'Guardando…' : 'Guardar'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <p className="text-xs text-[#94A3B8]">Historial de envíos</p>
                   <ul className="mt-2 space-y-2">
                     {(panelEmails ?? []).map((e) => (
@@ -525,15 +693,28 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                       Resend del workspace (Integraciones).
                     </p>
                     <label className="mt-2 block text-[10px] font-medium text-[#64748B]">
-                      URL del CTA (https) — opcional; por defecto getdilo.io
+                      URL del CTA (https) — opcional; si la dejas vacía usamos getdilo.io
                       <input
                         type="url"
                         value={registerCtaUrl}
-                        onChange={(e) => setRegisterCtaUrl(e.target.value)}
+                        onChange={(e) => setRegisterCtaUrl(normalizeCtaUrlInput(e.target.value))}
                         placeholder="https://…"
                         className="mt-1 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 font-mono text-xs dark:border-[#2A2F3F] dark:bg-[#252936]"
                       />
                     </label>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="text-[10px] text-[#94A3B8]">
+                        Tip: pega el link del flow publicado (por ejemplo <span className="font-mono">/f/…</span>).
+                      </p>
+                      <button
+                        type="button"
+                        disabled={registerBusy}
+                        onClick={() => setRegisterCtaUrl('')}
+                        className="shrink-0 rounded-md border border-[#E8EAEF] bg-white px-2 py-1 text-[10px] font-semibold text-[#64748B] hover:bg-[#F8FAFC] disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:hover:bg-[#252936]"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
                     <input
                       value={registerSubject}
                       onChange={(e) => setRegisterSubject(e.target.value)}

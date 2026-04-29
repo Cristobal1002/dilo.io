@@ -1,6 +1,8 @@
 import { Resend } from 'resend'
 import { resolveResendSendConfig } from '@/lib/email/org-resend'
+import { buildHotLeadAlertEmail } from '@/lib/email-templates/hot-lead-alert'
 import { createLogger } from '@/lib/logger'
+import { publicAppBaseUrl } from '@/lib/outreach'
 
 const log = createLogger('email/hot-lead')
 
@@ -38,16 +40,8 @@ export async function sendHotLeadAlertEmail(data: HotLeadEmailInput): Promise<vo
     return
   }
 
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  const base = publicAppBaseUrl()
   const dashboardUrl = `${base}/dashboard/flows/${data.flowId}/results/${data.sessionId}`
-
-  const contactLines = [
-    data.contact.name ? `Nombre: ${data.contact.name}` : '',
-    data.contact.email ? `Email: ${data.contact.email}` : '',
-    data.contact.phone ? `Teléfono: ${data.contact.phone}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
 
   const resend = new Resend(cfg.apiKey)
 
@@ -55,28 +49,15 @@ export async function sendHotLeadAlertEmail(data: HotLeadEmailInput): Promise<vo
     from: `Dilo <${cfg.from}>`,
     to: data.toEmail,
     subject: `Lead destacado en "${data.flowName}"`,
-    text: [
-      'Según tus alertas instantáneas, hay un lead que conviene revisar ya.',
-      '',
-      `Flow: ${data.flowName}`,
-      '',
-      'LEAD',
-      contactLines || 'Sin datos de contacto',
-      '',
-      'RESUMEN IA',
-      data.summary ?? 'Sin resumen',
-      '',
-      'SCORING',
-      `Clasificación: ${classificationLabel(data.classification)}`,
-      `Score: ${data.score ?? '–'}/100`,
-      `Acción sugerida: ${data.suggestedAction ?? '–'}`,
-      '',
-      'Ver respuesta:',
+    html: buildHotLeadAlertEmail({
+      flowName: data.flowName,
+      summary: data.summary,
+      score: data.score,
+      classification: data.classification,
+      suggestedAction: data.suggestedAction,
+      contact: data.contact,
       dashboardUrl,
-      '',
-      '---',
-      `Dilo · ${base.replace(/^https?:\/\//, '')}`,
-    ].join('\n'),
+    }),
   })
 
   if (error) {
