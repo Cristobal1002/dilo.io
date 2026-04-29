@@ -2,7 +2,9 @@
  * Verifica una API key de Resend contra la API.
  *
  * - Claves «Full access»: GET /domains responde 200.
- * - Claves solo de envío: GET /domains devuelve 401 `restricted_api_key`; probamos GET /emails.
+ * - Claves solo de envío (p. ej. la del onboarding «Send your first email»): GET /domains → 401
+ *   `restricted_api_key`. Entonces probamos GET /emails y, si hace falta, POST /emails con cuerpo `{}`:
+ *   Resend suele responder 422 por campos faltantes **después** de autenticar — no envía correo.
  *
  * Resend exige `User-Agent` en algunas rutas (403 código 1010 si falta).
  */
@@ -34,11 +36,43 @@ async function resendGet(key: string, path: string): Promise<Response> {
   })
 }
 
+/** POST con cuerpo inválido a propósito: si la key es válida, Resend responde error de validación, no 401. */
+async function resendPostEmptyEmailProbe(key: string): Promise<{ status: number; text: string }> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent': RESEND_UA,
+    },
+    body: JSON.stringify({}),
+  })
+  const text = await res.text().catch(() => '')
+  return { status: res.status, text }
+}
+
+/** La petición pasó autenticación de API key (fallo de negocio / validación, no clave inválida). */
+function resendAuthLooksOk(status: number, text: string): boolean {
+  const p = parseResendErrorBody(text)
+  if (status === 200 || status === 201) return true
+  if (status === 422) return true
+  if (status === 400) return true
+  if (status === 403) {
+    if (p.name === 'invalid_api_key') return false
+    return true
+  }
+  if (status === 429) return true
+  if (status === 401) return false
+  if (status >= 500) return false
+  return false
+}
+
 const MSG_INVALID =
   'Resend no reconoce la API key (revocada, incompleta o de otra cuenta). Genera una nueva en resend.com/api-keys y copia la cadena completa (empieza por re_).'
 
 const MSG_SENDING_ONLY =
-  'Esta clave es solo de envío y Resend no permite validarla con las rutas que usamos. Crea una API key con permiso «Full access» en resend.com/api-keys y vuelve a pegarla.'
+  'Esta clave no permite las comprobaciones que hace Dilo contra la API de Resend. Crea una API key con permiso «Full access» en resend.com/api-keys y vuelve a pegarla.'
 
 export async function verifyResendApiKey(apiKey: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const key = apiKey.trim()
@@ -57,9 +91,17 @@ export async function verifyResendApiKey(apiKey: string): Promise<{ ok: true } |
     if (restrictedOnDomains) {
       const emailsRes = await resendGet(key, '/emails')
       if (emailsRes.ok) return { ok: true }
-      text = await emailsRes.text().catch(() => '')
-      parsed = parseResendErrorBody(text)
-      if (parsed.name === 'invalid_api_key' || emailsRes.status === 403) {
+      const emailsText = await emailsRes.text().catch(() => '')
+      const emailsParsed = parseResendErrorBody(emailsText)
+      if (emailsParsed.name === 'invalid_api_key') {
+        return { ok: false, message: MSG_INVALID }
+      }
+
+      const probe = await resendPostEmptyEmailProbe(key)
+      if (resendAuthLooksOk(probe.status, probe.text)) return { ok: true }
+
+      const probeParsed = parseResendErrorBody(probe.text)
+      if (probe.status === 401 || (probe.status === 403 && probeParsed.name === 'invalid_api_key')) {
         return { ok: false, message: MSG_INVALID }
       }
       return { ok: false, message: MSG_SENDING_ONLY }

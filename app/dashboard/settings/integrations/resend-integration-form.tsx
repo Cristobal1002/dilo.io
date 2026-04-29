@@ -89,9 +89,9 @@ export function ResendIntegrationForm() {
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Resend</p>
       <h2 className="mt-1 text-lg font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Correo transaccional</h2>
       <p className="mt-2 text-sm leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-        Conecta la API key de tu cuenta Resend <strong>una sola vez</strong> para todo el workspace. Luego cada flow
-        podrá usarla en conectores (sin volver a pegar secretos). Usa una clave con permiso{' '}
-        <strong>Full access</strong> en resend.com/api-keys (las de solo envío a veces no pasan la verificación).
+        Conecta la API key de tu cuenta Resend <strong>una sola vez</strong> para todo el workspace (incluida la del
+        paso «Send your first email»). Si la verificación fallara, crea otra en{' '}
+        <span className="font-mono text-[11px]">resend.com/api-keys</span> con permiso <strong>Full access</strong>.
       </p>
       <p className="mt-2 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
         El remitente <span className="font-mono">from</span> debe usar un dominio que hayas verificado en Resend →
