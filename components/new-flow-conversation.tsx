@@ -56,6 +56,9 @@ export function NewFlowConversation() {
   const [loading, setLoading] = useState(false)
   const [bootError, setBootError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** Último `intro` enviado a `/api/flows/generate` para poder reintentar sin repetir el wizard. */
+  const lastGenerateIntroRef = useRef<string | null>(null)
+  const [showGenerateRetry, setShowGenerateRetry] = useState(false)
 
   const pushAssistant = useCallback((content: string) => {
     setMessages((m) => [...m, { id: uid(), role: 'assistant', content }])
@@ -228,6 +231,8 @@ export function NewFlowConversation() {
       setError('Faltan datos del flujo. Vuelve atrás en el chat no es posible — recarga si hace falta.')
       return
     }
+    lastGenerateIntroRef.current = intro
+    setShowGenerateRetry(false)
     setLoading(true)
     setError(null)
     pushAssistant('**Genial.** Estoy generando tu flow con IA… suele tardar **10–40 s**.')
@@ -255,9 +260,11 @@ export function NewFlowConversation() {
       }
       router.push(`/dashboard/flows/${json.data.flow.id}`)
     } catch (e) {
-      setLoading(false)
       setError(e instanceof Error ? e.message : 'Algo salió mal')
       pushAssistant('**No se pudo generar.** Revisa el mensaje de error abajo o inténtalo de nuevo en unos segundos.')
+      setShowGenerateRetry(true)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -317,6 +324,17 @@ export function NewFlowConversation() {
             <p className="text-center text-xs font-medium text-red-600 dark:text-red-400" role="alert">
               {error}
             </p>
+          ) : null}
+
+          {showGenerateRetry && lastGenerateIntroRef.current !== null && (step === 'saludo' || step === 'saludo_custom') ? (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void runGenerate(lastGenerateIntroRef.current ?? '')}
+              className="w-full rounded-xl border border-[#9C77F5]/35 bg-[#9C77F5]/10 py-3 text-sm font-bold text-[#5B3EC9] shadow-sm transition hover:bg-[#9C77F5]/16 disabled:opacity-40 dark:border-[#9C77F5]/30 dark:bg-[#9C77F5]/14 dark:text-[#E4D9FC] dark:hover:bg-[#9C77F5]/22"
+            >
+              Reintentar generación
+            </button>
           ) : null}
 
           {step === 'welcome' ? (
