@@ -1,9 +1,10 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { Resend } from 'resend'
 import { db } from '@/db'
-import { organizations } from '@/db/schema'
+import { flows, organizations } from '@/db/schema'
 import { buildColdEmail } from '@/lib/email-templates/cold-outreach'
 import type { ResolvedResendConfig } from '@/lib/email/org-resend'
+import { resolveOutreachColdTemplate } from '@/lib/outreach-cold-template'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/outreach-cold')
@@ -20,6 +21,8 @@ export type SendOutreachColdEmailParams = {
   resendConfig: ResolvedResendConfig
   /** Permite reusar un cliente por request. */
   resendClient?: Resend
+  /** Si se indica, se aplican overrides de plantilla cold definidos en el flow (sobre el workspace). */
+  flowId?: string | null
 }
 
 /**
@@ -39,6 +42,25 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
     .where(eq(organizations.id, params.organizationId))
     .limit(1)
 
+  let flowRow: {
+    outreachColdEmailBodyMarkdown: string | null
+    outreachColdEmailCtaLabel: string | null
+  } | null = null
+  const fid = params.flowId?.trim()
+  if (fid) {
+    const [r] = await db
+      .select({
+        outreachColdEmailBodyMarkdown: flows.outreachColdEmailBodyMarkdown,
+        outreachColdEmailCtaLabel: flows.outreachColdEmailCtaLabel,
+      })
+      .from(flows)
+      .where(and(eq(flows.id, fid), eq(flows.organizationId, params.organizationId)))
+      .limit(1)
+    flowRow = r ?? null
+  }
+
+  const tpl = resolveOutreachColdTemplate(orgRow ?? null, flowRow)
+
   const display = params.senderDisplayName.trim() || 'Equipo'
   const html = buildColdEmail({
     recipientName: params.recipientName,
@@ -46,8 +68,8 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
     logoUrl: orgRow?.logoUrl ?? null,
     trackingPixelUrl: params.trackingPixelUrl,
     ctaUrl: params.trackedCtaUrl,
-    bodyMarkdown: orgRow?.outreachColdEmailBodyMarkdown ?? null,
-    ctaLabel: orgRow?.outreachColdEmailCtaLabel ?? null,
+    bodyMarkdown: tpl.bodyMarkdown,
+    ctaLabel: tpl.ctaLabel,
     footerLinkUrl: orgRow?.websiteUrl ?? null,
   })
 

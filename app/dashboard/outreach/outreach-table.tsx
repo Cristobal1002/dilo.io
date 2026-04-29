@@ -75,6 +75,12 @@ export type OutreachLeadOverview = {
   lastSentAt: string | null
 }
 
+export type OutreachFlowOption = {
+  id: string
+  name: string
+  status: string
+}
+
 type EmailRow = {
   id: string
   leadId: string
@@ -87,10 +93,17 @@ type EmailRow = {
   clickCount: number
   lastClickedUrl: string | null
   ctaDestinationUrl: string | null
+  flowId?: string | null
   createdAt: string
 }
 
-export default function OutreachTable({ initialLeads }: { initialLeads: OutreachLeadOverview[] }) {
+export default function OutreachTable({
+  initialLeads,
+  flowsForOutreach = [],
+}: {
+  initialLeads: OutreachLeadOverview[]
+  flowsForOutreach?: OutreachFlowOption[]
+}) {
   const router = useRouter()
   const [filter, setFilter] = useState<OutreachFilterStatus>('all')
   const [leads, setLeads] = useState(initialLeads)
@@ -122,6 +135,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
   const [editRole, setEditRole] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [registerSubject, setRegisterSubject] = useState('')
+  const [registerFlowId, setRegisterFlowId] = useState('')
   const [registerCtaUrl, setRegisterCtaUrl] = useState('')
   const [sendWithResend, setSendWithResend] = useState(true)
   const [registerBusy, setRegisterBusy] = useState(false)
@@ -143,6 +157,11 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
     return leads.filter((l) => l.status === filter)
   }, [leads, filter])
 
+  const flowNameById = useMemo(
+    () => new Map(flowsForOutreach.map((f) => [f.id, f.name] as const)),
+    [flowsForOutreach],
+  )
+
   const refreshList = useCallback(async () => {
     const qs = filter === 'all' ? '' : `?status=${encodeURIComponent(filter)}`
     const res = await fetch(`/api/outreach/leads${qs}`)
@@ -161,6 +180,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
     setEditLeadBusy(false)
     setEditLeadMsg(null)
     setRegisterSubject('')
+    setRegisterFlowId('')
     setRegisterCtaUrl('')
     setSendWithResend(true)
     setRegisterResult(null)
@@ -278,6 +298,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
         body: JSON.stringify({
           subject: registerSubject.trim(),
           sendWithResend,
+          ...(registerFlowId.trim() ? { flowId: registerFlowId.trim() } : {}),
           ...(cta ? { ctaDestinationUrl: cta } : {}),
         }),
       })
@@ -659,6 +680,16 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                         <p className="mt-1 break-all font-mono text-[10px] leading-snug text-[#64748B]">
                           Pixel: {openPixelHref(e.trackingToken)}
                         </p>
+                        {e.flowId ? (
+                          <p className="mt-1 text-[10px] text-[#64748B]">
+                            Plantilla (flow):{' '}
+                            <span className="font-semibold text-[#334155] dark:text-[#CBD5E1]">
+                              {flowNameById.get(e.flowId) ?? e.flowId.slice(0, 8) + '…'}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[10px] text-[#94A3B8]">Plantilla: workspace (sin flow)</p>
+                        )}
                         {e.ctaDestinationUrl ? (
                           <p className="mt-1 break-all font-mono text-[10px] leading-snug text-[#64748B]">
                             CTA trackeado: {trackedClickHref(e.trackingToken, e.ctaDestinationUrl)}
@@ -690,8 +721,35 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                     <p className="text-xs font-semibold text-[#6B4DD4]">Registrar envío</p>
                     <p className="mt-1 text-[11px] leading-snug text-[#64748B]">
                       Crea el registro con pixel y CTA trackeados. Opcionalmente Dilo envía el cold mail con la cuenta
-                      Resend del workspace (Integraciones).
+                      Resend del workspace (Integraciones). Si eliges un flow, el cuerpo del mail puede usar la
+                      plantilla definida en <span className="font-semibold">Conectores de ese flow</span> (si no, la
+                      del workspace).
                     </p>
+                    <label className="mt-2 block text-[10px] font-medium text-[#64748B]">
+                      Flow (opcional) — plantilla cold por flow
+                      <select
+                        value={registerFlowId}
+                        disabled={registerBusy || flowsForOutreach.length === 0}
+                        onChange={(e) => {
+                          const id = e.target.value
+                          setRegisterFlowId(id)
+                          if (!id) return
+                          const f = flowsForOutreach.find((x) => x.id === id)
+                          if (f?.status === 'published') {
+                            setRegisterCtaUrl(`${TRACKING_APP_BASE}/f/${id}`)
+                          }
+                        }}
+                        className="mt-1 w-full rounded-lg border border-[#E8EAEF] bg-white px-2 py-1.5 text-xs dark:border-[#2A2F3F] dark:bg-[#252936]"
+                      >
+                        <option value="">Sin flow (solo plantilla del workspace)</option>
+                        {flowsForOutreach.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                            {f.status === 'published' ? '' : ` · ${f.status}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label className="mt-2 block text-[10px] font-medium text-[#64748B]">
                       URL del CTA (https) — opcional; si la dejas vacía usamos getdilo.io
                       <input

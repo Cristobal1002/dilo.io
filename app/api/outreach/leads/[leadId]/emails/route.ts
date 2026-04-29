@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
-import { outreachEmails, outreachLeads } from '@/db/schema'
+import { flows, outreachEmails, outreachLeads } from '@/db/schema'
 import { apiCreated } from '@/lib/api-response'
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { resolveResendSendConfig } from '@/lib/email/org-resend'
@@ -21,6 +21,8 @@ const BodySchema = z.object({
   subject: z.string().trim().min(1).max(300),
   /** URL final del CTA (https). Se guarda para volver a mostrar el link trackeado. */
   ctaDestinationUrl: z.string().trim().url().max(2000).optional(),
+  /** Flow del que tomar overrides de plantilla cold (opcional; debe pertenecer al workspace). */
+  flowId: z.string().uuid().optional(),
   /**
    * Si es true, envía el HTML de cold outreach con Resend (integración del workspace o `RESEND_*` en servidor).
    * El registro en BD se crea antes del envío; si Resend falla, se revierte el insert y el estado del lead.
@@ -68,6 +70,17 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
   }
 
   const sendWithResend = parsed.data.sendWithResend === true
+  const flowIdIn = parsed.data.flowId?.trim()
+  if (flowIdIn) {
+    const f = await db.query.flows.findFirst({
+      where: and(eq(flows.id, flowIdIn), eq(flows.organizationId, org.id)),
+      columns: { id: true },
+    })
+    if (!f) {
+      throw new ValidationError('El flow indicado no existe en este workspace.')
+    }
+  }
+
   const resendCfg = sendWithResend ? await resolveResendSendConfig(org.id) : null
   if (sendWithResend) {
     if (!resendCfg) {
@@ -97,6 +110,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         subject: parsed.data.subject,
         sentAt: now,
         ctaDestinationUrl: ctaDest ?? null,
+        flowId: flowIdIn ?? null,
       })
       .returning()
   } catch (e: unknown) {
@@ -150,6 +164,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         trackedCtaUrl,
         resendConfig: resendCfg!,
         resendClient,
+        flowId: flowIdIn ?? null,
       })
     } catch (err) {
       await db.delete(outreachEmails).where(eq(outreachEmails.id, emailRow.id))

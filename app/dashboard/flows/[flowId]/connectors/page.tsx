@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { and, desc, eq } from 'drizzle-orm'
 import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
-import { orgIntegrationCredentials, webhooks } from '@/db/schema'
+import { orgIntegrationCredentials, organizations, webhooks } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { ConnectorsForm } from './connectors-form'
 
@@ -18,6 +18,14 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
   const hookRows = await db.query.webhooks.findMany({
     where: eq(webhooks.flowId, flowId),
     orderBy: [desc(webhooks.createdAt)],
+  })
+
+  const orgRow = await db.query.organizations.findFirst({
+    where: eq(organizations.id, access.org.id),
+    columns: {
+      outreachColdEmailBodyMarkdown: true,
+      outreachColdEmailCtaLabel: true,
+    },
   })
 
   const resendRow = await db.query.orgIntegrationCredentials.findFirst({
@@ -48,29 +56,22 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
         </Link>
       </div>
 
-      <ConnectorsForm flowId={flowId} resendConnected={resendConnected} />
-
-      <div>
-        <h2 className="text-sm font-semibold text-[#1A1A1A] dark:text-[#F8F9FB]">Webhooks configurados</h2>
-        {hookRows.length === 0 ? (
-          <p className="mt-2 text-sm text-[#64748B] dark:text-[#94A3B8]">Todavía no hay webhooks para este flow.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {hookRows.map((h) => (
-              <li
-                key={h.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E8EAEF] bg-white px-3 py-3 text-sm dark:border-[#2A2F3F] dark:bg-[#1A1D29]"
-              >
-                <span className="min-w-0 break-all font-mono text-xs text-[#374151] dark:text-[#D1D5DB]">{h.url}</span>
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
-                  {h.active ? 'Activo' : 'Inactivo'}
-                  {h.secret ? ' · con secreto' : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ConnectorsForm
+        flowId={flowId}
+        resendConnected={resendConnected}
+        flowName={access.flow.name}
+        initialOutreachBody={access.flow.outreachColdEmailBodyMarkdown ?? null}
+        initialOutreachCta={access.flow.outreachColdEmailCtaLabel ?? null}
+        workspaceOutreachBody={orgRow?.outreachColdEmailBodyMarkdown ?? null}
+        workspaceOutreachCta={orgRow?.outreachColdEmailCtaLabel ?? null}
+        initialWebhooks={hookRows.map((h) => ({
+          id: h.id,
+          url: h.url,
+          active: h.active,
+          createdAt: h.createdAt,
+          hasSecret: Boolean(h.secret),
+        }))}
+      />
     </div>
   )
 }

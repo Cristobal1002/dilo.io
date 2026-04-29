@@ -86,6 +86,13 @@ import {
     description:     text('description'),
     promptOrigin:    text('prompt_origin'),
     status:          text('status').notNull().default('draft'), // draft | published | archived
+    /**
+     * Cold outreach (Markdown) solo para este flow. Null → hereda plantilla del workspace.
+     * Placeholders: `{{recipient}}`, `{{recipient_full}}`; párrafos con línea en blanco; `**negrita**`.
+     */
+    outreachColdEmailBodyMarkdown: text('outreach_cold_email_body_markdown'),
+    /** Texto del botón CTA en el cold mail; null → hereda workspace o default en código. */
+    outreachColdEmailCtaLabel: text('outreach_cold_email_cta_label'),
     settings:        jsonb('settings').default({}),
     scoringCriteria: jsonb('scoring_criteria').default({}),
     createdAt:       timestamp('created_at').notNull().defaultNow(),
@@ -238,6 +245,8 @@ import {
       lastClickedUrl: text('last_clicked_url'),
       /** Destino HTTPS del CTA al registrar el envío (para reconstruir el link trackeado). */
       ctaDestinationUrl: text('cta_destination_url'),
+      /** Flow cuyo override de plantilla cold se usó al enviar (opcional). */
+      flowId:       uuid('flow_id').references(() => flows.id, { onDelete: 'set null' }),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
     },
     (t) => [index('outreach_emails_lead_idx').on(t.leadId)],

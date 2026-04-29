@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { outreachEmails, outreachLeads } from '@/db/schema'
+import { flows, outreachEmails, outreachLeads } from '@/db/schema'
 import { getAuthContext } from '@/lib/auth'
-import OutreachTable, { type OutreachLeadOverview } from './outreach-table'
+import OutreachTable, { type OutreachFlowOption, type OutreachLeadOverview } from './outreach-table'
 
 function toIso(d: unknown): string | null {
   if (!d) return null
@@ -46,6 +46,19 @@ export default async function OutreachPage() {
 
   const aggMap = new Map(agg.map((r) => [r.leadId, r]))
 
+  const flowRows = await db.query.flows.findMany({
+    where: eq(flows.organizationId, org.id),
+    columns: { id: true, name: true, status: true },
+    orderBy: [desc(flows.updatedAt)],
+    limit: 200,
+  })
+
+  const flowsForOutreach: OutreachFlowOption[] = flowRows.map((f) => ({
+    id: f.id,
+    name: f.name,
+    status: f.status,
+  }))
+
   const initialLeads: OutreachLeadOverview[] = leads.map((l) => {
     const a = aggMap.get(l.id)
     return {
@@ -72,10 +85,12 @@ export default async function OutreachPage() {
       <h1 className="mt-1 text-2xl font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Cold email & seguimiento</h1>
       <p className="mt-1 max-w-2xl text-sm text-[#64748B] dark:text-[#94A3B8]">
         Leads por organización, registro de envíos con pixel de apertura y redirección de clics, y envío opcional del
-        cold mail con Resend (Integraciones). Los enlaces usan un token opaco (no el UUID interno).
+        cold mail con Resend (Integraciones). Podés asociar un <strong>flow</strong> para usar su plantilla de
+        outreach (Conectores del flow); si no, se usa la plantilla del workspace. Los enlaces usan un token opaco (no
+        el UUID interno).
       </p>
       <div className="mt-8">
-        <OutreachTable initialLeads={initialLeads} />
+        <OutreachTable initialLeads={initialLeads} flowsForOutreach={flowsForOutreach} />
       </div>
     </div>
   )

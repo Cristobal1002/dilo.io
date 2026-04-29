@@ -10,6 +10,26 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('flows/[flowId]')
 
+const optionalFlowOutreachMarkdown = z
+  .union([z.string().max(12000), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+
+const optionalFlowOutreachCtaLabel = z
+  .union([z.string().max(80), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+
 const SettingsPatchSchema = z
   .object({
     transition_style: z.enum(['ai', 'none']).optional(),
@@ -25,13 +45,17 @@ const UpdateSchema = z
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional().nullable(),
     settings: SettingsPatchSchema.optional(),
+    outreachColdEmailBodyMarkdown: optionalFlowOutreachMarkdown,
+    outreachColdEmailCtaLabel: optionalFlowOutreachCtaLabel,
   })
   .refine(
     (data) =>
       data.status !== undefined ||
       data.name !== undefined ||
       data.description !== undefined ||
-      (data.settings !== undefined && Object.keys(data.settings).length > 0),
+      (data.settings !== undefined && Object.keys(data.settings).length > 0) ||
+      data.outreachColdEmailBodyMarkdown !== undefined ||
+      data.outreachColdEmailCtaLabel !== undefined,
     { message: 'Debe proporcionar al menos un campo para actualizar' },
   )
 
@@ -73,6 +97,13 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) =
         ? { ...(existing.settings as Record<string, unknown>) }
         : {}
     updateData.settings = { ...cur, ...parsed.data.settings }
+  }
+
+  if (parsed.data.outreachColdEmailBodyMarkdown !== undefined) {
+    updateData.outreachColdEmailBodyMarkdown = parsed.data.outreachColdEmailBodyMarkdown
+  }
+  if (parsed.data.outreachColdEmailCtaLabel !== undefined) {
+    updateData.outreachColdEmailCtaLabel = parsed.data.outreachColdEmailCtaLabel
   }
 
   const [updated] = await db

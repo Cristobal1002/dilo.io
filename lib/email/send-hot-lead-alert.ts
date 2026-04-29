@@ -23,13 +23,6 @@ export type HotLeadEmailInput = {
   }
 }
 
-function classificationLabel(c: string | null): string {
-  if (c === 'hot') return '🔥 Hot'
-  if (c === 'warm') return '🟡 Warm'
-  if (c === 'cold') return '🔵 Cold'
-  return '–'
-}
-
 export async function sendHotLeadAlertEmail(data: HotLeadEmailInput): Promise<void> {
   const cfg = await resolveResendSendConfig(data.organizationId)
   if (!cfg) {

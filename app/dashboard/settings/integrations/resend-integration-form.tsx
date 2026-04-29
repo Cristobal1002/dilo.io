@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { readApiResult } from '@/lib/read-api-result'
+import { cn } from '@/lib/utils'
 
-type Status = {
+export type ResendIntegrationStatus = {
   connected: boolean
   sendReady?: boolean
   fromEmail: string | null
@@ -11,9 +12,21 @@ type Status = {
   corrupt?: boolean
 }
 
-export function ResendIntegrationForm() {
-  const [status, setStatus] = useState<Status | null>(null)
+type ResendIntegrationFormProps = {
+  /** Cuando true, el formulario va dentro de una card del catálogo (sin marco duplicado ni título largo). */
+  embedded?: boolean
+  /** Se llama cuando termina una carga inicial o refresco (p. ej. para el resumen en la card). */
+  onStatusChange?: (payload: {
+    status: ResendIntegrationStatus | null
+    loadComplete: boolean
+    loadError: boolean
+  }) => void
+}
+
+export function ResendIntegrationForm({ embedded = false, onStatusChange }: ResendIntegrationFormProps) {
+  const [status, setStatus] = useState<ResendIntegrationStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [fromEmail, setFromEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -26,11 +39,13 @@ export function ResendIntegrationForm() {
     setMsg(null)
     try {
       const res = await fetch('/api/settings/integrations/resend')
-      const r = await readApiResult<Status>(res)
+      const r = await readApiResult<ResendIntegrationStatus>(res)
       if (r.ok) {
+        setLoadError(false)
         setStatus(r.data)
         setFromEmail(r.data.fromEmail ?? '')
       } else {
+        setLoadError(true)
         setMsg(r.message)
       }
     } finally {
@@ -41,6 +56,12 @@ export function ResendIntegrationForm() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!loading) {
+      onStatusChange?.({ status, loadComplete: true, loadError })
+    }
+  }, [status, loading, loadError, onStatusChange])
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,7 +76,7 @@ export function ResendIntegrationForm() {
           fromEmail: fromEmail.trim(),
         }),
       })
-      const r = await readApiResult<Status>(res)
+      const r = await readApiResult<ResendIntegrationStatus>(res)
       if (!r.ok) {
         setMsg(r.message)
         return
@@ -112,15 +133,30 @@ export function ResendIntegrationForm() {
   }
 
   return (
-    <div className="rounded-2xl border border-[#E8EAEF] bg-white p-5 dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Resend</p>
-      <h2 className="mt-1 text-lg font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Correo transaccional</h2>
-      <p className="mt-2 text-sm leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-        Conecta la API key de tu cuenta Resend <strong>una sola vez</strong> para todo el workspace (incluida la del
-        paso «Send your first email»). Si la verificación fallara, crea otra en{' '}
-        <span className="font-mono text-[11px]">resend.com/api-keys</span> con permiso <strong>Full access</strong>.
-      </p>
-      <p className="mt-2 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+    <div
+      className={cn(
+        embedded
+          ? ''
+          : 'rounded-2xl border border-[#E8EAEF] bg-white p-5 dark:border-[#2A2F3F] dark:bg-[#1A1D29]',
+      )}
+    >
+      {!embedded ? (
+        <>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Resend</p>
+          <h2 className="mt-1 text-lg font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Correo transaccional</h2>
+          <p className="mt-2 text-sm leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+            Conecta la API key de tu cuenta Resend <strong>una sola vez</strong> para todo el workspace (incluida la del
+            paso «Send your first email»). Si la verificación fallara, crea otra en{' '}
+            <span className="font-mono text-[11px]">resend.com/api-keys</span> con permiso <strong>Full access</strong>.
+          </p>
+        </>
+      ) : null}
+      <p
+        className={cn(
+          'text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]',
+          embedded ? 'mt-0' : 'mt-2',
+        )}
+      >
         El remitente <span className="font-mono">from</span> debe usar un dominio que hayas verificado en Resend →
         Dominios; eso aplica al <em>enviar</em> correos, no a guardar la integración aquí. Dilo usa esta cuenta para
         alertas de leads y resúmenes por correo del workspace (si no hay integración completa, se usa{' '}
@@ -128,16 +164,18 @@ export function ResendIntegrationForm() {
       </p>
 
       {loading ? (
-        <p className="mt-4 text-sm text-[#64748B]">Cargando…</p>
+        <p className={cn('text-sm text-[#64748B]', embedded ? 'mt-3' : 'mt-4')}>Cargando…</p>
       ) : (
         <>
           {status?.connected ? (
             <div
-              className={`mt-4 rounded-xl px-3 py-2 text-sm ${
+              className={cn(
+                'rounded-xl px-3 py-2 text-sm',
+                embedded ? 'mt-3' : 'mt-4',
                 status.sendReady
                   ? 'border border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
-                  : 'border border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200'
-              }`}
+                  : 'border border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200',
+              )}
             >
               <p className="font-semibold">{status.sendReady ? 'Conectado' : 'Guardado (incompleto)'}</p>
               {status.corrupt ? (
@@ -163,7 +201,12 @@ export function ResendIntegrationForm() {
               )}
             </div>
           ) : (
-            <div className="mt-4 rounded-xl border border-[#E8EAEF] bg-[#FAFBFC] px-3 py-2 text-sm text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]">
+            <div
+              className={cn(
+                'rounded-xl border border-[#E8EAEF] bg-[#FAFBFC] px-3 py-2 text-sm text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]',
+                embedded ? 'mt-3' : 'mt-4',
+              )}
+            >
               Aún no hay API key guardada para esta organización.
             </div>
           )}
