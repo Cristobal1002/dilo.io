@@ -32,6 +32,10 @@ import {
     id:                    uuid('id').primaryKey().defaultRandom(),
     name:                  text('name').notNull(),
     slug:                  text('slug').notNull().unique(),
+    /** Logo por defecto del workspace (HTTPS). Se usa en flows públicos si el flow no define `settings.logo_url`. */
+    logoUrl:               text('logo_url'),
+    /** Sitio web público del negocio (HTTPS), p. ej. para futuros footers o emails. */
+    websiteUrl:            text('website_url'),
 
     // ── Plan & billing ──────────────────────────────────────
     plan:                  text('plan').notNull().default('free'), // FK se agrega después del seed — ver paso 2 de setup

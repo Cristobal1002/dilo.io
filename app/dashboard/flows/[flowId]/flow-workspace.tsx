@@ -175,12 +175,19 @@ function estimateDurationRange(stepCount: number): { min: number; max: number } 
   return { min, max }
 }
 
-function parsePresentationSettings(raw: FlowWorkspaceFlow['settings']) {
+function parsePresentationSettings(raw: FlowWorkspaceFlow['settings'], workspaceDefaultLogoUrl?: string | null) {
   const o = raw && typeof raw === 'object' ? (raw as FlowPresentationSettings) : {}
   const defaultTag = 'Conversación guiada, sin formularios largos.'
+  const fromFlow = typeof o.logo_url === 'string' && /^https?:\/\//.test(o.logo_url) ? o.logo_url : null
+  const fromWorkspace =
+    !fromFlow &&
+    workspaceDefaultLogoUrl &&
+    /^https:\/\//i.test(workspaceDefaultLogoUrl.trim())
+      ? workspaceDefaultLogoUrl.trim()
+      : null
   return {
     tagline: typeof o.tagline === 'string' && o.tagline.trim() ? o.tagline.trim() : defaultTag,
-    logoUrl: typeof o.logo_url === 'string' && /^https?:\/\//.test(o.logo_url) ? o.logo_url : null,
+    logoUrl: fromFlow ?? fromWorkspace,
     label: typeof o.presentation_label === 'string' && o.presentation_label.trim()
       ? o.presentation_label.trim()
       : 'PRESENTACIÓN',
@@ -221,9 +228,17 @@ function PresentationThemeToggle() {
 const presentationPill =
   'inline-flex items-center gap-1.5 rounded-full border border-[#9C77F5]/30 bg-white/90 px-3 py-1.5 text-xs font-medium text-[#6B4DD4] shadow-sm dark:border-[#9C77F5]/35 dark:bg-[#1A1D29]/90 dark:text-[#D4C4FC]'
 
-function FlowPresentationPreview({ flow, stepCount }: { flow: FlowWorkspaceFlow; stepCount: number }) {
+function FlowPresentationPreview({
+  flow,
+  stepCount,
+  workspaceLogoUrl,
+}: {
+  flow: FlowWorkspaceFlow
+  stepCount: number
+  workspaceLogoUrl?: string | null
+}) {
   const router = useRouter()
-  const pres = parsePresentationSettings(flow.settings)
+  const pres = parsePresentationSettings(flow.settings, workspaceLogoUrl)
   const derived = estimateDurationRange(stepCount)
   const minM = pres.estMin ?? derived.min
   const maxM = pres.estMax ?? derived.max
@@ -1014,11 +1029,14 @@ export default function FlowWorkspace({
   steps,
   publicFlowUrl,
   sessionCount,
+  workspaceLogoUrl = null,
 }: {
   flow: FlowWorkspaceFlow
   steps: FlowWorkspaceStep[]
   publicFlowUrl: string | null
   sessionCount: number
+  /** Logo del workspace si el flow no define `settings.logo_url`. */
+  workspaceLogoUrl?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1565,7 +1583,11 @@ export default function FlowWorkspace({
                   )}
                 >
                   {previewSection === 'presentation' ? (
-                    <FlowPresentationPreview flow={flow} stepCount={localSteps.length} />
+                    <FlowPresentationPreview
+                      flow={flow}
+                      stepCount={localSteps.length}
+                      workspaceLogoUrl={workspaceLogoUrl}
+                    />
                   ) : (
                     <>
                       <FlowMainPreviewProgressChrome totalSteps={localSteps.length} />

@@ -1,6 +1,6 @@
 import { eq, and, asc } from 'drizzle-orm'
 import { db } from '@/db'
-import { flows, steps, stepOptions } from '@/db/schema'
+import { flows, organizations, steps, stepOptions } from '@/db/schema'
 import { NotFoundError } from '@/lib/errors'
 import { DISCOVERY_STUB_FLOW_SEGMENT } from '@/lib/discovery-stub'
 
@@ -58,6 +58,11 @@ export async function loadPublishedFlowWithSteps(flowId: string): Promise<{
     orderBy: asc(steps.order),
   })
 
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, flow.organizationId),
+    columns: { logoUrl: true },
+  })
+
   const withOptions = await Promise.all(
     flowSteps.map(async (step) => {
       const options = await db.query.stepOptions.findMany({
@@ -86,12 +91,28 @@ export async function loadPublishedFlowWithSteps(flowId: string): Promise<{
     }),
   )
 
+  const baseSettings =
+    flow.settings && typeof flow.settings === 'object' && !Array.isArray(flow.settings)
+      ? { ...(flow.settings as Record<string, unknown>) }
+      : {}
+  const flowLogo = baseSettings.logo_url
+  const hasFlowLogo = typeof flowLogo === 'string' && /^https?:\/\//.test(flowLogo)
+  const orgLogo =
+    org?.logoUrl != null &&
+    typeof org.logoUrl === 'string' &&
+    /^https:\/\//i.test(org.logoUrl.trim())
+      ? org.logoUrl.trim()
+      : null
+  if (!hasFlowLogo && orgLogo) {
+    baseSettings.logo_url = orgLogo
+  }
+
   return {
     flow: {
       id: flow.id,
       name: flow.name,
       description: flow.description,
-      settings: flow.settings ?? {},
+      settings: baseSettings,
     },
     steps: withOptions,
   }

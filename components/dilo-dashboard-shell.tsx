@@ -7,6 +7,7 @@ import { useClerk, useUser } from '@clerk/nextjs'
 import {
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
+  BuildingOffice2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CreditCardIcon,
@@ -65,6 +66,7 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
   if (pathname.startsWith('/dashboard/settings/plan')) return 'Plan & Uso'
   if (pathname.startsWith('/dashboard/settings/integrations')) return 'Integraciones'
+  if (pathname.startsWith('/dashboard/settings/organization')) return 'Organización'
   if (pathname.startsWith('/dashboard/settings/team')) return 'Equipo'
   if (pathname.startsWith('/dashboard/settings')) return 'Configuración'
   return 'Dashboard'
@@ -297,6 +299,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
 
   const accountNavActive = pathname.startsWith('/dashboard/account')
   const settingsPlanActive = pathname.startsWith('/dashboard/settings/plan')
+  const settingsOrganizationActive = pathname.startsWith('/dashboard/settings/organization')
   const settingsIntegrationsActive = pathname.startsWith('/dashboard/settings/integrations')
   const settingsTeamActive = pathname.startsWith('/dashboard/settings/team')
   const canManageIntegrationsNav = orgRole === 'owner' || orgRole === 'admin'
@@ -504,6 +507,18 @@ export default function DiloDashboardShell({ children }: { children: React.React
                 {!isSidebarCollapsed && <span className="flex-1 text-left">Plan & Uso</span>}
               </Link>
             </li>
+            {meLoaded && canManageIntegrationsNav ? (
+              <li>
+                <Link
+                  href="/dashboard/settings/organization"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={navBtn(settingsOrganizationActive, isSidebarCollapsed)}
+                >
+                  <BuildingOffice2Icon className="w-5 h-5 shrink-0" />
+                  {!isSidebarCollapsed && <span className="flex-1 text-left">Organización</span>}
+                </Link>
+              </li>
+            ) : null}
             {meLoaded && canManageIntegrationsNav ? (
               <li>
                 <Link

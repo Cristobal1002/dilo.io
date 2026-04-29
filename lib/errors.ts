@@ -89,6 +89,18 @@ export class AiConfigurationError extends AppError {
   }
 }
 
+/**
+ * 503 — La BD de este entorno no tiene tablas que exige esta versión del código
+ * (p. ej. falta `drizzle-kit push` o una migración SQL).
+ */
+export class SchemaOutdatedError extends AppError {
+  constructor(
+    message = 'La base de datos no está al día con esta versión. Ejecuta migraciones o «npm run db:push» contra el DATABASE_URL de este entorno.',
+  ) {
+    super(message, 503, 'SCHEMA_OUTDATED')
+  }
+}
+
 /** Type guard */
 export const isAppError = (err: unknown): err is AppError =>
   err instanceof AppError

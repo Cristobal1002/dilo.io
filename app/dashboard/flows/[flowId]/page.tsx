@@ -10,7 +10,7 @@ async function getFlow(flowId: string, orgIdentifier: string) {
   const access = await findDashboardFlow(flowId, orgIdentifier)
   if (!access) return null
 
-  const { flow } = access
+  const { flow, org } = access
 
   const flowSteps = await db.query.steps.findMany({
     where: eq(steps.flowId, flowId),
@@ -45,7 +45,12 @@ async function getFlow(flowId: string, orgIdentifier: string) {
     .from(sessions)
     .where(eq(sessions.flowId, flowId))
 
-  return { flow, steps: stepsWithOptions, sessionCount }
+  const workspaceLogoUrl =
+    org.logoUrl != null && typeof org.logoUrl === 'string' && /^https:\/\//i.test(org.logoUrl.trim())
+      ? org.logoUrl.trim()
+      : null
+
+  return { flow, steps: stepsWithOptions, sessionCount, workspaceLogoUrl }
 }
 
 export default async function FlowDetailPage({
@@ -60,7 +65,7 @@ export default async function FlowDetailPage({
   const data = await getFlow(flowId, orgId ?? userId)
   if (!data) notFound()
 
-  const { flow, steps: flowSteps, sessionCount } = data
+  const { flow, steps: flowSteps, sessionCount, workspaceLogoUrl } = data
 
   const flowPayload: FlowWorkspaceFlow = {
     id: flow.id,
@@ -102,6 +107,7 @@ export default async function FlowDetailPage({
       steps={stepsPayload}
       publicFlowUrl={publicFlowUrl}
       sessionCount={sessionCount}
+      workspaceLogoUrl={workspaceLogoUrl}
     />
   )
 }

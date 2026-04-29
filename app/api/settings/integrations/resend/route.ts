@@ -11,10 +11,12 @@ import {
   encryptIntegrationPayload,
 } from '@/lib/integration-crypto'
 import { requireOrgRoles } from '@/lib/org-role'
+import { rethrowUnlessMissingRelation } from '@/lib/pg-relation-errors'
 import { verifyResendApiKey } from '@/lib/resend-verify'
 import { withApiHandler } from '@/lib/with-api-handler'
 
 const RESEND = 'resend' as const
+const INTEGRATIONS_TABLE = 'org_integration_credentials'
 
 const PatchBody = z.object({
   apiKey: z.string().trim().min(8).max(256),
@@ -24,12 +26,17 @@ const PatchBody = z.object({
 export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
   requireOrgRoles(auth, ['owner', 'admin'])
 
-  const row = await db.query.orgIntegrationCredentials.findFirst({
-    where: and(
-      eq(orgIntegrationCredentials.organizationId, auth.org.id),
-      eq(orgIntegrationCredentials.provider, RESEND),
-    ),
-  })
+  let row
+  try {
+    row = await db.query.orgIntegrationCredentials.findFirst({
+      where: and(
+        eq(orgIntegrationCredentials.organizationId, auth.org.id),
+        eq(orgIntegrationCredentials.provider, RESEND),
+      ),
+    })
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, INTEGRATIONS_TABLE)
+  }
 
   if (!row) {
     return apiSuccess({
@@ -87,26 +94,30 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
   }
 
   const now = new Date()
-  const existing = await db.query.orgIntegrationCredentials.findFirst({
-    where: and(
-      eq(orgIntegrationCredentials.organizationId, auth.org.id),
-      eq(orgIntegrationCredentials.provider, RESEND),
-    ),
-  })
-
-  if (existing) {
-    await db
-      .update(orgIntegrationCredentials)
-      .set({ encryptedPayload: encrypted, updatedAt: now })
-      .where(eq(orgIntegrationCredentials.id, existing.id))
-  } else {
-    await db.insert(orgIntegrationCredentials).values({
-      organizationId: auth.org.id,
-      provider: RESEND,
-      encryptedPayload: encrypted,
-      createdAt: now,
-      updatedAt: now,
+  try {
+    const existing = await db.query.orgIntegrationCredentials.findFirst({
+      where: and(
+        eq(orgIntegrationCredentials.organizationId, auth.org.id),
+        eq(orgIntegrationCredentials.provider, RESEND),
+      ),
     })
+
+    if (existing) {
+      await db
+        .update(orgIntegrationCredentials)
+        .set({ encryptedPayload: encrypted, updatedAt: now })
+        .where(eq(orgIntegrationCredentials.id, existing.id))
+    } else {
+      await db.insert(orgIntegrationCredentials).values({
+        organizationId: auth.org.id,
+        provider: RESEND,
+        encryptedPayload: encrypted,
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, INTEGRATIONS_TABLE)
   }
 
   return apiSuccess({
@@ -119,14 +130,18 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
 export const DELETE = withApiHandler(async (_req: NextRequest, { auth }) => {
   requireOrgRoles(auth, ['owner', 'admin'])
 
-  await db
-    .delete(orgIntegrationCredentials)
-    .where(
-      and(
-        eq(orgIntegrationCredentials.organizationId, auth.org.id),
-        eq(orgIntegrationCredentials.provider, RESEND),
-      ),
-    )
+  try {
+    await db
+      .delete(orgIntegrationCredentials)
+      .where(
+        and(
+          eq(orgIntegrationCredentials.organizationId, auth.org.id),
+          eq(orgIntegrationCredentials.provider, RESEND),
+        ),
+      )
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, INTEGRATIONS_TABLE)
+  }
 
   return apiNoContent()
 }, { requireAuth: true })
