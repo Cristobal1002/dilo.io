@@ -57,6 +57,14 @@ export function autoStatusAfterClick(current: string): OutreachStatus | null {
 export function publicAppBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? ''
   if (raw) return raw
+
+  const vercel = process.env.VERCEL_URL?.trim().replace(/\/$/, '')
+  if (vercel) {
+    if (/^https?:\/\//i.test(vercel)) return vercel
+    return `https://${vercel}`
+  }
+
+  if (process.env.NODE_ENV === 'production') return 'https://getdilo.io'
   return 'http://localhost:3000'
 }
 
