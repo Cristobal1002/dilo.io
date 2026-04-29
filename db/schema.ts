@@ -36,6 +36,13 @@ import {
     logoUrl:               text('logo_url'),
     /** Sitio web público del negocio (HTTPS), p. ej. para futuros footers o emails. */
     websiteUrl:            text('website_url'),
+    /**
+     * Cuerpo del cold email (Outreach), Markdown. Placeholders: `{{recipient}}`, `{{recipient_full}}`.
+     * Párrafos separados con línea en blanco; `**negrita**`. Vacío → plantilla por defecto en código.
+     */
+    outreachColdEmailBodyMarkdown: text('outreach_cold_email_body_markdown'),
+    /** Texto del botón CTA (HTML); null → "Ver enlace →". */
+    outreachColdEmailCtaLabel: text('outreach_cold_email_cta_label'),
 
     // ── Plan & billing ──────────────────────────────────────
     plan:                  text('plan').notNull().default('free'), // FK se agrega después del seed — ver paso 2 de setup

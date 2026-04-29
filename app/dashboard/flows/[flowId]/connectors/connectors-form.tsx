@@ -49,7 +49,8 @@ export function ConnectorsForm({ flowId, resendConnected }: { flowId: string; re
           <Link href="/dashboard/settings/integrations" className="font-semibold text-[#6B4DD4] hover:underline">
             Configuración → Integraciones
           </Link>
-          . Aquí solo verás el estado para este flow.
+          . Con ella (y el remitente guardado) Dilo envía alertas y resúmenes del workspace; si no hay integración,
+          puede usarse <span className="font-mono">RESEND_*</span> en el servidor.
         </p>
         <p className="mt-3 text-xs font-medium text-[#64748B] dark:text-[#94A3B8]">
           Estado:{' '}

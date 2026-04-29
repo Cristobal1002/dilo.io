@@ -1,9 +1,11 @@
 import { Resend } from 'resend'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/hot-lead')
 
 export type HotLeadEmailInput = {
+  organizationId: string
   toEmail: string
   flowName: string
   flowId: string
@@ -27,10 +29,12 @@ function classificationLabel(c: string | null): string {
 }
 
 export async function sendHotLeadAlertEmail(data: HotLeadEmailInput): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM_EMAIL
-  if (!apiKey || !from) {
-    log.warn({}, 'RESEND_API_KEY or RESEND_FROM_EMAIL not set; skipping hot lead email')
+  const cfg = await resolveResendSendConfig(data.organizationId)
+  if (!cfg) {
+    log.warn(
+      { organizationId: data.organizationId },
+      'Sin Resend: configura Integraciones → Resend en el workspace o RESEND_API_KEY + RESEND_FROM_EMAIL en el servidor',
+    )
     return
   }
 
@@ -45,10 +49,10 @@ export async function sendHotLeadAlertEmail(data: HotLeadEmailInput): Promise<vo
     .filter(Boolean)
     .join('\n')
 
-  const resend = new Resend(apiKey)
+  const resend = new Resend(cfg.apiKey)
 
   const { error } = await resend.emails.send({
-    from: `Dilo <${from}>`,
+    from: `Dilo <${cfg.from}>`,
     to: data.toEmail,
     subject: `Lead destacado en "${data.flowName}"`,
     text: [

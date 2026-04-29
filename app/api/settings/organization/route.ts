@@ -28,15 +28,43 @@ const optionalHttpsUrl = z
     message: 'Debe ser una URL vacía o que empiece con https://',
   })
 
+const optionalOutreachMarkdown = z
+  .union([z.string().max(12000), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+
+const optionalOutreachCtaLabel = z
+  .union([z.string().max(80), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+
 const PatchBody = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     logoUrl: optionalHttpsUrl,
     websiteUrl: optionalHttpsUrl,
+    outreachColdEmailBodyMarkdown: optionalOutreachMarkdown,
+    outreachColdEmailCtaLabel: optionalOutreachCtaLabel,
   })
-  .refine((d) => d.name !== undefined || d.logoUrl !== undefined || d.websiteUrl !== undefined, {
-    message: 'Envía al menos un campo para actualizar',
-  })
+  .refine(
+    (d) =>
+      d.name !== undefined ||
+      d.logoUrl !== undefined ||
+      d.websiteUrl !== undefined ||
+      d.outreachColdEmailBodyMarkdown !== undefined ||
+      d.outreachColdEmailCtaLabel !== undefined,
+    { message: 'Envía al menos un campo para actualizar' },
+  )
 
 export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
   const { org } = auth
@@ -44,6 +72,8 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
     name: org.name,
     logoUrl: org.logoUrl ?? null,
     websiteUrl: org.websiteUrl ?? null,
+    outreachColdEmailBodyMarkdown: org.outreachColdEmailBodyMarkdown ?? null,
+    outreachColdEmailCtaLabel: org.outreachColdEmailCtaLabel ?? null,
   })
 }, { requireAuth: true })
 
@@ -56,11 +86,18 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Datos inválidos', parsed.error.flatten().fieldErrors)
   }
 
-  const { name, logoUrl, websiteUrl } = parsed.data
+  const { name, logoUrl, websiteUrl, outreachColdEmailBodyMarkdown, outreachColdEmailCtaLabel } =
+    parsed.data
   const patch: Partial<typeof organizations.$inferInsert> = {}
   if (name !== undefined) patch.name = name
   if (logoUrl !== undefined) patch.logoUrl = logoUrl
   if (websiteUrl !== undefined) patch.websiteUrl = websiteUrl
+  if (outreachColdEmailBodyMarkdown !== undefined) {
+    patch.outreachColdEmailBodyMarkdown = outreachColdEmailBodyMarkdown
+  }
+  if (outreachColdEmailCtaLabel !== undefined) {
+    patch.outreachColdEmailCtaLabel = outreachColdEmailCtaLabel
+  }
 
   try {
     await db.update(organizations).set(patch).where(eq(organizations.id, auth.org.id))
@@ -73,6 +110,8 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
       name: organizations.name,
       logoUrl: organizations.logoUrl,
       websiteUrl: organizations.websiteUrl,
+      outreachColdEmailBodyMarkdown: organizations.outreachColdEmailBodyMarkdown,
+      outreachColdEmailCtaLabel: organizations.outreachColdEmailCtaLabel,
     })
     .from(organizations)
     .where(eq(organizations.id, auth.org.id))
@@ -82,5 +121,7 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     name: row?.name ?? auth.org.name,
     logoUrl: row?.logoUrl ?? null,
     websiteUrl: row?.websiteUrl ?? null,
+    outreachColdEmailBodyMarkdown: row?.outreachColdEmailBodyMarkdown ?? null,
+    outreachColdEmailCtaLabel: row?.outreachColdEmailCtaLabel ?? null,
   })
 }, { requireAuth: true })

@@ -48,6 +48,7 @@ export async function notifyOrgUsersInstantLeadAlerts(args: {
     if (!ok) continue
 
     void sendHotLeadAlertEmail({
+      organizationId: args.organizationId,
       toEmail: u.email,
       flowName: args.flowName,
       flowId: args.flowId,

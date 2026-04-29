@@ -95,7 +95,9 @@ export function ResendIntegrationForm() {
       </p>
       <p className="mt-2 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
         El remitente <span className="font-mono">from</span> debe usar un dominio que hayas verificado en Resend →
-        Dominios; eso aplica al <em>enviar</em> correos, no a guardar la integración aquí.
+        Dominios; eso aplica al <em>enviar</em> correos, no a guardar la integración aquí. Dilo usa esta cuenta para
+        alertas de leads y resúmenes por correo del workspace (si no hay integración completa, se usa{' '}
+        <span className="font-mono">RESEND_*</span> del servidor).
       </p>
 
       {loading ? (

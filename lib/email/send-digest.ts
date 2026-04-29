@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/digest')
@@ -13,6 +14,7 @@ export type DigestSessionLine = {
 }
 
 export type DigestEmailInput = {
+  organizationId: string
   toEmail: string
   digestLabel: 'daily' | 'weekly'
   lines: DigestSessionLine[]
@@ -27,10 +29,12 @@ function classificationLabel(c: string | null): string {
 }
 
 export async function sendSessionsDigestEmail(data: DigestEmailInput): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM_EMAIL
-  if (!apiKey || !from) {
-    log.warn({}, 'RESEND_API_KEY or RESEND_FROM_EMAIL not set; skipping digest email')
+  const cfg = await resolveResendSendConfig(data.organizationId)
+  if (!cfg) {
+    log.warn(
+      { organizationId: data.organizationId },
+      'Sin Resend: integración del workspace o RESEND_* en servidor; digest no enviado',
+    )
     return
   }
 
@@ -54,9 +58,9 @@ export async function sendSessionsDigestEmail(data: DigestEmailInput): Promise<v
           }),
         ]
 
-  const resend = new Resend(apiKey)
+  const resend = new Resend(cfg.apiKey)
   const { error } = await resend.emails.send({
-    from: `Dilo <${from}>`,
+    from: `Dilo <${cfg.from}>`,
     to: data.toEmail,
     subject: `${title} · ${data.periodDescription}`,
     text: [

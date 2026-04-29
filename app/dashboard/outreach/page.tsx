@@ -71,8 +71,8 @@ export default async function OutreachPage() {
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Outreach</p>
       <h1 className="mt-1 text-2xl font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Cold email & seguimiento</h1>
       <p className="mt-1 max-w-2xl text-sm text-[#64748B] dark:text-[#94A3B8]">
-        Leads por organización, registro de envíos con pixel de apertura y redirección de clics. Los enlaces públicos usan
-        un token opaco (no el UUID interno).
+        Leads por organización, registro de envíos con pixel de apertura y redirección de clics, y envío opcional del
+        cold mail con Resend (Integraciones). Los enlaces usan un token opaco (no el UUID interno).
       </p>
       <div className="mt-8">
         <OutreachTable initialLeads={initialLeads} />

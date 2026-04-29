@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
 
       if (user.email && rows.length > 0) {
         await sendSessionsDigestEmail({
+          organizationId: user.organizationId,
           toEmail: user.email,
           digestLabel,
           periodDescription,

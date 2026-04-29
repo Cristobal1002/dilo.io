@@ -1,9 +1,11 @@
 import { Resend } from 'resend'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/session-complete')
 
 export type SessionCompleteEmailInput = {
+  organizationId: string
   toEmail: string
   flowName: string
   flowId: string
@@ -34,10 +36,12 @@ function scoreBar(score: number | null): string {
 }
 
 export async function sendSessionCompleteEmail(data: SessionCompleteEmailInput): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM_EMAIL
-  if (!apiKey || !from) {
-    log.warn({}, 'RESEND_API_KEY or RESEND_FROM_EMAIL not set; skipping session complete email')
+  const cfg = await resolveResendSendConfig(data.organizationId)
+  if (!cfg) {
+    log.warn(
+      { organizationId: data.organizationId },
+      'Sin Resend: integración del workspace o RESEND_* en servidor; email de sesión no enviado',
+    )
     return
   }
 
@@ -52,11 +56,11 @@ export async function sendSessionCompleteEmail(data: SessionCompleteEmailInput):
     .filter(Boolean)
     .join('\n')
 
-  const resend = new Resend(apiKey)
+  const resend = new Resend(cfg.apiKey)
   const hot = data.classification === 'hot' ? ' 🔥' : ''
 
   const { error } = await resend.emails.send({
-    from: `Dilo <${from}>`,
+    from: `Dilo <${cfg.from}>`,
     to: data.toEmail,
     subject: `Nueva respuesta en "${data.flowName}"${hot}`,
     text: [

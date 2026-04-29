@@ -114,6 +114,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
   const [panelLoading, setPanelLoading] = useState(false)
   const [registerSubject, setRegisterSubject] = useState('')
   const [registerCtaUrl, setRegisterCtaUrl] = useState('https://getdilo.io')
+  const [sendWithResend, setSendWithResend] = useState(true)
   const [registerBusy, setRegisterBusy] = useState(false)
   const [registerResult, setRegisterResult] = useState<string | null>(null)
 
@@ -137,6 +138,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
     setPanelEmails(null)
     setRegisterSubject('')
     setRegisterCtaUrl('https://getdilo.io')
+    setSendWithResend(true)
     setRegisterResult(null)
     setPanelLoading(true)
     try {
@@ -216,6 +218,7 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: registerSubject.trim(),
+          sendWithResend,
           ...(cta ? { ctaDestinationUrl: cta } : {}),
         }),
       })
@@ -223,13 +226,24 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
         openPixelUrl: string
         trackedCtaUrl: string
         trackingToken: string
+        emailSent?: boolean
       }>(res)
       if (!result.ok) {
         setRegisterResult(result.message)
         return
       }
       setRegisterResult(
-        `Pixel (img en el HTML):\n${result.data.openPixelUrl}\n\nLink CTA trackeado:\n${result.data.trackedCtaUrl}\n\nToken: ${result.data.trackingToken}`,
+        [
+          result.data.emailSent
+            ? 'Correo enviado con Resend (integración del workspace o servidor).'
+            : 'Solo registro en Dilo (sin envío). Puedes copiar el HTML y enviar con otra herramienta.',
+          '',
+          `Pixel (img en el HTML):\n${result.data.openPixelUrl}`,
+          '',
+          `Link CTA trackeado:\n${result.data.trackedCtaUrl}`,
+          '',
+          `Token: ${result.data.trackingToken}`,
+        ].join('\n'),
       )
       const detail = await fetch(`/api/outreach/leads/${panelLeadId}`)
       const d = await readApiResult<{ emails: EmailRow[] }>(detail)
@@ -505,10 +519,10 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                   </ul>
 
                   <div className="mt-6 rounded-xl border border-dashed border-[#9C77F5]/35 bg-[#9C77F5]/5 p-3 dark:bg-[#9C77F5]/10">
-                    <p className="text-xs font-semibold text-[#6B4DD4]">Registrar envío (antes de Resend)</p>
+                    <p className="text-xs font-semibold text-[#6B4DD4]">Registrar envío</p>
                     <p className="mt-1 text-[11px] leading-snug text-[#64748B]">
-                      Crea el registro, copia el pixel y el link trackeado del CTA (se guardan para recuperarlos
-                      después). Luego envía el HTML con Resend.
+                      Crea el registro con pixel y CTA trackeados. Opcionalmente Dilo envía el cold mail con la cuenta
+                      Resend del workspace (Integraciones).
                     </p>
                     <label className="mt-2 block text-[10px] font-medium text-[#64748B]">
                       URL del CTA (https) — opcional; por defecto getdilo.io
@@ -526,13 +540,26 @@ export default function OutreachTable({ initialLeads }: { initialLeads: Outreach
                       placeholder="Asunto del correo"
                       className="mt-2 w-full rounded-lg border border-[#E8EAEF] px-2 py-1.5 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
                     />
+                    <label className="mt-3 flex cursor-pointer items-start gap-2 text-[11px] text-[#475569] dark:text-[#94A3B8]">
+                      <input
+                        type="checkbox"
+                        checked={sendWithResend}
+                        onChange={(e) => setSendWithResend(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-[#CBD5E1] text-[#6B4DD4] focus:ring-[#9C77F5]"
+                      />
+                      <span>
+                        <strong className="text-[#1A1A1A] dark:text-[#F8F9FB]">Enviar ahora</strong> con Resend
+                        (Integraciones → Resend del workspace, o <span className="font-mono">RESEND_*</span> en
+                        servidor). Si lo desmarcas, solo queda el registro y las URLs para copiar.
+                      </span>
+                    </label>
                     <button
                       type="button"
                       disabled={registerBusy || !registerSubject.trim()}
                       onClick={() => void registerEmail()}
                       className="mt-2 w-full rounded-lg bg-[#0f172a] py-2 text-sm font-semibold text-white disabled:opacity-40 dark:bg-[#334155]"
                     >
-                      {registerBusy ? 'Creando…' : 'Registrar envío y ver URLs'}
+                      {registerBusy ? 'Procesando…' : sendWithResend ? 'Registrar y enviar' : 'Registrar y ver URLs'}
                     </button>
                     {registerResult ? (
                       <textarea
