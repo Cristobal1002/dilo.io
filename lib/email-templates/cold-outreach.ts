@@ -6,6 +6,8 @@ import {
 export type ColdEmailParams = {
   recipientName: string
   senderName: string
+  /** Logo del workspace (HTTPS). */
+  logoUrl?: string | null
   trackingPixelUrl: string
   /** URL del CTA ya envuelta con /api/track/c/... */
   ctaUrl: string
@@ -39,6 +41,17 @@ function safeFooterHref(url: string | null | undefined): string {
   return 'https://getdilo.io'
 }
 
+function safeLogoSrc(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null
+  try {
+    const u = new URL(url.trim())
+    if (u.protocol === 'https:') return u.toString()
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
 function footerDisplayHost(href: string): string {
   try {
     return new URL(href).host.replace(/^www\./, '')
@@ -53,6 +66,7 @@ function footerDisplayHost(href: string): string {
 export function buildColdEmail({
   recipientName,
   senderName,
+  logoUrl,
   trackingPixelUrl,
   ctaUrl,
   bodyMarkdown,
@@ -60,11 +74,14 @@ export function buildColdEmail({
   footerLinkUrl,
 }: ColdEmailParams): string {
   const safeSender = escapeHtml(senderName.trim() || 'Equipo')
+  const logoSrc = safeLogoSrc(logoUrl)
+  const logoSrcEsc = logoSrc ? escapeHtml(logoSrc) : null
   const pixel = escapeHtml(trackingPixelUrl)
   const cta = escapeHtml(ctaUrl)
   const md = bodyMarkdown?.trim() ? bodyMarkdown : DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN
   const bodyHtml = renderOutreachColdBodyMarkdown(md, recipientName)
-  const btnLabel = escapeHtml((ctaLabel?.trim() || 'Ver enlace →').slice(0, 80))
+  const btnLabelRaw = (ctaLabel?.trim() || 'Abrir formulario →').slice(0, 80)
+  const btnLabel = escapeHtml(btnLabelRaw)
   const footHref = safeFooterHref(footerLinkUrl ?? null)
   const footHrefEsc = escapeHtml(footHref)
   const footHost = escapeHtml(footerDisplayHost(footHref))
@@ -82,18 +99,23 @@ export function buildColdEmail({
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="100%" style="max-width:600px;" cellspacing="0" cellpadding="0">
           <tr>
-            <td style="padding:0 0 24px 0;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.02em;">
-              ${safeSender}
+            <td style="padding:0 0 24px 0;">
+              ${logoSrcEsc ? `<img src="${logoSrcEsc}" alt="" height="32" style="display:block;height:32px;max-height:32px;width:auto;max-width:180px;margin:0 0 10px 0;border:0;outline:none;text-decoration:none;"/>` : ''}
+              <div style="font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.02em;">${safeSender}</div>
             </td>
           </tr>
           <tr>
             <td style="font-size:16px;line-height:1.6;color:#334155;">
               ${bodyHtml}
-              <p style="margin:0;">
-                <a href="${cta}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">
-                  ${btnLabel}
-                </a>
-              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0;">
+                <tr>
+                  <td bgcolor="#0f172a" style="border-radius:10px;">
+                    <a href="${cta}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 22px;border-radius:10px;letter-spacing:-0.01em;">
+                      ${btnLabel}
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>

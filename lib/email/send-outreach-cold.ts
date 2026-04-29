@@ -33,6 +33,7 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
       outreachColdEmailBodyMarkdown: organizations.outreachColdEmailBodyMarkdown,
       outreachColdEmailCtaLabel: organizations.outreachColdEmailCtaLabel,
       websiteUrl: organizations.websiteUrl,
+      logoUrl: organizations.logoUrl,
     })
     .from(organizations)
     .where(eq(organizations.id, params.organizationId))
@@ -42,6 +43,7 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
   const html = buildColdEmail({
     recipientName: params.recipientName,
     senderName: display,
+    logoUrl: orgRow?.logoUrl ?? null,
     trackingPixelUrl: params.trackingPixelUrl,
     ctaUrl: params.trackedCtaUrl,
     bodyMarkdown: orgRow?.outreachColdEmailBodyMarkdown ?? null,
