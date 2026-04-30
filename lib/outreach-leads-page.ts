@@ -1,4 +1,4 @@
-import { type SQL, and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { type SQL, and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
 import { flows, outreachEmails, outreachLeads } from '@/db/schema'
@@ -73,20 +73,18 @@ export async function loadOutreachLeadsPage(
       ? or(ilike(outreachLeads.name, `%${qSafe}%`), ilike(outreachLeads.email, `%${qSafe}%`))
       : undefined
 
-  const flowExists = flowFilterId
-    ? exists(
-        db
-          .select({ x: sql`1` })
-          .from(outreachEmails)
-          .where(
-            and(eq(outreachEmails.leadId, outreachLeads.id), eq(outreachEmails.flowId, flowFilterId)),
-          ),
-      )
+  /** Por flow: `IN (subquery)` evita `exists` correlacionado con la query API en prod. */
+  const flowInSubquery: SQL | undefined = flowFilterId
+    ? sql`${outreachLeads.id} IN (
+        SELECT ${outreachEmails.leadId}
+        FROM ${outreachEmails}
+        WHERE ${outreachEmails.flowId} = ${flowFilterId}
+      )`
     : undefined
 
   const whereParts: SQL[] = [statusWhere as SQL]
   if (nameSearch) whereParts.push(nameSearch)
-  if (flowExists) whereParts.push(flowExists)
+  if (flowInSubquery) whereParts.push(flowInSubquery)
   const fullWhere = whereParts.length === 1 ? whereParts[0]! : and(...whereParts)
 
   const [{ count }] = await db
@@ -97,12 +95,13 @@ export async function loadOutreachLeadsPage(
   const total = Number(count) || 0
   const offset = (page - 1) * pageSize
 
-  const leads = await db.query.outreachLeads.findMany({
-    where: fullWhere,
-    orderBy: [desc(outreachLeads.lastActivityAt), desc(outreachLeads.createdAt)],
-    limit: pageSize,
-    offset,
-  })
+  const leads = await db
+    .select()
+    .from(outreachLeads)
+    .where(fullWhere)
+    .orderBy(desc(outreachLeads.lastActivityAt), desc(outreachLeads.createdAt))
+    .limit(pageSize)
+    .offset(offset)
 
   const ids = leads.map((l) => l.id)
   const agg =
