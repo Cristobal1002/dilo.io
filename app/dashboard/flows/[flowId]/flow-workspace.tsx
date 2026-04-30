@@ -27,6 +27,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { STEP_BRANCH_COLOR_PRESETS } from '@/lib/branch-colors'
+import { FlowDemoVideo } from '@/components/flow-demo-video'
 import { StepConditionsEditor } from '@/components/step-conditions-editor'
 import { SavingSpinner } from '@/components/spinners'
 import { cn } from '@/lib/utils'
@@ -94,6 +95,8 @@ export type FlowPresentationSettings = {
   estimated_minutes_max?: number
   /** Primer mensaje del chat público; vacío → la app arma saludo desde la descripción. */
   chat_intro?: string
+  /** Debajo de la descripción en /f/: YouTube, Vimeo, Loom, o .gif / .mp4 / .webm (https). */
+  demo_video_url?: string | null
 }
 
 export type FlowWorkspaceFlow = {
@@ -249,6 +252,13 @@ function FlowPresentationPreview({
   const [chatIntroDraft, setChatIntroDraft] = useState('')
   const [savingAssist, setSavingAssist] = useState(false)
   const [assistError, setAssistError] = useState<string | null>(null)
+  const [demoVideoDraft, setDemoVideoDraft] = useState(() => {
+    const o =
+      flow.settings && typeof flow.settings === 'object' ? (flow.settings as FlowPresentationSettings) : {}
+    return typeof o.demo_video_url === 'string' ? o.demo_video_url : ''
+  })
+  const [demoVideoSaving, setDemoVideoSaving] = useState(false)
+  const [demoVideoError, setDemoVideoError] = useState<string | null>(null)
 
   useEffect(() => {
     const o =
@@ -256,6 +266,7 @@ function FlowPresentationPreview({
     setToneAssist(typeof o.tone === 'string' && o.tone.trim() ? o.tone.trim() : 'cálido, breve y natural')
     setTransitionAi(o.transition_style === 'ai')
     setChatIntroDraft(typeof o.chat_intro === 'string' ? o.chat_intro : '')
+    setDemoVideoDraft(typeof o.demo_video_url === 'string' ? o.demo_video_url : '')
   }, [flow.settings])
 
   const saveAssistant = useCallback(async () => {
@@ -382,6 +393,36 @@ function FlowPresentationPreview({
       setSaving(false)
     }
   }, [descDraft, flow.description, flow.id, router])
+
+  const saveDemoVideo = useCallback(async () => {
+    setDemoVideoError(null)
+    const o =
+      flow.settings && typeof flow.settings === 'object' ? (flow.settings as FlowPresentationSettings) : {}
+    const prevStored = typeof o.demo_video_url === 'string' ? o.demo_video_url.trim() : ''
+    const trimmed = demoVideoDraft.trim()
+    const nextPayload = trimmed === '' ? null : trimmed
+    const prevNorm = prevStored === '' ? null : prevStored
+    if (nextPayload === prevNorm) return
+
+    setDemoVideoSaving(true)
+    try {
+      const res = await fetch(`/api/flows/${flow.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { demo_video_url: nextPayload } }),
+      })
+      const result = await readApiResult(res)
+      if (!result.ok) {
+        setDemoVideoError(result.message)
+        return
+      }
+      router.refresh()
+    } catch {
+      setDemoVideoError('No se pudo guardar.')
+    } finally {
+      setDemoVideoSaving(false)
+    }
+  }, [demoVideoDraft, flow.id, flow.settings, router])
 
   const startTitleEdit = () => {
     setPatchError(null)
@@ -510,6 +551,43 @@ function FlowPresentationPreview({
             />
           </div>
         )}
+
+        <div className="mt-5 w-full max-w-md text-left">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9C77F5]">Video de demo (opcional)</p>
+          <p className="mt-1 text-[11px] leading-snug text-[#6B7280] dark:text-[#9CA3AF]">
+            Se muestra debajo de la descripción en el enlace público. YouTube, Vimeo, Loom, o un .gif / .mp4 / .webm en
+            https.
+          </p>
+          <input
+            type="url"
+            value={demoVideoDraft}
+            onChange={(e) => {
+              setDemoVideoDraft(e.target.value)
+              setDemoVideoError(null)
+            }}
+            placeholder="https://www.youtube.com/watch?v=…"
+            className="mt-2 w-full rounded-xl border border-[#9C77F5]/25 bg-white px-3 py-2 text-xs text-[#1A1A1A] shadow-sm placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#9C77F5]/30 dark:border-[#2A2F3F] dark:bg-[#0F1117] dark:text-[#E5E7EB]"
+            aria-label="URL de video de demo"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void saveDemoVideo()}
+              disabled={demoVideoSaving}
+              className="rounded-lg bg-[#1A1A1A] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60 dark:bg-[#F8F9FB] dark:text-[#1A1A1A]"
+            >
+              {demoVideoSaving ? 'Guardando…' : 'Guardar enlace'}
+            </button>
+          </div>
+          {demoVideoError ? (
+            <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+              {demoVideoError}
+            </p>
+          ) : null}
+          <div className="mt-4 flex justify-center">
+            <FlowDemoVideo url={demoVideoDraft} showInvalidHint clickToLoadIframe />
+          </div>
+        </div>
 
         {patchError ? (
           <p className="mt-2 max-w-md text-center text-xs font-medium text-red-600 dark:text-red-400" role="alert">

@@ -30,12 +30,27 @@ const optionalFlowOutreachCtaLabel = z
     return t === '' ? null : t
   })
 
+const optionalDemoVideoUrl = z
+  .union([z.string().max(500), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+  .refine((v) => v === undefined || v === null || /^https:\/\//i.test(v), {
+    message: 'La URL del video debe usar https://',
+  })
+
 const SettingsPatchSchema = z
   .object({
     transition_style: z.enum(['ai', 'none']).optional(),
     tone: z.string().max(220).optional(),
     chat_intro: z.string().max(4000).optional(),
     hide_branding: z.boolean().optional(),
+    /** YouTube, Vimeo, Loom, o .gif / .mp4 / .webm en https. Vacío/null borra. */
+    demo_video_url: optionalDemoVideoUrl,
   })
   .strict()
 

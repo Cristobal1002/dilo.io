@@ -15,7 +15,9 @@ import {
   stripFileDataUrlsFromAnswers,
   type FileAnswerPayload,
 } from '@/lib/public-flow-file-helpers'
+import { FlowDemoVideo } from '@/components/flow-demo-video'
 import { PublicFlowBrandingFooter } from '@/components/public-flow-branding'
+import { readDemoVideoUrlFromSettings } from '@/lib/demo-video-embed'
 import { resolvePublicFlowChatOpening } from '@/lib/public-flow-chat-opening'
 import {
   buildMultiOtherStored,
@@ -573,6 +575,7 @@ function WelcomeScreen({
   onReturnToChat: () => void
 }) {
   const w = welcomeCopy(flow, stepCount)
+  const demoVideoUrl = readDemoVideoUrlFromSettings(flow.settings)
   return (
     <div className="flex min-h-dvh flex-col px-5 py-10 text-center">
       <div className="flex flex-1 flex-col items-center justify-center">
@@ -589,6 +592,11 @@ function WelcomeScreen({
         <p className="mb-4 max-w-md text-left text-[15px] leading-relaxed text-[#4B5563] dark:text-[#B8BCC9] whitespace-pre-wrap">
           {flow.description.trim()}
         </p>
+      ) : null}
+      {demoVideoUrl ? (
+        <div className="mb-6 w-full max-w-md">
+          <FlowDemoVideo url={demoVideoUrl} clickToLoadIframe={false} />
+        </div>
       ) : null}
       <p className="mb-8 max-w-md text-base leading-relaxed text-[#5B5670] dark:text-[#9CA3AF]">{w.tagline}</p>
       <div className="mb-9 flex flex-wrap justify-center gap-2">
