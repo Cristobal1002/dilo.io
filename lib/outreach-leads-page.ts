@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { type SQL, and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
 import { flows, outreachEmails, outreachLeads } from '@/db/schema'
@@ -84,7 +84,10 @@ export async function loadOutreachLeadsPage(
       )
     : undefined
 
-  const fullWhere = and(statusWhere, nameSearch, flowExists)
+  const whereParts: SQL[] = [statusWhere as SQL]
+  if (nameSearch) whereParts.push(nameSearch)
+  if (flowExists) whereParts.push(flowExists)
+  const fullWhere = whereParts.length === 1 ? whereParts[0]! : and(...whereParts)
 
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
