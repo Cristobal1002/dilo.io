@@ -27,8 +27,9 @@ export type SendOutreachColdEmailParams = {
 
 /**
  * Envía el HTML de cold outreach con Resend (integración del workspace o `RESEND_*` en servidor).
+ * @returns Id del mensaje en Resend (`data.id`) para correlacionar webhooks; null si no vino en la respuesta.
  */
-export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams): Promise<void> {
+export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams): Promise<string | null> {
   const cfg = params.resendConfig
 
   const [orgRow] = await db
@@ -74,7 +75,7 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
   })
 
   const resend = params.resendClient ?? new Resend(cfg.apiKey)
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: `${display} <${cfg.from}>`,
     to: params.toEmail.trim(),
     subject: params.subject.trim(),
@@ -85,4 +86,10 @@ export async function sendOutreachColdEmail(params: SendOutreachColdEmailParams)
     log.error({ error, to: params.toEmail }, 'Outreach cold email Resend failed')
     throw new Error(error.message)
   }
+
+  const resendEmailId = data?.id?.trim() ? data.id.trim() : null
+  if (!resendEmailId) {
+    log.warn({ to: params.toEmail }, 'Resend aceptó el envío pero no devolvió data.id')
+  }
+  return resendEmailId
 }

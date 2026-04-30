@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
-import { outreachEmails, outreachLeads } from '@/db/schema'
+import { flows, outreachEmails, outreachLeads } from '@/db/schema'
 import { apiNoContent, apiSuccess } from '@/lib/api-response'
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors'
 import {
@@ -47,7 +47,22 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth, params }) =>
     orderBy: [desc(outreachEmails.sentAt)],
   })
 
-  return apiSuccess({ lead, emails })
+  const lastFlowId = emails[0]?.flowId ?? null
+  let lastCampaignFlowName: string | null = null
+  if (lastFlowId) {
+    const f = await db.query.flows.findFirst({
+      where: and(eq(flows.id, lastFlowId), eq(flows.organizationId, org.id)),
+      columns: { name: true },
+    })
+    lastCampaignFlowName = f?.name ?? null
+  }
+
+  return apiSuccess({
+    lead,
+    emails,
+    lastCampaignFlowId: lastFlowId,
+    lastCampaignFlowName,
+  })
 }, { requireAuth: true })
 
 export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) => {

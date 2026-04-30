@@ -154,7 +154,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
   if (sendWithResend) {
     try {
       const resendClient = new Resend(resendCfg!.apiKey)
-      await sendOutreachColdEmail({
+      const resendEmailId = await sendOutreachColdEmail({
         organizationId: org.id,
         senderDisplayName: org.name?.trim() || 'Dilo',
         toEmail: lead.email,
@@ -166,6 +166,21 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         resendClient,
         flowId: flowIdIn ?? null,
       })
+      const statusAt = new Date()
+      const [updatedRow] = await db
+        .update(outreachEmails)
+        .set({
+          resendEmailId: resendEmailId ?? null,
+          resendDeliveryStatus: resendEmailId ? 'queued' : null,
+          resendDeliveryUpdatedAt: statusAt,
+          resendBounceType: null,
+          resendBounceMessage: null,
+        })
+        .where(eq(outreachEmails.id, emailRow.id))
+        .returning()
+      if (updatedRow) {
+        emailRow = updatedRow
+      }
     } catch (err) {
       await db.delete(outreachEmails).where(eq(outreachEmails.id, emailRow.id))
       await db

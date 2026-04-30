@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { outreachEmails, outreachLeads } from '@/db/schema'
+import { outreachLeads } from '@/db/schema'
 import { apiCreated, apiSuccess } from '@/lib/api-response'
 import { ConflictError, ValidationError } from '@/lib/errors'
+import { loadOutreachLeadsPage } from '@/lib/outreach-leads-page'
 import { normalizeLeadEmailKey, OUTREACH_FILTER_STATUSES } from '@/lib/outreach'
 import { withApiHandler } from '@/lib/with-api-handler'
 
@@ -18,58 +18,39 @@ const CreateBody = z.object({
 
 const ListQuery = z.object({
   status: z.enum(OUTREACH_FILTER_STATUSES).optional().default('all'),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(80),
+  q: z.string().max(200).optional(),
+  flowId: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const t = v?.trim()
+      if (!t) return undefined
+      const r = z.string().uuid().safeParse(t)
+      return r.success ? r.data : undefined
+    }),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(25),
 })
 
 export const GET = withApiHandler(async (req: NextRequest, { auth }) => {
   const { org } = auth
-  const q = Object.fromEntries(req.nextUrl.searchParams.entries())
-  const parsed = ListQuery.safeParse(q)
+  const raw = Object.fromEntries(req.nextUrl.searchParams.entries())
+  const parsed = ListQuery.safeParse(raw)
   if (!parsed.success) {
     throw new ValidationError('Parámetros inválidos', parsed.error.flatten().fieldErrors)
   }
-  const { status, limit } = parsed.data
+  const { status, q, flowId, page, pageSize } = parsed.data
 
-  const whereBase = and(eq(outreachLeads.organizationId, org.id), isNull(outreachLeads.deletedAt))
-  const where =
-    status === 'all' ? whereBase : and(whereBase, eq(outreachLeads.status, status))
-
-  const leads = await db.query.outreachLeads.findMany({
-    where,
-    orderBy: [desc(outreachLeads.lastActivityAt), desc(outreachLeads.createdAt)],
-    limit,
+  const result = await loadOutreachLeadsPage({
+    organizationId: org.id,
+    status,
+    q: q?.trim() || null,
+    flowId: flowId ?? null,
+    page,
+    pageSize,
   })
 
-  const ids = leads.map((l) => l.id)
-  const agg =
-    ids.length === 0
-      ? []
-      : await db
-          .select({
-            leadId: outreachEmails.leadId,
-            emailCount: sql<number>`count(*)::int`,
-            totalOpens: sql<number>`coalesce(sum(${outreachEmails.openCount}), 0)::int`,
-            totalClicks: sql<number>`coalesce(sum(${outreachEmails.clickCount}), 0)::int`,
-            lastSent: sql<Date | null>`max(${outreachEmails.sentAt})`,
-          })
-          .from(outreachEmails)
-          .where(inArray(outreachEmails.leadId, ids))
-          .groupBy(outreachEmails.leadId)
-
-  const aggByLead = new Map(agg.map((r) => [r.leadId, r]))
-
-  const data = leads.map((l) => {
-    const a = aggByLead.get(l.id)
-    return {
-      ...l,
-      emailCount: a?.emailCount ?? 0,
-      totalOpens: a?.totalOpens ?? 0,
-      totalClicks: a?.totalClicks ?? 0,
-      lastSentAt: a?.lastSent ?? null,
-    }
-  })
-
-  return apiSuccess({ leads: data })
+  return apiSuccess(result)
 }, { requireAuth: true })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {

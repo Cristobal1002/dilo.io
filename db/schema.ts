@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
     pgTable, uuid, text, integer, boolean,
     timestamp, jsonb, index, uniqueIndex,
@@ -247,9 +248,21 @@ import {
       ctaDestinationUrl: text('cta_destination_url'),
       /** Flow cuyo override de plantilla cold se usó al enviar (opcional). */
       flowId:       uuid('flow_id').references(() => flows.id, { onDelete: 'set null' }),
+      /** Id del mensaje en Resend (`data.id` al enviar); webhooks actualizan estado. */
+      resendEmailId: text('resend_email_id'),
+      /** Último estado conocido: queued | sent | delivered | bounced | complained | failed | delayed */
+      resendDeliveryStatus: text('resend_delivery_status'),
+      resendBounceType: text('resend_bounce_type'),
+      resendBounceMessage: text('resend_bounce_message'),
+      resendDeliveryUpdatedAt: timestamp('resend_delivery_updated_at'),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
     },
-    (t) => [index('outreach_emails_lead_idx').on(t.leadId)],
+    (t) => [
+      index('outreach_emails_lead_idx').on(t.leadId),
+      uniqueIndex('outreach_emails_resend_email_id_uidx')
+        .on(t.resendEmailId)
+        .where(sql`${t.resendEmailId} IS NOT NULL`),
+    ],
   )
 
   /** Credenciales de integraciones por workspace (Resend, etc.) — payload cifrado en app. */

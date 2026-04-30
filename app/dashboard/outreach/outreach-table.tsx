@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { readApiResult } from '@/lib/read-api-result'
 import {
   OUTREACH_FILTER_STATUSES,
@@ -73,6 +73,9 @@ export type OutreachLeadOverview = {
   totalOpens: number
   totalClicks: number
   lastSentAt: string | null
+  /** Flow del último envío registrado (plantilla / “campaña”). */
+  lastCampaignFlowId?: string | null
+  lastCampaignFlowName?: string | null
 }
 
 export type OutreachFlowOption = {
@@ -94,23 +97,78 @@ type EmailRow = {
   lastClickedUrl: string | null
   ctaDestinationUrl: string | null
   flowId?: string | null
+  resendEmailId?: string | null
+  resendDeliveryStatus?: string | null
+  resendBounceType?: string | null
+  resendBounceMessage?: string | null
+  resendDeliveryUpdatedAt?: string | null
   createdAt: string
+}
+
+function resendDeliveryLabel(status: string | null | undefined): string | null {
+  if (!status) return null
+  const map: Record<string, string> = {
+    queued: 'Resend: en cola',
+    sent: 'Resend: aceptado',
+    delivered: 'Resend: entregado',
+    bounced: 'Resend: rebotado',
+    complained: 'Resend: marcado spam',
+    failed: 'Resend: falló',
+    delayed: 'Resend: entrega demorada',
+  }
+  return map[status] ?? `Resend: ${status}`
 }
 
 export default function OutreachTable({
   initialLeads,
+  initialTotal,
+  initialPage,
+  pageSize,
+  initialQ,
+  initialFlowId,
+  initialStatus,
   flowsForOutreach = [],
 }: {
   initialLeads: OutreachLeadOverview[]
+  initialTotal: number
+  initialPage: number
+  pageSize: number
+  initialQ: string
+  initialFlowId: string | null
+  initialStatus: OutreachFilterStatus
   flowsForOutreach?: OutreachFlowOption[]
 }) {
   const router = useRouter()
-  const [filter, setFilter] = useState<OutreachFilterStatus>('all')
-  const [leads, setLeads] = useState(initialLeads)
+  const pathname = usePathname()
+
+  const [qDraft, setQDraft] = useState(initialQ)
+  const [flowDraft, setFlowDraft] = useState(initialFlowId ?? '')
 
   useEffect(() => {
-    setLeads(initialLeads)
-  }, [initialLeads])
+    setQDraft(initialQ)
+    setFlowDraft(initialFlowId ?? '')
+  }, [initialQ, initialFlowId])
+
+  const totalPages = Math.max(1, Math.ceil(initialTotal / pageSize))
+
+  const pushListUrl = useCallback(
+    (next: { page?: number; q?: string; flow?: string | null; status?: OutreachFilterStatus }) => {
+      const p = new URLSearchParams()
+      const pageVal = next.page ?? initialPage
+      const qVal = next.q !== undefined ? next.q : initialQ
+      const flowVal = next.flow !== undefined ? next.flow : initialFlowId
+      const statusVal = next.status ?? initialStatus
+      const qTrim = qVal.trim()
+      if (qTrim) p.set('q', qTrim)
+      if (flowVal?.trim()) p.set('flow', flowVal.trim())
+      if (statusVal !== 'all') p.set('status', statusVal)
+      if (pageVal > 1) p.set('page', String(pageVal))
+      const qs = p.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname)
+      router.refresh()
+    },
+    [initialPage, initialQ, initialFlowId, initialStatus, pathname, router],
+  )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -152,25 +210,14 @@ export default function OutreachTable({
     return raw
   }
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return leads
-    return leads.filter((l) => l.status === filter)
-  }, [leads, filter])
-
   const flowNameById = useMemo(
     () => new Map(flowsForOutreach.map((f) => [f.id, f.name] as const)),
     [flowsForOutreach],
   )
 
-  const refreshList = useCallback(async () => {
-    const qs = filter === 'all' ? '' : `?status=${encodeURIComponent(filter)}`
-    const res = await fetch(`/api/outreach/leads${qs}`)
-    const result = await readApiResult<{ leads: OutreachLeadOverview[] }>(res)
-    if (result.ok) {
-      setLeads(result.data.leads)
-    }
+  const refreshList = useCallback(() => {
     router.refresh()
-  }, [filter, router])
+  }, [router])
 
   const openPanel = useCallback(async (leadId: string) => {
     setPanelLeadId(leadId)
@@ -187,9 +234,18 @@ export default function OutreachTable({
     setPanelLoading(true)
     try {
       const res = await fetch(`/api/outreach/leads/${leadId}`)
-      const result = await readApiResult<{ lead: OutreachLeadOverview; emails: EmailRow[] }>(res)
+      const result = await readApiResult<{
+        lead: OutreachLeadOverview
+        emails: EmailRow[]
+        lastCampaignFlowId?: string | null
+        lastCampaignFlowName?: string | null
+      }>(res)
       if (result.ok) {
-        setPanelLead(result.data.lead)
+        setPanelLead({
+          ...result.data.lead,
+          lastCampaignFlowId: result.data.lastCampaignFlowId ?? null,
+          lastCampaignFlowName: result.data.lastCampaignFlowName ?? null,
+        })
         setEditName(result.data.lead.name ?? '')
         setEditEmail(result.data.lead.email ?? '')
         setEditCompany(result.data.lead.company ?? '')
@@ -368,16 +424,79 @@ export default function OutreachTable({
         </p>
       ) : null}
 
+      <div className="rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] p-4 dark:border-[#2A2F3F] dark:bg-[#161821]">
+        <p className="text-xs font-semibold text-[#1A1A1A] dark:text-[#F8F9FB]">Buscar y campaña</p>
+        <p className="mt-1 text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+          Filtra por nombre o email, y por flow usado en algún envío (plantilla en Conectores). Los filtros actualizan
+          la URL para poder compartir o guardar la vista.
+        </p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="block min-w-[180px] flex-1 text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+            Nombre o email
+            <input
+              value={qDraft}
+              onChange={(e) => setQDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  pushListUrl({ page: 1, q: qDraft, flow: flowDraft || null, status: initialStatus })
+                }
+              }}
+              placeholder="Ej. María o @dominio.com"
+              className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+            />
+          </label>
+          <label className="block min-w-[200px] flex-1 text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+            Campaña (flow con envío)
+            <select
+              value={flowDraft}
+              onChange={(e) => setFlowDraft(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
+            >
+              <option value="">Todas las campañas</option>
+              {flowsForOutreach.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                  {f.status === 'published' ? '' : ` · ${f.status}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                pushListUrl({ page: 1, q: qDraft, flow: flowDraft || null, status: initialStatus })
+              }
+              className="rounded-xl bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white dark:bg-[#334155]"
+            >
+              Aplicar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setQDraft('')
+                setFlowDraft('')
+                pushListUrl({ page: 1, q: '', flow: null, status: initialStatus })
+              }}
+              className="rounded-xl border border-[#E8EAEF] bg-white px-4 py-2 text-sm font-semibold text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#1A1D29]"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1">
           {OUTREACH_FILTER_STATUSES.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => setFilter(s)}
+              onClick={() => pushListUrl({ status: s, page: 1 })}
               className={cn(
                 'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
-                filter === s
+                initialStatus === s
                   ? 'bg-[#9C77F5]/20 text-[#6B4DD4] dark:bg-[#9C77F5]/25 dark:text-[#D4C4FC]'
                   : 'text-[#64748B] hover:bg-[#F1F5F9] dark:text-[#94A3B8] dark:hover:bg-[#252936]',
               )}
@@ -395,12 +514,18 @@ export default function OutreachTable({
         </button>
       </div>
 
+      <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+        Mostrando {initialLeads.length} de {initialTotal} leads
+        {totalPages > 1 ? ` · página ${initialPage} de ${totalPages}` : null}
+      </p>
+
       <div className="overflow-x-auto rounded-2xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1020px] text-left text-sm">
           <thead className="border-b border-[#E8EAEF] bg-[#FAFBFC] text-[11px] font-semibold uppercase tracking-wide text-[#64748B] dark:border-[#2A2F3F] dark:bg-[#161821] dark:text-[#94A3B8]">
             <tr>
               <th className="px-3 py-3">Lead</th>
               <th className="px-3 py-3">Empresa</th>
+              <th className="px-3 py-3">Campaña</th>
               <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3 text-center">Emails</th>
               <th className="px-3 py-3 text-center">Aperturas</th>
@@ -410,14 +535,14 @@ export default function OutreachTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {initialLeads.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-10 text-center text-[#64748B] dark:text-[#94A3B8]">
+                <td colSpan={9} className="px-3 py-10 text-center text-[#64748B] dark:text-[#94A3B8]">
                   No hay leads con este filtro.
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => (
+              initialLeads.map((row) => (
                 <tr
                   key={row.id}
                   className="cursor-pointer border-b border-[#F1F5F9] last:border-0 hover:bg-[#FAFBFC] dark:border-[#252936] dark:hover:bg-[#161821]"
@@ -428,6 +553,15 @@ export default function OutreachTable({
                     <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">{row.email}</p>
                   </td>
                   <td className="px-3 py-3 text-[#475569] dark:text-[#CBD5E1]">{row.company ?? '—'}</td>
+                  <td className="max-w-[200px] px-3 py-3 text-xs text-[#475569] dark:text-[#CBD5E1]">
+                    {row.lastCampaignFlowName ? (
+                      <span className="line-clamp-2 font-medium text-[#334155] dark:text-[#E2E8F0]">
+                        {row.lastCampaignFlowName}
+                      </span>
+                    ) : (
+                      <span className="text-[#94A3B8]">Workspace / sin flow</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={row.status}
@@ -467,6 +601,30 @@ export default function OutreachTable({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={initialPage <= 1}
+            onClick={() => pushListUrl({ page: initialPage - 1 })}
+            className="rounded-xl border border-[#E8EAEF] bg-white px-4 py-2 text-sm font-semibold text-[#334155] disabled:opacity-40 dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#CBD5E1]"
+          >
+            ← Anterior
+          </button>
+          <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+            Página {initialPage} de {totalPages}
+          </p>
+          <button
+            type="button"
+            disabled={initialPage >= totalPages}
+            onClick={() => pushListUrl({ page: initialPage + 1 })}
+            className="rounded-xl border border-[#E8EAEF] bg-white px-4 py-2 text-sm font-semibold text-[#334155] disabled:opacity-40 dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#CBD5E1]"
+          >
+            Siguiente →
+          </button>
+        </div>
+      ) : null}
 
       {newOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
@@ -567,6 +725,10 @@ export default function OutreachTable({
                             {panelLead.name}
                           </p>
                           <p className="truncate text-xs text-[#64748B] dark:text-[#94A3B8]">{panelLead.email}</p>
+                          <p className="mt-1 text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                            <span className="font-semibold text-[#334155] dark:text-[#CBD5E1]">Campaña: </span>
+                            {panelLead.lastCampaignFlowName ?? 'Workspace / sin flow en el último envío'}
+                          </p>
                           {panelLead.company ? (
                             <p className="mt-1 truncate text-xs text-[#64748B] dark:text-[#94A3B8]">
                               {panelLead.company}
@@ -677,6 +839,25 @@ export default function OutreachTable({
                       >
                         <p className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">{e.subject}</p>
                         <p className="text-xs text-[#64748B]">Enviado {formatDate(e.sentAt)}</p>
+                        {e.resendDeliveryStatus ? (
+                          <p className="mt-1 text-xs font-medium text-[#334155] dark:text-[#CBD5E1]">
+                            {resendDeliveryLabel(e.resendDeliveryStatus)}
+                            {e.resendDeliveryUpdatedAt ? (
+                              <span className="font-normal text-[#94A3B8]">
+                                {' '}
+                                · {formatDate(e.resendDeliveryUpdatedAt)}
+                              </span>
+                            ) : null}
+                          </p>
+                        ) : e.resendEmailId ? (
+                          <p className="mt-1 text-xs text-[#94A3B8]">Resend: esperando evento de entrega…</p>
+                        ) : null}
+                        {e.resendDeliveryStatus === 'bounced' && (e.resendBounceMessage || e.resendBounceType) ? (
+                          <p className="mt-1 text-[11px] leading-snug text-red-700 dark:text-red-300">
+                            {e.resendBounceType ? <span className="font-semibold">{e.resendBounceType}. </span> : null}
+                            {e.resendBounceMessage ?? ''}
+                          </p>
+                        ) : null}
                         <p className="mt-1 break-all font-mono text-[10px] leading-snug text-[#64748B]">
                           Pixel: {openPixelHref(e.trackingToken)}
                         </p>
