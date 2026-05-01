@@ -193,7 +193,7 @@ function parsePresentationSettings(raw: FlowWorkspaceFlow['settings'], workspace
     logoUrl: fromFlow ?? fromWorkspace,
     label: typeof o.presentation_label === 'string' && o.presentation_label.trim()
       ? o.presentation_label.trim()
-      : 'PRESENTACIÓN',
+      : 'Bienvenida',
     tonePill: typeof o.tone_pill === 'string' && o.tone_pill.trim() ? o.tone_pill.trim() : 'Claro y humano',
     estMin: typeof o.estimated_minutes_min === 'number' ? o.estimated_minutes_min : null,
     estMax: typeof o.estimated_minutes_max === 'number' ? o.estimated_minutes_max : null,
@@ -1559,6 +1559,8 @@ export default function FlowWorkspace({
                 status={flow.status}
                 flowName={flow.name}
                 sessionCount={sessionCount}
+                flowSettings={flow.settings}
+                workspaceLogoUrl={workspaceLogoUrl}
               />
             </div>
           </div>

@@ -9,12 +9,14 @@ import {
   EllipsisVerticalIcon,
   LinkIcon,
   PuzzlePieceIcon,
+  QrCodeIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline'
 import { ButtonSpinner } from '@/components/spinners'
 import { readApiResult } from '@/lib/read-api-result'
 import { DeleteFlowModal } from '@/components/ui/delete-flow-modal'
 import { DiloModal } from '@/components/ui/modal'
+import { FlowShareModal } from '@/components/flow-share-modal'
 import { useToast } from '@/components/ui/toast'
 import { publicAppOrigin } from '@/lib/public-site'
 
@@ -23,6 +25,8 @@ interface FlowEditorProps {
   status: string
   flowName: string
   sessionCount: number
+  flowSettings?: unknown
+  workspaceLogoUrl?: string | null
 }
 
 /** Alineado con Mordecai (DashboardShell ⋮ / CaseActionsRow): ghost, sin borde. */
@@ -43,7 +47,14 @@ const menuItemDanger =
 
 const menuIcon = 'h-5 w-5 shrink-0'
 
-export default function FlowEditor({ flowId, status, flowName, sessionCount }: FlowEditorProps) {
+export default function FlowEditor({
+  flowId,
+  status,
+  flowName,
+  sessionCount,
+  flowSettings,
+  workspaceLogoUrl = null,
+}: FlowEditorProps) {
   const router = useRouter()
   const toast = useToast()
   const menuId = useId()
@@ -52,6 +63,7 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
   const [publishError, setPublishError] = useState<string | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [embedModalOpen, setEmbedModalOpen] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
   useEffect(() => {
@@ -86,8 +98,8 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
   }
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/f/${flowId}`
-    navigator.clipboard.writeText(url)
+    const url = `${publicAppOrigin()}/f/${flowId}`
+    void navigator.clipboard.writeText(url)
     toast('Enlace copiado al portapapeles', 'success')
     closeMenu()
   }
@@ -135,6 +147,18 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
                 <>
                   <div className="fixed inset-0 z-40" aria-hidden="true" onClick={closeMenu} />
                   <div id={menuId} className={menuPanel} role="menu" aria-label="Opciones del flow">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={menuItemBase}
+                      onClick={() => {
+                        closeMenu()
+                        setShareModalOpen(true)
+                      }}
+                    >
+                      <QrCodeIcon className={menuIcon} strokeWidth={1.5} aria-hidden="true" />
+                      Enlace y código QR
+                    </button>
                     <button type="button" role="menuitem" className={menuItemBase} onClick={handleCopyLink}>
                       <LinkIcon className={menuIcon} strokeWidth={1.5} aria-hidden="true" />
                       Copiar enlace público
@@ -226,6 +250,15 @@ export default function FlowEditor({ flowId, status, flowName, sessionCount }: F
         flowName={flowName}
         sessionCount={sessionCount}
         onConfirm={handleDeleteConfirm}
+      />
+
+      <FlowShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        flowId={flowId}
+        flowName={flowName}
+        flowSettings={flowSettings}
+        workspaceLogoUrl={workspaceLogoUrl}
       />
 
       <DiloModal

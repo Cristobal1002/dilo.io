@@ -382,7 +382,7 @@ function welcomeCopy(flow: PublicFlowRecord, stepCount: number) {
   const label =
     typeof o.presentation_label === 'string' && o.presentation_label.trim()
       ? o.presentation_label.trim()
-      : 'Encuesta'
+      : 'Bienvenida'
   const tagline =
     typeof o.tagline === 'string' && o.tagline.trim()
       ? o.tagline.trim()
