@@ -76,7 +76,7 @@ function UsageBar({
 }
 
 const PLAN_FEATURES: Record<Plan, string[]> = {
-  free: ['3 flows activos', '150 respuestas / mes', '1 miembro', 'Webhooks básicos', 'Soporte por email'],
+  free: ['1 flow activo', '50 respuestas / mes', '1 miembro', 'Webhooks básicos', 'Soporte por email'],
   pro: ['20 flows activos', '5.000 respuestas / mes', '5 miembros', 'Webhooks + n8n', 'Resumen IA por respuesta', 'Soporte prioritario'],
   agency: ['Flows ilimitados', 'Respuestas ilimitadas', 'Miembros ilimitados', 'Todo de Pro', 'Onboarding personalizado', 'SLA de respuesta'],
 }

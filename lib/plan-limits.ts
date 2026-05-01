@@ -21,7 +21,7 @@ export type PlanLimits = {
 
 /** Fallback estático — usar solo si la BD no tiene el plan. */
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
-  free:   { flows: 3,  sessionsPerMonth: 150,    members: 1  },
+  free:   { flows: 1,  sessionsPerMonth: 50,     members: 1  },
   pro:    { flows: 20, sessionsPerMonth: 5_000,  members: 5  },
   agency: { flows: -1, sessionsPerMonth: -1,     members: -1 },
 }

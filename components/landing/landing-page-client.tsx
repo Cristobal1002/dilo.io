@@ -821,7 +821,7 @@ function DemoSection({ t }: { t: ThemeTokens }) {
 function Pricing({ t }: { t: ThemeTokens }) {
   const [yearly, setYearly] = useState(false)
   const plans = [
-    { name: 'Gratis',  price: '$0',              desc: 'Para empezar hoy',             features: ['3 flows activos', '150 respuestas/mes', 'Link compartible', 'Exportar CSV'],                                                         cta: 'Empezar gratis',   h: false },
+    { name: 'Gratis',  price: '$0',              desc: 'Para empezar hoy',             features: ['1 flow activo', '50 respuestas/mes', '1 miembro', 'Link compartible', 'Exportar CSV'],                                              cta: 'Empezar gratis',   h: false },
     { name: 'Pro',     price: yearly ? '$19' : '$25', desc: 'Para equipos en crecimiento', features: ['Flows ilimitados', '5,000 respuestas/mes', 'HubSpot & Notion', 'Dominio propio', 'Analytics avanzados', 'Soporte prioritario'], cta: 'Comenzar ahora',   h: true  },
     { name: 'Agencia', price: yearly ? '$69' : '$89', desc: 'Para múltiples clientes',     features: ['Todo en Pro', 'Clientes ilimitados', 'White-label completo', 'API access', 'Onboarding dedicado'],                              cta: 'Hablar con ventas', h: false },
   ]
@@ -902,7 +902,7 @@ function CTAFinal({ t }: { t: ThemeTokens }) {
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform = 'translateY(-3px)'; el.style.boxShadow = `0 20px 60px ${P}60` }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform = 'translateY(0)'; el.style.boxShadow = `0 12px 48px ${P}50` }}
           >Crea tu flow gratis →</Link>
-          <div style={{ marginTop: 20, fontSize: 13, color: t.textMuted }}>Gratis hasta 150 respuestas/mes</div>
+          <div style={{ marginTop: 20, fontSize: 13, color: t.textMuted }}>Gratis hasta 50 respuestas/mes</div>
           <div style={{ marginTop: 56, display: 'flex', justifyContent: 'center', gap: 4 }}>
             {'🇲🇽 🇨🇴 🇦🇷 🇧🇷 🇨🇱 🇵🇪'.split(' ').map((f, i) => <span key={i} style={{ fontSize: 24 }}>{f}</span>)}
           </div>

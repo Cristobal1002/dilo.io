@@ -18,8 +18,8 @@ const PLANS = [
   {
     id: 'free',
     label: 'Free',
-    flowsLimit: 3,
-    sessionsMonthLimit: 150,
+    flowsLimit: 1,
+    sessionsMonthLimit: 50,
     membersLimit: 1,
     priceUsdMonthly: 0,
     isActive: true,
