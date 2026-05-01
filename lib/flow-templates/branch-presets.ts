@@ -46,4 +46,11 @@ export const TB = {
   orPerf: { branch_label: 'Perfil de la org.', branch_color: '#3B82F6' },
   orOps: { branch_label: 'Operación diaria', branch_color: '#10B981' },
   orInv: { branch_label: 'Inversión y plazo', branch_color: '#F59E0B' },
+
+  // Evangelización / iglesia
+  igNom: { branch_label: 'Te conocemos', branch_color: '#9C77F5' },
+  igOra: { branch_label: 'Oración', branch_color: '#10B981' },
+  igCor: { branch_label: 'Contacto', branch_color: '#06B6D4' },
+  igSeg: { branch_label: 'Seguimiento', branch_color: '#3B82F6' },
+  igCom: { branch_label: 'Comunidad de fe', branch_color: '#64748B' },
 } as const

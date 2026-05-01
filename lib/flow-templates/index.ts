@@ -1,5 +1,6 @@
 import { agenciaTemplate } from './agencia'
 import { erpTemplate } from './erp'
+import { evangelizacionIglesiasTemplate } from './evangelizacion-iglesias'
 import { inmobiliariaTemplate } from './inmobiliaria'
 import { legalTemplate } from './legal'
 import { onboardingTemplate } from './onboarding'
@@ -16,6 +17,7 @@ const FLOW_TEMPLATES_INTERNAL: FlowTemplateDefinition[] = [
   onboardingTemplate,
   legalTemplate,
   organizacionesTemplate,
+  evangelizacionIglesiasTemplate,
 ]
 
 const byId = new Map(FLOW_TEMPLATES_INTERNAL.map((t) => [t.id, t]))
