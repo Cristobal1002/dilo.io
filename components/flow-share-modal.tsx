@@ -8,7 +8,11 @@ import { resolveFlowShareLogoUrl } from '@/lib/flow-share-logo'
 import { publicAppOrigin } from '@/lib/public-site'
 import { cn } from '@/lib/utils'
 
-const QR_SIZE = 420
+function measureQrPixelSize(): number {
+  if (typeof window === 'undefined') return 320
+  const w = window.innerWidth
+  return Math.min(420, Math.max(200, w - 56))
+}
 
 async function drawLogoOnQrCanvas(canvas: HTMLCanvasElement, logoUrl: string): Promise<void> {
   const ctx = canvas.getContext('2d')
@@ -57,8 +61,9 @@ export function FlowShareModal({ isOpen, onClose, flowId, flowName, flowSettings
     if (!canvas) return
     setRendering(true)
     try {
+      const size = measureQrPixelSize()
       await QRCode.toCanvas(canvas, publicUrl, {
-        width: QR_SIZE,
+        width: size,
         margin: 2,
         errorCorrectionLevel: 'H',
         color: { dark: '#0f1117', light: '#ffffff' },
@@ -69,7 +74,7 @@ export function FlowShareModal({ isOpen, onClose, flowId, flowName, flowSettings
         } catch {
           toast('No se pudo cargar el logo (CORS o URL). El QR se descarga sin logo.', 'error')
           await QRCode.toCanvas(canvas, publicUrl, {
-            width: QR_SIZE,
+            width: size,
             margin: 2,
             errorCorrectionLevel: 'H',
             color: { dark: '#0f1117', light: '#ffffff' },
@@ -86,6 +91,9 @@ export function FlowShareModal({ isOpen, onClose, flowId, flowName, flowSettings
   useEffect(() => {
     if (!isOpen || tab !== 'qr') return
     void paintQr()
+    const onResize = () => void paintQr()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [isOpen, tab, paintQr])
 
   useEffect(() => {
@@ -231,8 +239,8 @@ export function FlowShareModal({ isOpen, onClose, flowId, flowName, flowSettings
             </p>
           ) : null}
           <div className="flex flex-col items-center gap-2">
-            <div className="relative rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-[#2A2F3F] dark:bg-white">
-              <canvas ref={canvasRef} width={QR_SIZE} height={QR_SIZE} className="h-auto max-w-full" />
+            <div className="relative mx-auto w-full max-w-[min(92vw,420px)] rounded-2xl border border-[#E5E7EB] bg-white p-2 sm:p-3 dark:border-[#2A2F3F] dark:bg-white">
+              <canvas ref={canvasRef} className="mx-auto block h-auto max-h-[min(50dvh,320px)] w-full max-w-full object-contain" />
               {rendering ? (
                 <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 text-xs font-medium text-[#6B7280] dark:bg-[#1A1D29]/70 dark:text-[#9CA3AF]">
                   Generando…

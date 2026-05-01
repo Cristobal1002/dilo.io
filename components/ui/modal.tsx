@@ -51,23 +51,23 @@ export function DiloModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center overflow-y-auto overscroll-y-contain px-4 py-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:justify-center sm:py-8">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         aria-hidden="true"
         onClick={onClose}
       />
 
-      {/* Panel */}
+      {/* Panel: altura acotada + cuerpo con scroll para móvil */}
       <div
-        className={`relative w-full ${MAX_WIDTH[size]} rounded-2xl bg-white dark:bg-[#1A1D29] shadow-xl border border-[#E5E7EB] dark:border-[#2A2F3F]`}
+        className={`relative my-auto flex w-full ${MAX_WIDTH[size]} max-h-[min(90dvh,42rem)] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-xl dark:border-[#2A2F3F] dark:bg-[#1A1D29]`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dilo-modal-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#E5E7EB] dark:border-[#2A2F3F]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] px-6 pb-4 pt-5 dark:border-[#2A2F3F]">
           <h2
             id="dilo-modal-title"
             className="text-base font-semibold text-foreground"
@@ -93,11 +93,11 @@ export function DiloModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-5">{children}</div>
 
         {/* Footer */}
         {footer ? (
-          <div className="flex items-center justify-end gap-3 px-6 pb-5 pt-1">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-[#E5E7EB] bg-white px-6 py-4 dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
             {footer}
           </div>
         ) : null}
