@@ -16,6 +16,7 @@ import {
 import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
+import { sendWhatsAppOnSessionComplete } from '@/lib/whatsapp/on-session-complete'
 import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
 import { formatMultiAnswerForDisplay, formatSelectAnswerForDisplay } from '@/lib/step-choice-helpers'
 
@@ -373,6 +374,22 @@ export async function processSessionCompletion(
       contact,
     }).catch((err) => {
       log.error({ err, sessionId: sessionRow.id }, 'notifyOrgUsersInstantLeadAlerts failed')
+    })
+
+    void sendWhatsAppOnSessionComplete({
+      organizationId: flowRow.organizationId,
+      flowId: flowRow.id,
+      flowName: flowRow.name,
+      sessionId: sessionRow.id,
+      flowSettings: flowRow.settings,
+      contact,
+      result: {
+        summary: resultRow.summary ?? '',
+        classification: resultRow.classification,
+        score: resultRow.score,
+      },
+    }).catch((err) => {
+      log.error({ err, sessionId: sessionRow.id }, 'sendWhatsAppOnSessionComplete failed')
     })
   }
 

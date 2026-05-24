@@ -5,6 +5,8 @@ import { notFound, redirect } from 'next/navigation'
 import { db } from '@/db'
 import { orgIntegrationCredentials, organizations, webhooks } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
+import { getFlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
+import { WHATSAPP_PROVIDER } from '@/lib/whatsapp/constants'
 import { ConnectorsForm } from './connectors-form'
 
 export default async function FlowConnectorsPage({ params }: { params: Promise<{ flowId: string }> }) {
@@ -37,6 +39,19 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
   })
   const resendConnected = Boolean(resendRow)
 
+  const whatsappRow = await db.query.orgIntegrationCredentials.findFirst({
+    where: and(
+      eq(orgIntegrationCredentials.organizationId, access.org.id),
+      eq(orgIntegrationCredentials.provider, WHATSAPP_PROVIDER),
+    ),
+    columns: { id: true, status: true, phoneNumberId: true },
+  })
+  const whatsappConnected = Boolean(
+    whatsappRow?.status === 'active' && whatsappRow.phoneNumberId,
+  )
+
+  const initialWhatsApp = getFlowWhatsAppSettings(access.flow.settings)
+
   return (
     <div className="mx-auto flex min-h-0 max-w-2xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -44,8 +59,8 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
           <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Conectores</p>
           <h1 className="mt-1 text-xl font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">{access.flow.name}</h1>
           <p className="mt-1 text-sm text-[#6B7280] dark:text-[#9CA3AF]">
-            Resend a nivel workspace y webhooks por flow cuando un visitante completa el público. Las entregas de
-            webhooks quedan registradas en el sistema.
+            Resend y WhatsApp a nivel workspace; webhooks y plantillas WhatsApp configurables por flow al completar
+            sesión.
           </p>
         </div>
         <Link
@@ -59,7 +74,9 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
       <ConnectorsForm
         flowId={flowId}
         resendConnected={resendConnected}
+        whatsappConnected={whatsappConnected}
         flowName={access.flow.name}
+        initialWhatsApp={initialWhatsApp}
         initialOutreachBody={access.flow.outreachColdEmailBodyMarkdown ?? null}
         initialOutreachCta={access.flow.outreachColdEmailCtaLabel ?? null}
         workspaceOutreachBody={orgRow?.outreachColdEmailBodyMarkdown ?? null}

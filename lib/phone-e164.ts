@@ -46,6 +46,24 @@ export function buildPhoneStepFooterHint(stepHint: string | null | undefined, ac
   return `${raw} · ${formatLine}`
 }
 
+/** Normaliza a E.164 (+573001234567) o null si no es válido. */
+export function toPhoneE164(value: string): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  try {
+    const p = parsePhoneNumber(v)
+    if (!p.isValid()) return null
+    return p.format('E.164')
+  } catch {
+    return null
+  }
+}
+
+/** Dígitos sin + para la API de Meta (ej. 573001234567). */
+export function toWhatsAppRecipientDigits(e164: string): string {
+  return e164.replace(/\D/g, '')
+}
+
 /** Formato legible internacional (p. ej. +57 300 123 4567). */
 export function formatPhoneNumberIntl(value: string): string {
   const v = value?.trim()

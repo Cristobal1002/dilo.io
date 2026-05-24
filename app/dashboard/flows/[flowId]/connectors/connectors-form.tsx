@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN } from '@/lib/outreach-cold-email-body'
 import { readApiResult } from '@/lib/read-api-result'
+import type { FlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
 import { cn } from '@/lib/utils'
 
 function Badge({
@@ -81,20 +82,24 @@ function Section({
 export function ConnectorsForm({
   flowId,
   resendConnected,
+  whatsappConnected,
   flowName,
   initialOutreachBody,
   initialOutreachCta,
   workspaceOutreachBody,
   workspaceOutreachCta,
+  initialWhatsApp,
   initialWebhooks,
 }: {
   flowId: string
   resendConnected: boolean
+  whatsappConnected: boolean
   flowName: string
   initialOutreachBody: string | null
   initialOutreachCta: string | null
   workspaceOutreachBody: string | null
   workspaceOutreachCta: string | null
+  initialWhatsApp: FlowWhatsAppSettings
   initialWebhooks: Array<{
     id: string
     url: string
@@ -120,11 +125,23 @@ export function ConnectorsForm({
   const [hooksErr, setHooksErr] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
+  const [waEnabled, setWaEnabled] = useState(initialWhatsApp.enabled)
+  const [waTemplate, setWaTemplate] = useState(initialWhatsApp.templateName ?? '')
+  const [waMinClass, setWaMinClass] = useState<'hot' | 'warm' | ''>(
+    initialWhatsApp.minClassification ?? '',
+  )
+  const [waBusy, setWaBusy] = useState(false)
+  const [waErr, setWaErr] = useState<string | null>(null)
+  const [waOk, setWaOk] = useState<string | null>(null)
+
   useEffect(() => {
     setOutreachMd(initialOutreachBody ?? '')
     setOutreachCta(initialOutreachCta ?? '')
     setWebhooksState(initialWebhooks)
-  }, [flowId, initialOutreachBody, initialOutreachCta, initialWebhooks])
+    setWaEnabled(initialWhatsApp.enabled)
+    setWaTemplate(initialWhatsApp.templateName ?? '')
+    setWaMinClass(initialWhatsApp.minClassification ?? '')
+  }, [flowId, initialOutreachBody, initialOutreachCta, initialWebhooks, initialWhatsApp])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -246,7 +263,41 @@ export function ConnectorsForm({
     }
   }
 
+  const saveWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setWaErr(null)
+    setWaOk(null)
+    setWaBusy(true)
+    try {
+      const res = await fetch(`/api/flows/${flowId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            whatsapp: {
+              enabled: waEnabled,
+              templateName: waTemplate.trim() === '' ? null : waTemplate.trim(),
+              templateLanguage: initialWhatsApp.templateLanguage ?? 'es',
+              variableKeys: initialWhatsApp.variableKeys ?? ['contact.name', 'result.summary'],
+              minClassification: waMinClass === '' ? null : waMinClass,
+            },
+          },
+        }),
+      })
+      const r = await readApiResult<{ flow: unknown }>(res)
+      if (!r.ok) {
+        setWaErr(r.message)
+        return
+      }
+      setWaOk('Configuración de WhatsApp guardada.')
+      router.refresh()
+    } finally {
+      setWaBusy(false)
+    }
+  }
+
   const emailsReady = resendConnected
+  const whatsappReady = whatsappConnected
   const templateCustomized = Boolean(outreachMd.trim() || outreachCta.trim())
 
   return (
@@ -267,6 +318,11 @@ export function ConnectorsForm({
             <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Plantilla de cold outreach</span>
             {templateCustomized ? <Badge variant="ok">Personalizada</Badge> : <Badge variant="optional">Heredando</Badge>}
             <span className="text-[#94A3B8]">({flowName})</span>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">WhatsApp al completar</span>
+            {whatsappReady ? <Badge variant="ok">Workspace listo</Badge> : <Badge variant="warn">Falta conectar</Badge>}
+            {waEnabled && waTemplate.trim() ? <Badge variant="ok">Activo en flow</Badge> : <Badge variant="optional">Off</Badge>}
           </li>
           <li className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Webhooks</span>
@@ -405,6 +461,84 @@ export function ConnectorsForm({
             {outreachBusy ? 'Guardando…' : 'Guardar plantilla del flow'}
           </button>
         </form>
+      </Section>
+
+      <Section
+        title="WhatsApp al completar"
+        badge={<Badge variant="optional">Opcional</Badge>}
+        defaultOpen={waEnabled}
+        description={
+          <>
+            Envía una plantilla <strong>aprobada en Meta</strong> al teléfono del visitante cuando complete el flow.
+            Requiere WhatsApp conectado en{' '}
+            <Link href="/dashboard/settings/integrations" className="font-semibold text-[#6B4DD4] hover:underline">
+              Integraciones
+            </Link>
+            .
+          </>
+        }
+      >
+        {!whatsappConnected ? (
+          <Link
+            href="/dashboard/settings/integrations"
+            className="inline-flex rounded-xl bg-[#25D366] px-3 py-2 text-xs font-semibold text-white"
+          >
+            Conectar WhatsApp
+          </Link>
+        ) : (
+          <form onSubmit={saveWhatsApp} className="space-y-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-[#1A1A1A] dark:text-[#F8F9FB]">
+              <input
+                type="checkbox"
+                checked={waEnabled}
+                onChange={(e) => setWaEnabled(e.target.checked)}
+                className="rounded border-[#E8EAEF]"
+              />
+              Enviar mensaje al completar sesión
+            </label>
+            <label className="block text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+              Nombre de plantilla en Meta (exacto, aprobada)
+              <input
+                type="text"
+                value={waTemplate}
+                onChange={(e) => setWaTemplate(e.target.value)}
+                placeholder="ej. dilo_confirmacion_lead"
+                disabled={!waEnabled}
+                className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2.5 text-sm disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#1A1D29]"
+              />
+            </label>
+            <label className="block text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
+              Solo si clasificación es al menos
+              <select
+                value={waMinClass}
+                onChange={(e) => setWaMinClass(e.target.value as 'hot' | 'warm' | '')}
+                disabled={!waEnabled}
+                className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#1A1D29]"
+              >
+                <option value="">Cualquiera (hot, warm, cold)</option>
+                <option value="warm">Warm o hot</option>
+                <option value="hot">Solo hot</option>
+              </select>
+            </label>
+            <p className="text-[11px] leading-relaxed text-[#94A3B8]">
+              Variables por defecto: nombre del contacto y resumen del resultado. La plantilla debe tener el mismo número
+              de variables en el cuerpo (Meta).
+            </p>
+            {waErr ? (
+              <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert">
+                {waErr}
+              </p>
+            ) : null}
+            {waOk ? <p className="text-xs text-emerald-600 dark:text-emerald-400">{waOk}</p> : null}
+            <button
+              type="submit"
+              disabled={waBusy}
+              className="w-full rounded-xl bg-[#0f172a] py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-[#334155]"
+            >
+              {waBusy ? 'Guardando…' : 'Guardar WhatsApp'}
+            </button>
+          </form>
+        )}
       </Section>
 
       <Section

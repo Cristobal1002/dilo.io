@@ -7,6 +7,7 @@ import {
   LogoWhatsApp,
 } from './integration-logos'
 import { ResendIntegrationCard } from './resend-integration-card'
+import { WhatsAppIntegrationCard } from './whatsapp-integration-card'
 
 const soonCard = `${integrationCardShell} opacity-[0.92]`
 
@@ -14,6 +15,8 @@ export function IntegrationGrid() {
   return (
     <div className="mt-8 grid gap-4 sm:grid-cols-2">
       <ResendIntegrationCard />
+
+      <WhatsAppIntegrationCard />
 
       <article className={soonCard}>
         <div className="flex h-full flex-col gap-3">
@@ -53,24 +56,6 @@ export function IntegrationGrid() {
         </div>
       </article>
 
-      <article className={soonCard}>
-        <div className="flex h-full flex-col gap-3">
-          <div className="flex gap-3">
-            <div className={integrationLogoWrap}>
-              <LogoWhatsApp />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">WhatsApp</h2>
-                <BadgeSoon />
-              </div>
-              <p className="mt-1 flex-1 text-sm leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                Mensajes y seguimiento con leads por el canal que ya usan tus equipos comerciales.
-              </p>
-            </div>
-          </div>
-        </div>
-      </article>
     </div>
   )
 }

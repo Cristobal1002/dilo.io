@@ -31,6 +31,7 @@
 Documento de trabajo del equipo (orden de implementación, QA, convenciones de dominio y contratos de API):
 
 - **[docs/SPRINT1.md](./docs/SPRINT1.md)**
+- **[docs/WHATSAPP_INTEGRATION.md](./docs/WHATSAPP_INTEGRATION.md)** — WhatsApp Business API (Embedded Signup, webhooks, envío al completar flow)
 
 Resumen: branding en flow público → email al completar (Resend) → embed (`public/embed.js` + `?embed=1`) → transiciones con IA (`/acknowledge` + settings en builder). Todo el mundo público debe usar **`NEXT_PUBLIC_APP_URL`** como origen canónico (p. ej. `https://getdilo.io`).
 

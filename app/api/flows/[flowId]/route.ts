@@ -7,6 +7,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError, NotFoundError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
+import { FlowWhatsAppSettingsSchema } from '@/lib/whatsapp/flow-settings'
 
 const log = createLogger('flows/[flowId]')
 
@@ -51,6 +52,7 @@ const SettingsPatchSchema = z
     hide_branding: z.boolean().optional(),
     /** YouTube, Vimeo, Loom, o .gif / .mp4 / .webm en https. Vacío/null borra. */
     demo_video_url: optionalDemoVideoUrl,
+    whatsapp: FlowWhatsAppSettingsSchema.optional(),
   })
   .strict()
 
@@ -111,7 +113,16 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth, params }) =
       existing.settings && typeof existing.settings === 'object'
         ? { ...(existing.settings as Record<string, unknown>) }
         : {}
-    updateData.settings = { ...cur, ...parsed.data.settings }
+    const patch = { ...parsed.data.settings }
+    if (patch.whatsapp !== undefined) {
+      const prevWa =
+        cur.whatsapp && typeof cur.whatsapp === 'object'
+          ? { ...(cur.whatsapp as Record<string, unknown>) }
+          : {}
+      cur.whatsapp = { ...prevWa, ...patch.whatsapp }
+      delete patch.whatsapp
+    }
+    updateData.settings = { ...cur, ...patch }
   }
 
   if (parsed.data.outreachColdEmailBodyMarkdown !== undefined) {

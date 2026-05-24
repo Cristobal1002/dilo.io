@@ -265,7 +265,7 @@ import {
     ],
   )
 
-  /** Credenciales de integraciones por workspace (Resend, etc.) — payload cifrado en app. */
+  /** Credenciales de integraciones por workspace (Resend, WhatsApp, etc.) — token/API key cifrado. */
   export const orgIntegrationCredentials = pgTable(
     'org_integration_credentials',
     {
@@ -273,14 +273,79 @@ import {
       organizationId: uuid('organization_id')
         .notNull()
         .references(() => organizations.id, { onDelete: 'cascade' }),
-      /** Ej.: resend */
+      /** Ej.: resend | whatsapp */
       provider:         text('provider').notNull(),
       encryptedPayload: text('encrypted_payload').notNull(),
+      /** Lookup webhook Meta → org (solo whatsapp; sin cifrar). */
+      phoneNumberId:  text('phone_number_id'),
+      wabaId:         text('waba_id'),
+      displayPhone:   text('display_phone'),
+      status:         text('status').notNull().default('active'), // active | disconnected | error
+      tokenExpiresAt: timestamp('token_expires_at'),
+      lastError:      text('last_error'),
       createdAt:        timestamp('created_at').notNull().defaultNow(),
       updatedAt:        timestamp('updated_at').notNull().defaultNow(),
     },
     (t) => [
       index('org_integration_org_idx').on(t.organizationId),
       uniqueIndex('org_integration_org_provider_uidx').on(t.organizationId, t.provider),
+      uniqueIndex('org_integration_whatsapp_phone_uidx')
+        .on(t.phoneNumberId)
+        .where(sql`${t.provider} = 'whatsapp' AND ${t.phoneNumberId} IS NOT NULL`),
+    ],
+  )
+
+  /** Plantillas WhatsApp sincronizadas con Meta (por workspace). */
+  export const whatsappTemplates = pgTable(
+    'whatsapp_templates',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      name:           text('name').notNull(),
+      language:       text('language').notNull().default('es'),
+      category:       text('category').notNull(),
+      status:         text('status').notNull().default('PENDING'),
+      components:     jsonb('components').notNull().default([]),
+      metaTemplateId: text('meta_template_id'),
+      rejectionReason: text('rejection_reason'),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+      updatedAt:      timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('wa_templates_org_idx').on(t.organizationId),
+      uniqueIndex('wa_templates_org_name_lang_uidx').on(t.organizationId, t.name, t.language),
+    ],
+  )
+
+  /** Auditoría de mensajes WhatsApp (inbound/outbound). */
+  export const whatsappMessages = pgTable(
+    'whatsapp_messages',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      sessionId:      uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+      direction:      text('direction').notNull(),
+      toNumber:       text('to_number'),
+      fromNumber:     text('from_number'),
+      templateId:     uuid('template_id').references(() => whatsappTemplates.id, { onDelete: 'set null' }),
+      templateName:   text('template_name'),
+      templateVars:   jsonb('template_vars'),
+      status:         text('status').notNull().default('sent'),
+      metaMessageId:  text('meta_message_id'),
+      errorCode:      text('error_code'),
+      errorMessage:   text('error_message'),
+      rawPayload:     jsonb('raw_payload'),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('wa_messages_org_idx').on(t.organizationId),
+      index('wa_messages_session_idx').on(t.sessionId),
+      uniqueIndex('wa_messages_meta_id_uidx')
+        .on(t.metaMessageId)
+        .where(sql`${t.metaMessageId} IS NOT NULL`),
     ],
   )
