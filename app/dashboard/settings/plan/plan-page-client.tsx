@@ -45,7 +45,7 @@ function UsageBar({
       {isUnlimited ? (
         <div className="h-1.5 w-full rounded-full bg-[#F3F4F6] dark:bg-[#252936] overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#7C3AED] to-[#06B6D4]"
+            className="h-full rounded-full bg-linear-to-r from-[#7C3AED] to-[#06B6D4]"
             style={{ width: '100%' }}
           />
         </div>

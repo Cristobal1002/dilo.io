@@ -49,6 +49,28 @@ const optionalOutreachCtaLabel = z
     return t === '' ? null : t
   })
 
+const optionalSupportContractPrompt = z
+  .union([z.string().max(12000), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    const t = v.trim()
+    return t === '' ? null : t
+  })
+
+const optionalHourlyRate = z
+  .union([z.number(), z.string(), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined
+    if (v === null || v === '') return null
+    const n = typeof v === 'number' ? v : Number(v)
+    if (!Number.isFinite(n) || n < 0) return Number.NaN
+    return Math.round(n * 100) / 100
+  })
+  .pipe(z.number().min(0).max(99999).nullable().optional())
+
 const PatchBody = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
@@ -56,6 +78,8 @@ const PatchBody = z
     websiteUrl: optionalHttpsUrl,
     outreachColdEmailBodyMarkdown: optionalOutreachMarkdown,
     outreachColdEmailCtaLabel: optionalOutreachCtaLabel,
+    supportContractPrompt: optionalSupportContractPrompt,
+    supportHourlyRateUsd: optionalHourlyRate,
   })
   .refine(
     (d) =>
@@ -63,7 +87,9 @@ const PatchBody = z
       d.logoUrl !== undefined ||
       d.websiteUrl !== undefined ||
       d.outreachColdEmailBodyMarkdown !== undefined ||
-      d.outreachColdEmailCtaLabel !== undefined,
+      d.outreachColdEmailCtaLabel !== undefined ||
+      d.supportContractPrompt !== undefined ||
+      d.supportHourlyRateUsd !== undefined,
     { message: 'Envía al menos un campo para actualizar' },
   )
 
@@ -75,6 +101,8 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
     websiteUrl: org.websiteUrl ?? null,
     outreachColdEmailBodyMarkdown: org.outreachColdEmailBodyMarkdown ?? null,
     outreachColdEmailCtaLabel: org.outreachColdEmailCtaLabel ?? null,
+    supportContractPrompt: org.supportContractPrompt ?? null,
+    supportHourlyRateUsd: org.supportHourlyRateUsd ?? null,
     logoUploadConfigured: isUploadthingConfigured(),
   })
 }, { requireAuth: true })
@@ -88,8 +116,15 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Datos inválidos', parsed.error.flatten().fieldErrors)
   }
 
-  const { name, logoUrl, websiteUrl, outreachColdEmailBodyMarkdown, outreachColdEmailCtaLabel } =
-    parsed.data
+  const {
+    name,
+    logoUrl,
+    websiteUrl,
+    outreachColdEmailBodyMarkdown,
+    outreachColdEmailCtaLabel,
+    supportContractPrompt,
+    supportHourlyRateUsd,
+  } = parsed.data
   const patch: Partial<typeof organizations.$inferInsert> = {}
   if (name !== undefined) patch.name = name
   if (logoUrl !== undefined) patch.logoUrl = logoUrl
@@ -99,6 +134,12 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
   }
   if (outreachColdEmailCtaLabel !== undefined) {
     patch.outreachColdEmailCtaLabel = outreachColdEmailCtaLabel
+  }
+  if (supportContractPrompt !== undefined) {
+    patch.supportContractPrompt = supportContractPrompt
+  }
+  if (supportHourlyRateUsd !== undefined) {
+    patch.supportHourlyRateUsd = supportHourlyRateUsd
   }
 
   try {
@@ -114,6 +155,8 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
       websiteUrl: organizations.websiteUrl,
       outreachColdEmailBodyMarkdown: organizations.outreachColdEmailBodyMarkdown,
       outreachColdEmailCtaLabel: organizations.outreachColdEmailCtaLabel,
+      supportContractPrompt: organizations.supportContractPrompt,
+      supportHourlyRateUsd: organizations.supportHourlyRateUsd,
     })
     .from(organizations)
     .where(eq(organizations.id, auth.org.id))
@@ -125,5 +168,7 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     websiteUrl: row?.websiteUrl ?? null,
     outreachColdEmailBodyMarkdown: row?.outreachColdEmailBodyMarkdown ?? null,
     outreachColdEmailCtaLabel: row?.outreachColdEmailCtaLabel ?? null,
+    supportContractPrompt: row?.supportContractPrompt ?? null,
+    supportHourlyRateUsd: row?.supportHourlyRateUsd ?? null,
   })
 }, { requireAuth: true })

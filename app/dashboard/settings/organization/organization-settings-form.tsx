@@ -11,6 +11,8 @@ type OrgPayload = {
   websiteUrl: string | null
   outreachColdEmailBodyMarkdown: string | null
   outreachColdEmailCtaLabel: string | null
+  supportContractPrompt: string | null
+  supportHourlyRateUsd: number | null
   logoUploadConfigured?: boolean
 }
 
@@ -20,6 +22,8 @@ export function OrganizationSettingsForm() {
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [outreachMarkdown, setOutreachMarkdown] = useState('')
   const [outreachCtaLabel, setOutreachCtaLabel] = useState('')
+  const [supportContractPrompt, setSupportContractPrompt] = useState('')
+  const [supportHourlyRateUsd, setSupportHourlyRateUsd] = useState('')
   const [logoUploadConfigured, setLogoUploadConfigured] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -37,6 +41,10 @@ export function OrganizationSettingsForm() {
         setWebsiteUrl(r.data.websiteUrl ?? '')
         setOutreachMarkdown(r.data.outreachColdEmailBodyMarkdown ?? '')
         setOutreachCtaLabel(r.data.outreachColdEmailCtaLabel ?? '')
+        setSupportContractPrompt(r.data.supportContractPrompt ?? '')
+        setSupportHourlyRateUsd(
+          r.data.supportHourlyRateUsd != null ? String(r.data.supportHourlyRateUsd) : '',
+        )
         setLogoUploadConfigured(r.data.logoUploadConfigured ?? false)
       } else {
         setMsg(r.message)
@@ -71,6 +79,10 @@ export function OrganizationSettingsForm() {
           outreachMarkdown.trim() === '' ? null : outreachMarkdown,
         outreachColdEmailCtaLabel:
           outreachCtaLabel.trim() === '' ? null : outreachCtaLabel.trim(),
+        supportContractPrompt:
+          supportContractPrompt.trim() === '' ? null : supportContractPrompt,
+        supportHourlyRateUsd:
+          supportHourlyRateUsd.trim() === '' ? null : parseFloat(supportHourlyRateUsd),
       })
       if (!r.ok) {
         setMsg(r.message)
@@ -81,6 +93,10 @@ export function OrganizationSettingsForm() {
       setWebsiteUrl(r.data.websiteUrl ?? '')
       setOutreachMarkdown(r.data.outreachColdEmailBodyMarkdown ?? '')
       setOutreachCtaLabel(r.data.outreachColdEmailCtaLabel ?? '')
+      setSupportContractPrompt(r.data.supportContractPrompt ?? '')
+      setSupportHourlyRateUsd(
+        r.data.supportHourlyRateUsd != null ? String(r.data.supportHourlyRateUsd) : '',
+      )
       setMsg('Guardado.')
     } finally {
       setBusy(false)
@@ -209,6 +225,46 @@ export function OrganizationSettingsForm() {
           <span className="mt-1 block text-[11px] text-[#64748B] dark:text-[#94A3B8]">
             Vacío = «Ver enlace →». El enlace del pie usa tu sitio web (HTTPS) si lo configuraste arriba; si no,
             getdilo.io.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-8 border-t border-[#E8EAEF] pt-6 dark:border-[#2A2F3F]">
+        <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F8F9FB]">
+          Informes de soporte (interno)
+        </h3>
+        <p className="mt-1 text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+          Solo tu equipo ve esto. Se usa en <strong>Biblioteca → Soporte → Informes</strong> para calcular
+          valor y redactar el informe mensual al cliente (horas × tarifa y contexto del contrato).
+        </p>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">
+            Prompt de contrato / valoración
+          </span>
+          <textarea
+            value={supportContractPrompt}
+            onChange={(e) => setSupportContractPrompt(e.target.value)}
+            rows={8}
+            maxLength={12000}
+            placeholder="Ej.: Tarifa acordada USD 85/h. Paquete 10 h/mes incluidas. El informe debe destacar ahorro vs contratar agencia externa…"
+            className="mt-1.5 w-full resize-y rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm leading-relaxed text-[#111827] outline-none ring-[#9C77F5]/30 focus:border-[#9C77F5]/40 focus:ring-2 dark:border-[#2A2F3F] dark:bg-[#151828] dark:text-[#F8F9FB]"
+          />
+        </label>
+        <label className="mt-4 block">
+          <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">
+            Tarifa USD por hora (opcional)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            value={supportHourlyRateUsd}
+            onChange={(e) => setSupportHourlyRateUsd(e.target.value)}
+            placeholder="Ej. 85"
+            className="mt-1.5 w-full max-w-[200px] rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm text-[#111827] outline-none ring-[#9C77F5]/30 focus:border-[#9C77F5]/40 focus:ring-2 dark:border-[#2A2F3F] dark:bg-[#151828] dark:text-[#F8F9FB]"
+          />
+          <span className="mt-1 block text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+            Si la defines, el informe muestra valor estimado en USD además de las horas.
           </span>
         </label>
       </div>

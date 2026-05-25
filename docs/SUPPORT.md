@@ -17,7 +17,8 @@ MVP de casos por workspace, separado de Outreach y de resultados de captación.
 
 - `GET /api/support/cases` — listado (`status`, `assignee`, `q`, `flow`, `page`)
 - `GET /api/support/cases/:caseId` — detalle
-- `PATCH /api/support/cases/:caseId` — estado, prioridad, tipo, asignado, notas
+- `PATCH /api/support/cases/:caseId` — estado, prioridad, tipo, asignado, notas, horas, entrega
+- `POST /api/support/cases/:caseId/request-approval` — aprobación del solicitante
 
 ## Migración
 
@@ -69,8 +70,39 @@ Si tu paso de empresa usa variable `compania`, se guarda bien aunque la pregunta
 
 `POST /api/support/cases/:caseId/request-approval` — genera o reutiliza token y envía correo.
 
+## Informes de valor (mensual)
+
+Pestaña **Informes** en `/dashboard/support?view=reports`.
+
+### Configuración (solo tu equipo)
+
+En **Mi cuenta → Organización**:
+
+- **Prompt de contrato / valoración** — contexto interno para la IA (tarifa acordada, paquete de horas, qué destacar al cliente).
+- **Tarifa USD por hora** — opcional; si está definida, el resumen muestra valor estimado (`horas × tarifa`).
+
+### Qué casos entran al informe
+
+Del mes seleccionado (UTC), casos con:
+
+- Estado `closed` o `resolved`
+- `hours_spent` &gt; 0
+- Actividad de cierre en el mes (`resolved_at` o, si falta, `last_activity_at`)
+
+Agrupación por **empresa** (`client_company`). Filtro opcional por una empresa.
+
+### API
+
+- `GET /api/support/reports/preview?month=YYYY-MM&clientCompany=…`
+- `POST /api/support/reports/generate` — narrativa Markdown con IA
+- `POST /api/support/reports/send` — email HTML (Resend); requiere rol owner/admin
+
+### Migración
+
+`db/migrations/0015_support_value_report_settings.sql` — columnas en `organizations`.
+
 ## Próximo (no incluido)
 
-- Informe mensual de valor (horas + prompt de contrato)
-- Prompt de contrato por workspace / por empresa
+- Prompt de contrato distinto por empresa
+- PDF adjunto
 - SLA e ITIL

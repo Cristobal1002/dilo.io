@@ -12,14 +12,22 @@ import {
   type SupportFilterStatus,
 } from '@/lib/support'
 import { loadSupportCasesPage } from '@/lib/support-cases-page'
-import SupportTable, { type SupportCaseOverview, type SupportFlowOption } from './support-table'
+import SupportPageClient from './support-page-client'
+import { type SupportCaseOverview, type SupportFlowOption } from './support-table'
 
 const DEFAULT_PAGE_SIZE = 25
 
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ page?: string; q?: string; flow?: string; status?: string; assignee?: string }>
+  searchParams?: Promise<{
+    page?: string
+    q?: string
+    flow?: string
+    status?: string
+    assignee?: string
+    view?: string
+  }>
 }) {
   const auth = await getAuthContext()
   const dbUser = await getAuthUserInOrg(auth)
@@ -79,7 +87,7 @@ export default async function SupportPage({
         formulario).
       </p>
       <div className="mt-8">
-        <SupportTable
+        <SupportPageClient
           initialCases={initialCases}
           initialTotal={total}
           initialPage={page}

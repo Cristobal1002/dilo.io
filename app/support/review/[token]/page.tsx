@@ -149,7 +149,7 @@ export default function SupportReviewPage() {
         {preview.resolutionNotes ? (
           <div className="border-t border-[#E8EAEF] pt-3">
             <p className="text-xs font-semibold text-[#64748B]">Qué se entregó</p>
-            <p className="mt-1 max-h-none whitespace-pre-wrap break-words text-[#374151]">
+            <p className="mt-1 max-h-none whitespace-pre-wrap wrap-break-word text-[#374151]">
               {preview.resolutionNotes}
             </p>
           </div>

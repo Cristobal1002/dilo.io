@@ -593,7 +593,7 @@ export default function SupportTable({
 
       {panelCaseId ? (
         <div
-          className="fixed inset-0 z-[200] flex justify-end bg-black/30"
+          className="fixed inset-0 z-200 flex justify-end bg-black/30"
           role="presentation"
           onClick={() => setPanelCaseId(null)}
         >

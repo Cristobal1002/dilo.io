@@ -44,6 +44,13 @@ import {
     outreachColdEmailBodyMarkdown: text('outreach_cold_email_body_markdown'),
     /** Texto del botón CTA (HTML); null → "Ver enlace →". */
     outreachColdEmailCtaLabel: text('outreach_cold_email_cta_label'),
+    /**
+     * Instrucciones internas para valorar soporte/features (informe mensual).
+     * Ej.: tarifa acordada, paquete de horas, qué cuenta como ahorro para el cliente.
+     */
+    supportContractPrompt: text('support_contract_prompt'),
+    /** Tarifa USD/hora explícita; si null, el informe solo muestra horas salvo que el prompt indique otra cosa. */
+    supportHourlyRateUsd: real('support_hourly_rate_usd'),
 
     // ── Plan & billing ──────────────────────────────────────
     plan:                  text('plan').notNull().default('free'), // FK se agrega después del seed — ver paso 2 de setup
