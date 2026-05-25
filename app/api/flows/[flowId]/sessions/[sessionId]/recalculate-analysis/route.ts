@@ -15,7 +15,7 @@ export const POST = withApiHandler(
   async (_req: NextRequest, { auth, params }) => {
     const { flowId, sessionId } = params
 
-    const access = await findDashboardFlow(flowId, auth.orgId)
+    const access = await findDashboardFlow(flowId, auth.org.id)
     if (!access) throw new NotFoundError('Flow')
 
     const sessionRow = await db.query.sessions.findFirst({

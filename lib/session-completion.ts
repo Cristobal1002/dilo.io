@@ -16,6 +16,7 @@ import {
 import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
+import { createSupportCaseFromSession } from '@/lib/support-case-from-session'
 import { sendWhatsAppOnSessionComplete } from '@/lib/whatsapp/on-session-complete'
 import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
 import { formatMultiAnswerForDisplay, formatSelectAnswerForDisplay } from '@/lib/step-choice-helpers'
@@ -390,6 +391,20 @@ export async function processSessionCompletion(
       },
     }).catch((err) => {
       log.error({ err, sessionId: sessionRow.id }, 'sendWhatsAppOnSessionComplete failed')
+    })
+
+    const structuredAnswers = buildStructuredFromSteps(stepRows, answerByStep)
+    void createSupportCaseFromSession({
+      organizationId: flowRow.organizationId,
+      flowId: flowRow.id,
+      flowName: flowRow.name,
+      flowSettings: flowRow.settings,
+      sessionId: sessionRow.id,
+      structuredAnswers,
+      contact,
+      summaryFallback: resultRow.summary,
+    }).catch((err) => {
+      log.error({ err, sessionId: sessionRow.id }, 'createSupportCaseFromSession failed')
     })
   }
 

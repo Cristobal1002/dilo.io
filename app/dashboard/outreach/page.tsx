@@ -5,6 +5,7 @@ import { flows } from '@/db/schema'
 import { getAuthContext } from '@/lib/auth'
 import { OUTREACH_FILTER_STATUSES, type OutreachFilterStatus } from '@/lib/outreach'
 import { loadOutreachLeadsPage } from '@/lib/outreach-leads-page'
+import { dashboardPageClass } from '@/lib/dashboard-page-layout'
 import OutreachTable, { type OutreachFlowOption, type OutreachLeadOverview } from './outreach-table'
 
 const DEFAULT_PAGE_SIZE = 25
@@ -53,7 +54,7 @@ export default async function OutreachPage({
   }))
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className={dashboardPageClass}>
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Outreach</p>
       <h1 className="mt-1 text-2xl font-bold text-[#1A1A1A] dark:text-[#F8F9FB]">Cold email & seguimiento</h1>
       <p className="mt-1 max-w-2xl text-sm text-[#64748B] dark:text-[#94A3B8]">

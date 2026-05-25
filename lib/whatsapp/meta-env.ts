@@ -27,3 +27,14 @@ export function requireMetaEnv(): MetaEnv {
   }
   return env
 }
+
+/** Solo verificación GET del webhook — no exige CONFIG_ID ni APP_ID. */
+export function getWebhookVerifyToken(): string | null {
+  const t = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN?.trim()
+  return t || null
+}
+
+export function getFacebookAppSecret(): string | null {
+  const s = process.env.FACEBOOK_APP_SECRET?.trim()
+  return s || null
+}

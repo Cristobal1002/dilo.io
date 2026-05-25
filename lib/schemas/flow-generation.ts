@@ -54,6 +54,8 @@ export const FlowGenerationSchema = z.object({
       tone: z.string().max(200),
       /** Saludo inicial del chat; `""` si prefieres que la app arme el texto desde `description`. */
       chat_intro: z.string().max(2000),
+      /** `support` → crea casos en la bandeja Soporte al completar sesión. */
+      purpose: z.enum(['support']).optional(),
     }),
     scoring_criteria: z.object({
       hot: z.string(),

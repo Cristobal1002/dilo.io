@@ -108,12 +108,7 @@ export function AuthPageShell({
               className="relative mx-auto flex w-fit justify-center"
               style={{ filter: 'drop-shadow(0 10px 28px rgba(156,119,245,.22))' }}
             >
-              <DiloBrandLockup
-                imageHeight={38}
-                className="justify-center"
-                gapClassName="gap-[10px]"
-                wordmarkClassName="text-[28px] font-bold tracking-tight text-[#111827] dark:text-[#F9FAFB]"
-              />
+              <DiloBrandLockup imageHeight={38} className="justify-center" />
             </div>
             <div
               className="mx-auto mt-3 h-1 w-10 rounded-full bg-linear-to-r from-[#9C77F5] to-[#00d4b0]"

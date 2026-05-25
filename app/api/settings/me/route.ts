@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { users } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
@@ -11,7 +11,7 @@ export const GET = withApiHandler(
     const { userId, org } = auth
 
     const user = await db.query.users.findFirst({
-      where: eq(users.clerkId, userId),
+      where: and(eq(users.clerkId, userId), eq(users.organizationId, org.id)),
       columns: { name: true, email: true },
     })
 

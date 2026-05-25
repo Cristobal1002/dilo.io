@@ -6,8 +6,8 @@ import { notFound, redirect } from 'next/navigation'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import FlowWorkspace, { type FlowWorkspaceFlow, type FlowWorkspaceStep } from './flow-workspace'
 
-async function getFlow(flowId: string, orgIdentifier: string) {
-  const access = await findDashboardFlow(flowId, orgIdentifier)
+async function getFlow(flowId: string) {
+  const access = await findDashboardFlow(flowId)
   if (!access) return null
 
   const { flow, org } = access
@@ -59,10 +59,10 @@ export default async function FlowDetailPage({
   params: Promise<{ flowId: string }>
 }) {
   const { flowId } = await params
-  const { userId, orgId } = await auth()
+  const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const data = await getFlow(flowId, orgId ?? userId)
+  const data = await getFlow(flowId)
   if (!data) notFound()
 
   const { flow, steps: flowSteps, sessionCount, workspaceLogoUrl } = data

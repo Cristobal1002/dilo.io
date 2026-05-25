@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
-    pgTable, uuid, text, integer, boolean,
+    pgTable, uuid, text, integer, boolean, real,
     timestamp, jsonb, index, uniqueIndex,
   } from 'drizzle-orm/pg-core'
 
@@ -33,7 +33,7 @@ import {
     id:                    uuid('id').primaryKey().defaultRandom(),
     name:                  text('name').notNull(),
     slug:                  text('slug').notNull().unique(),
-    /** Logo por defecto del workspace (HTTPS). Se usa en flows públicos si el flow no define `settings.logo_url`. */
+    /** Logo del workspace (URL en CDN, p. ej. Uploadthing). Flows públicos y emails si el flow no define `settings.logo_url`. */
     logoUrl:               text('logo_url'),
     /** Sitio web público del negocio (HTTPS), p. ej. para futuros footers o emails. */
     websiteUrl:            text('website_url'),
@@ -61,7 +61,7 @@ import {
   export const users = pgTable('users', {
     id:             uuid('id').primaryKey().defaultRandom(),
     organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    clerkId:        text('clerk_id').notNull().unique(),
+    clerkId:        text('clerk_id').notNull(),
     email:          text('email').notNull(),
     name:           text('name'),
     phone:          text('phone'),
@@ -77,7 +77,26 @@ import {
     /** Estado interno p. ej. { hotDay, hotCount } para tope de alertas instantáneas. */
     notificationStats: jsonb('notification_stats').notNull().default({}),
     createdAt:      timestamp('created_at').notNull().defaultNow(),
-  })
+  }, (t) => [
+    uniqueIndex('users_org_clerk_uidx').on(t.organizationId, t.clerkId),
+  ])
+
+  /** Invitaciones al workspace (sin Clerk Organizations). */
+  export const organizationInvitations = pgTable('organization_invitations', {
+    id:             uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    email:          text('email').notNull(),
+    role:           text('role').notNull(), // admin | member
+    token:          text('token').notNull().unique(),
+    invitedByUserId: uuid('invited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt:      timestamp('expires_at').notNull(),
+    acceptedAt:     timestamp('accepted_at'),
+    revokedAt:      timestamp('revoked_at'),
+    createdAt:      timestamp('created_at').notNull().defaultNow(),
+  }, (t) => [
+    index('org_invites_org_email_idx').on(t.organizationId, t.email),
+    index('org_invites_pending_idx').on(t.organizationId, t.acceptedAt, t.revokedAt),
+  ])
 
   // ─── Flows ───────────────────────────────────────────────
   export const flows = pgTable('flows', {
@@ -316,6 +335,62 @@ import {
     (t) => [
       index('wa_templates_org_idx').on(t.organizationId),
       uniqueIndex('wa_templates_org_name_lang_uidx').on(t.organizationId, t.name, t.language),
+    ],
+  )
+
+  /**
+   * Casos de soporte por workspace (bandeja Soporte).
+   * Status: new | in_progress | waiting | resolved | closed
+   */
+  export const supportCases = pgTable(
+    'support_cases',
+    {
+      id:               uuid('id').primaryKey().defaultRandom(),
+      organizationId:   uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      caseNumber:       integer('case_number').notNull(),
+      flowId:           uuid('flow_id').references(() => flows.id, { onDelete: 'set null' }),
+      sessionId:        uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+      status:           text('status').notNull().default('new'),
+      priority:         text('priority').notNull().default('medium'),
+      /** support | improvement | inquiry | other */
+      type:             text('type').notNull().default('support'),
+      subject:          text('subject').notNull(),
+      description:      text('description'),
+      requesterName:    text('requester_name'),
+      requesterEmail:   text('requester_email'),
+      requesterPhone:   text('requester_phone'),
+      /** Empresa/cliente del solicitante (desde el flow: variable `cliente`, `empresa`, etc.). */
+      clientCompany:    text('client_company'),
+      assignedUserId:   uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
+      internalNotes:    text('internal_notes'),
+      resolutionNotes:  text('resolution_notes'),
+      /** Horas dedicadas por el equipo (base para informe de valor). */
+      hoursSpent:       real('hours_spent'),
+      /** Fecha comprometida de entrega. */
+      dueAt:            timestamp('due_at'),
+      /** null | pending | approved | cancelled | changes_requested */
+      clientApprovalStatus: text('client_approval_status'),
+      clientApprovalToken:  text('client_approval_token'),
+      clientFeedback:       text('client_feedback'),
+      submittedForApprovalAt: timestamp('submitted_for_approval_at'),
+      clientRespondedAt:      timestamp('client_responded_at'),
+      lastActivityAt:   timestamp('last_activity_at').notNull().defaultNow(),
+      resolvedAt:       timestamp('resolved_at'),
+      createdAt:        timestamp('created_at').notNull().defaultNow(),
+      updatedAt:        timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('support_cases_org_status_idx').on(t.organizationId, t.status),
+      index('support_cases_org_activity_idx').on(t.organizationId, t.lastActivityAt),
+      uniqueIndex('support_cases_org_number_uidx').on(t.organizationId, t.caseNumber),
+      uniqueIndex('support_cases_session_uidx')
+        .on(t.sessionId)
+        .where(sql`${t.sessionId} IS NOT NULL`),
+      uniqueIndex('support_cases_approval_token_uidx')
+        .on(t.clientApprovalToken)
+        .where(sql`${t.clientApprovalToken} IS NOT NULL`),
     ],
   )
 

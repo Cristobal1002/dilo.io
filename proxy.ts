@@ -11,6 +11,10 @@ const isPublicRoute = createRouteMatcher([
   '/api/track/(.*)',      // tracking de aperturas y clics — sin auth (pixels + redirects)
   '/onboarding',          // accesible para usuarios autenticados sin perfil completo
   '/api/onboarding',
+  '/invite/(.*)',
+  '/api/invitations/(.*)',
+  '/support/review/(.*)',
+  '/api/support/review/(.*)',
   '/api/webhooks/(.*)',   // webhooks — sin sesión de usuario
   '/discovery(.*)',
   '/privacy',             // política de privacidad — pública

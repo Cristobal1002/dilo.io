@@ -5,12 +5,14 @@ import { flows, sessions, users, plans } from '@/db/schema'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
+import { requireOrgRoles } from '@/lib/org-role'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('settings/usage')
 
 export const GET = withApiHandler(
   async (_req: NextRequest, { auth }) => {
+    requireOrgRoles(auth, ['owner'])
     const { org } = auth
 
     // ── 1. Load plan limits from DB (fallback to hardcoded config) ───────────

@@ -8,14 +8,15 @@ import { db } from '@/db'
 import { whatsappMessages, whatsappTemplates } from '@/db/schema'
 import { createLogger } from '@/lib/logger'
 import { findOrgByWhatsAppPhoneNumberId } from '@/lib/whatsapp/get-active-integration'
-import { getMetaEnv } from '@/lib/whatsapp/meta-env'
+import { getFacebookAppSecret, getWebhookVerifyToken } from '@/lib/whatsapp/meta-env'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/verify-meta-signature'
 
 const log = createLogger('webhooks/whatsapp')
 
 export async function GET(req: NextRequest) {
-  const meta = getMetaEnv()
-  if (!meta) {
+  const verifyToken = getWebhookVerifyToken()
+  if (!verifyToken) {
+    log.warn({}, 'WHATSAPP_WEBHOOK_VERIFY_TOKEN no configurado en el servidor')
     return new Response('Not configured', { status: 503 })
   }
 
@@ -24,23 +25,25 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === meta.webhookVerifyToken && challenge) {
-    return new Response(challenge, { status: 200 })
+  if (mode === 'subscribe' && token === verifyToken && challenge) {
+    return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } })
   }
 
+  log.warn({ mode, tokenMatch: token === verifyToken }, 'Webhook verify failed')
   return new Response('Forbidden', { status: 403 })
 }
 
 export async function POST(req: NextRequest) {
-  const meta = getMetaEnv()
-  if (!meta) {
+  const appSecret = getFacebookAppSecret()
+  if (!appSecret) {
+    log.warn({}, 'FACEBOOK_APP_SECRET no configurado; webhook POST ignorado')
     return NextResponse.json({ ok: true, skipped: true })
   }
 
   const rawBody = await req.text()
   const signature = req.headers.get('x-hub-signature-256')
 
-  if (!verifyMetaWebhookSignature(rawBody, signature, meta.appSecret)) {
+  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
     log.warn({}, 'WhatsApp webhook signature invalid')
     return new Response('Forbidden', { status: 403 })
   }

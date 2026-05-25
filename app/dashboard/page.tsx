@@ -1,26 +1,45 @@
 import Link from 'next/link'
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { count, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { flows, sessions, organizations } from '@/db/schema'
+import { flows, sessions } from '@/db/schema'
 import { FlowList } from '@/components/flow-list'
+import { getAuthContext } from '@/lib/auth'
+import { getDatabaseConnectionInfo } from '@/lib/database-info'
+import { UnauthorizedError } from '@/lib/errors'
+import { createLogger } from '@/lib/logger'
+import { dashboardPageClass } from '@/lib/dashboard-page-layout'
+
+export const dynamic = 'force-dynamic'
+
+const log = createLogger('dashboard')
 
 export default async function DashboardPage() {
-  const { userId, orgId } = await auth()
-  if (!userId) redirect('/sign-in')
+  let org
+  try {
+    ;({ org } = await getAuthContext())
+  } catch (e) {
+    if (e instanceof UnauthorizedError) redirect('/sign-in')
+    throw e
+  }
 
-  const org = await db.query.organizations.findFirst({
-    where: eq(organizations.slug, orgId ?? userId),
+  const flowList = await db.query.flows.findMany({
+    where: eq(flows.organizationId, org.id),
+    orderBy: desc(flows.updatedAt),
+    limit: 50,
   })
 
-  const flowList = org
-    ? await db.query.flows.findMany({
-        where: eq(flows.organizationId, org.id),
-        orderBy: desc(flows.updatedAt),
-        limit: 50,
-      })
-    : []
+  const dbInfo = getDatabaseConnectionInfo()
+  log.info(
+    {
+      dbBranchHint: dbInfo?.branchHint,
+      dbHost: dbInfo?.host,
+      diloOrgId: org.id,
+      orgSlug: org.slug,
+      flowCount: flowList.length,
+    },
+    'Dashboard flows loaded',
+  )
 
   // Count sessions per flow in a single query
   const sessionCounts =
@@ -43,7 +62,7 @@ export default async function DashboardPage() {
   }))
 
   return (
-    <div>
+    <div className={dashboardPageClass}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Mis Flows</h2>

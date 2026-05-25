@@ -22,7 +22,7 @@ export function DashboardLayoutFallback() {
         <div className="h-16 shrink-0 animate-pulse border-b border-border bg-surface" aria-hidden />
         <main className="flex-1 bg-background p-6">
           <div className="mb-6 h-8 w-44 max-w-full rounded-lg bg-muted/30" />
-          <div className="h-28 max-w-2xl rounded-2xl bg-muted/25" />
+          <div className="h-28 max-w-6xl rounded-2xl bg-muted/25" />
         </main>
       </div>
     </div>

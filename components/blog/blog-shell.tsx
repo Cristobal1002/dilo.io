@@ -27,7 +27,7 @@ export function BlogShell({ children }: { children: React.ReactNode }) {
             href="/"
             className="flex shrink-0 items-center gap-2 rounded-lg outline-offset-2 transition-opacity hover:opacity-90"
           >
-            <DiloBrandLockup imageHeight={28} gapClassName="gap-2" wordmarkClassName="text-lg text-foreground" />
+            <DiloBrandLockup imageHeight={28} />
           </Link>
 
           <nav className="flex items-center gap-1 sm:gap-2" aria-label="Principal">

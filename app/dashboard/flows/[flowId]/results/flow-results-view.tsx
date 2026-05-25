@@ -15,6 +15,7 @@ import {
   TableCellsIcon,
 } from '@heroicons/react/24/outline'
 import { readApiResult } from '@/lib/read-api-result'
+import { dashboardPageWideClass } from '@/lib/dashboard-page-layout'
 import { cn } from '@/lib/utils'
 import { downloadDetailTableExcel } from '@/lib/export-flow-results-detail-excel'
 import type { FlowResultsAnalytics } from '@/lib/flow-results-analytics'
@@ -734,7 +735,8 @@ export function FlowResultsView({
   return (
     <div
       className={cn(
-        'mx-auto flex min-h-0 w-full max-w-screen-2xl flex-1 flex-col gap-6 px-4 pt-8 sm:px-6 lg:px-8',
+        dashboardPageWideClass,
+        'flex min-h-0 flex-1 flex-col gap-6',
         tab === 'detalle' ? 'pb-[25px]' : 'pb-8',
       )}
     >

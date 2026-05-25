@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN } from '@/lib/outreach-cold-email-body'
 import { readApiResult } from '@/lib/read-api-result'
+import { isSupportFlow } from '@/lib/support-flow-purpose'
 import type { FlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
 import { cn } from '@/lib/utils'
 
@@ -90,11 +91,13 @@ export function ConnectorsForm({
   workspaceOutreachCta,
   initialWhatsApp,
   initialWebhooks,
+  initialFlowSettings,
 }: {
   flowId: string
   resendConnected: boolean
   whatsappConnected: boolean
   flowName: string
+  initialFlowSettings: unknown
   initialOutreachBody: string | null
   initialOutreachCta: string | null
   workspaceOutreachBody: string | null
@@ -119,6 +122,11 @@ export function ConnectorsForm({
   const [outreachBusy, setOutreachBusy] = useState(false)
   const [outreachErr, setOutreachErr] = useState<string | null>(null)
   const [outreachOk, setOutreachOk] = useState<string | null>(null)
+
+  const [supportEnabled, setSupportEnabled] = useState(() => isSupportFlow(initialFlowSettings))
+  const [supportBusy, setSupportBusy] = useState(false)
+  const [supportErr, setSupportErr] = useState<string | null>(null)
+  const [supportOk, setSupportOk] = useState<string | null>(null)
 
   const [webhooksState, setWebhooksState] = useState(initialWebhooks)
   const [hooksBusy, setHooksBusy] = useState(false)
@@ -300,6 +308,34 @@ export function ConnectorsForm({
   const whatsappReady = whatsappConnected
   const templateCustomized = Boolean(outreachMd.trim() || outreachCta.trim())
 
+  async function saveSupportPurpose(enabled: boolean) {
+    setSupportBusy(true)
+    setSupportErr(null)
+    setSupportOk(null)
+    try {
+      const res = await fetch(`/api/flows/${flowId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { purpose: enabled ? 'support' : null } }),
+      })
+      const r = await readApiResult<{ flow: unknown }>(res)
+      if (!r.ok) {
+        setSupportErr(r.message)
+        setSupportEnabled(isSupportFlow(initialFlowSettings))
+        return
+      }
+      setSupportEnabled(enabled)
+      setSupportOk(
+        enabled
+          ? 'Al completar una sesión se creará un caso en Soporte.'
+          : 'Este flow ya no creará casos automáticos.',
+      )
+      router.refresh()
+    } finally {
+      setSupportBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#E8EAEF] bg-[#FAFBFC] p-4 dark:border-[#2A2F3F] dark:bg-[#161821]">
@@ -323,6 +359,15 @@ export function ConnectorsForm({
             <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">WhatsApp al completar</span>
             {whatsappReady ? <Badge variant="ok">Workspace listo</Badge> : <Badge variant="warn">Falta conectar</Badge>}
             {waEnabled && waTemplate.trim() ? <Badge variant="ok">Activo en flow</Badge> : <Badge variant="optional">Off</Badge>}
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Bandeja Soporte</span>
+            {supportEnabled ? <Badge variant="ok">Activo</Badge> : <Badge variant="optional">Off</Badge>}
+            {supportEnabled ? (
+              <Link href="/dashboard/support" className="font-semibold text-[#6B4DD4] hover:underline">
+                Ver casos
+              </Link>
+            ) : null}
           </li>
           <li className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">Webhooks</span>
@@ -369,7 +414,7 @@ export function ConnectorsForm({
           <>
             Personaliza el correo frío cuando enviás Outreach asociado a <span className="font-semibold">{flowName}</span>
             . Si lo dejas vacío, Dilo usa la plantilla del workspace en{' '}
-            <Link href="/dashboard/settings/organization" className="font-semibold text-[#6B4DD4] hover:underline">
+            <Link href="/dashboard/account?tab=organization" className="font-semibold text-[#6B4DD4] hover:underline">
               Organización
             </Link>
             .
@@ -539,6 +584,39 @@ export function ConnectorsForm({
             </button>
           </form>
         )}
+      </Section>
+
+      <Section
+        title="Soporte (bandeja Dilo)"
+        badge={<Badge variant="optional">Opcional</Badge>}
+        defaultOpen={supportEnabled}
+        description={
+          <>
+            Si está activo, cada sesión <strong>completada</strong> de este flow crea un caso en{' '}
+            <Link href="/dashboard/support" className="font-semibold text-[#6B4DD4] hover:underline">
+              Soporte
+            </Link>
+            . Separa en el flow: <strong>persona</strong> (<code className="text-[10px]">nombre_contacto</code>) y{' '}
+            <strong>empresa</strong> (<code className="text-[10px]">empresa</code> o{' '}
+            <code className="text-[10px]">compania</code>), más <code className="text-[10px]">asunto</code>,{' '}
+            <code className="text-[10px]">descripcion</code>, <code className="text-[10px]">urgencia</code>.
+          </>
+        }
+      >
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={supportEnabled}
+            disabled={supportBusy}
+            onChange={(e) => void saveSupportPurpose(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#9C77F5]"
+          />
+          <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
+            Crear caso de soporte al completar el flow
+          </span>
+        </label>
+        {supportErr ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{supportErr}</p> : null}
+        {supportOk ? <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">{supportOk}</p> : null}
       </Section>
 
       <Section

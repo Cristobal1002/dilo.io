@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { clerkClient } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { users } from '@/db/schema'
@@ -19,7 +19,7 @@ const ProfileSchema = z.object({
 
 export const PATCH = withApiHandler(
   async (req: NextRequest, { auth }) => {
-    const { userId } = auth
+    const { userId, org } = auth
 
     const body = await req.json()
     const parsed = ProfileSchema.safeParse(body)
@@ -33,7 +33,7 @@ export const PATCH = withApiHandler(
     await db
       .update(users)
       .set({ name, phone: phone ?? null })
-      .where(eq(users.clerkId, userId))
+      .where(and(eq(users.clerkId, userId), eq(users.organizationId, org.id)))
 
     // Sync name to Clerk
     try {
@@ -56,10 +56,10 @@ export const PATCH = withApiHandler(
 
 export const GET = withApiHandler(
   async (_req: NextRequest, { auth }) => {
-    const { userId } = auth
+    const { userId, org } = auth
 
     const user = await db.query.users.findFirst({
-      where: eq(users.clerkId, userId),
+      where: and(eq(users.clerkId, userId), eq(users.organizationId, org.id)),
       columns: {
         name: true,
         phone: true,

@@ -7,6 +7,7 @@ import { orgIntegrationCredentials, organizations, webhooks } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { getFlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
 import { WHATSAPP_PROVIDER } from '@/lib/whatsapp/constants'
+import { dashboardPageNarrowClass } from '@/lib/dashboard-page-layout'
 import { ConnectorsForm } from './connectors-form'
 
 export default async function FlowConnectorsPage({ params }: { params: Promise<{ flowId: string }> }) {
@@ -14,7 +15,7 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
   const { userId, orgId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const access = await findDashboardFlow(flowId, orgId ?? userId)
+  const access = await findDashboardFlow(flowId)
   if (!access) notFound()
 
   const hookRows = await db.query.webhooks.findMany({
@@ -53,7 +54,7 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
   const initialWhatsApp = getFlowWhatsAppSettings(access.flow.settings)
 
   return (
-    <div className="mx-auto flex min-h-0 max-w-2xl flex-1 flex-col gap-8 px-4 py-8">
+    <div className={`${dashboardPageNarrowClass} flex min-h-0 flex-1 flex-col gap-8`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-[#9C77F5]">Conectores</p>
@@ -81,6 +82,7 @@ export default async function FlowConnectorsPage({ params }: { params: Promise<{
         initialOutreachCta={access.flow.outreachColdEmailCtaLabel ?? null}
         workspaceOutreachBody={orgRow?.outreachColdEmailBodyMarkdown ?? null}
         workspaceOutreachCta={orgRow?.outreachColdEmailCtaLabel ?? null}
+        initialFlowSettings={access.flow.settings}
         initialWebhooks={hookRows.map((h) => ({
           id: h.id,
           url: h.url,

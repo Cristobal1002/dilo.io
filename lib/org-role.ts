@@ -26,6 +26,11 @@ export function canManageBilling(role: OrgRole): boolean {
   return role === 'owner'
 }
 
+/** Puede invitar o quitar miembros del workspace. */
+export function canManageTeam(role: OrgRole): boolean {
+  return role === 'owner'
+}
+
 /**
  * Lanza `ForbiddenError` si el rol actual no está permitido.
  * Usar en rutas API después de `getAuthContext()`.

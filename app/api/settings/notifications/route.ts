@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { users } from '@/db/schema'
 import { apiSuccess } from '@/lib/api-response'
@@ -15,9 +15,9 @@ const log = createLogger('settings/notifications')
 
 export const GET = withApiHandler(
   async (_req: NextRequest, { auth }) => {
-    const { userId } = auth
+    const { userId, org } = auth
     const row = await db.query.users.findFirst({
-      where: eq(users.clerkId, userId),
+      where: and(eq(users.clerkId, userId), eq(users.organizationId, org.id)),
       columns: {
         emailNotificationSettings: true,
         lastDigestSentAt: true,
@@ -34,7 +34,7 @@ export const GET = withApiHandler(
 
 export const PATCH = withApiHandler(
   async (req: NextRequest, { auth }) => {
-    const { userId } = auth
+    const { userId, org } = auth
     const body = await req.json()
     const parsed = patchEmailNotificationSettingsSchema.safeParse(body)
     if (!parsed.success) {
@@ -42,7 +42,7 @@ export const PATCH = withApiHandler(
     }
 
     const current = await db.query.users.findFirst({
-      where: eq(users.clerkId, userId),
+      where: and(eq(users.clerkId, userId), eq(users.organizationId, org.id)),
       columns: { emailNotificationSettings: true },
     })
     const merged = normalizeEmailNotificationSettings({
@@ -50,7 +50,10 @@ export const PATCH = withApiHandler(
       ...parsed.data,
     })
 
-    await db.update(users).set({ emailNotificationSettings: merged }).where(eq(users.clerkId, userId))
+    await db
+      .update(users)
+      .set({ emailNotificationSettings: merged })
+      .where(and(eq(users.clerkId, userId), eq(users.organizationId, org.id)))
 
     log.info({ userId }, 'Notification settings updated')
     return apiSuccess({ settings: merged })

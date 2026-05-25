@@ -7,6 +7,7 @@ import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
 import { requireOrgRoles } from '@/lib/org-role'
 import { rethrowUnlessMissingRelation } from '@/lib/pg-relation-errors'
+import { isUploadthingConfigured } from '@/lib/uploadthing-config'
 import { withApiHandler } from '@/lib/with-api-handler'
 
 const ORG_TABLE = 'organizations'
@@ -74,6 +75,7 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
     websiteUrl: org.websiteUrl ?? null,
     outreachColdEmailBodyMarkdown: org.outreachColdEmailBodyMarkdown ?? null,
     outreachColdEmailCtaLabel: org.outreachColdEmailCtaLabel ?? null,
+    logoUploadConfigured: isUploadthingConfigured(),
   })
 }, { requireAuth: true })
 

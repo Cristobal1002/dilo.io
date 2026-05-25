@@ -5,13 +5,15 @@ import Link from 'next/link'
 import { NewFlowClassicForm } from '@/components/new-flow-classic-form'
 import { NewFlowConversation } from '@/components/new-flow-conversation'
 import { NewFlowTemplates } from '@/components/new-flow-templates'
+import { dashboardPageClass } from '@/lib/dashboard-page-layout'
+import { pillTabActiveClass, pillTabBaseClass, pillTabInactiveClass } from '@/lib/pill-tab-styles'
 import { cn } from '@/lib/utils'
 
 export default function NewFlowPage() {
   const [mode, setMode] = useState<'chat' | 'classic' | 'templates'>('chat')
 
   return (
-    <div className="mx-auto max-w-xl px-3 py-6 sm:max-w-3xl sm:px-4">
+    <div className={dashboardPageClass}>
       <Link
         href="/dashboard"
         className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -32,12 +34,7 @@ export default function NewFlowPage() {
               role="tab"
               aria-selected={mode === 'chat'}
               onClick={() => setMode('chat')}
-              className={cn(
-                'rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-200',
-                mode === 'chat'
-                  ? 'border-[#9C77F5]/28 bg-[#9C77F5]/10 font-medium text-[#5B3FC9] dark:border-[#9C77F5]/35 dark:bg-[#9C77F5]/14 dark:text-[#E9D5FF]'
-                  : 'border-transparent bg-transparent font-medium text-[#64748B] hover:bg-black/4 hover:text-[#475569] dark:text-[#94A3B8] dark:hover:bg-white/5 dark:hover:text-[#CBD5E1]',
-              )}
+              className={cn(pillTabBaseClass, mode === 'chat' ? pillTabActiveClass : pillTabInactiveClass)}
             >
               Chat guiado
             </button>
@@ -46,12 +43,7 @@ export default function NewFlowPage() {
               role="tab"
               aria-selected={mode === 'classic'}
               onClick={() => setMode('classic')}
-              className={cn(
-                'rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-200',
-                mode === 'classic'
-                  ? 'border-[#9C77F5]/28 bg-[#9C77F5]/10 font-medium text-[#5B3FC9] dark:border-[#9C77F5]/35 dark:bg-[#9C77F5]/14 dark:text-[#E9D5FF]'
-                  : 'border-transparent bg-transparent font-medium text-[#64748B] hover:bg-black/4 hover:text-[#475569] dark:text-[#94A3B8] dark:hover:bg-white/5 dark:hover:text-[#CBD5E1]',
-              )}
+              className={cn(pillTabBaseClass, mode === 'classic' ? pillTabActiveClass : pillTabInactiveClass)}
             >
               Vista clásica
             </button>
@@ -60,12 +52,7 @@ export default function NewFlowPage() {
               role="tab"
               aria-selected={mode === 'templates'}
               onClick={() => setMode('templates')}
-              className={cn(
-                'rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-200',
-                mode === 'templates'
-                  ? 'border-[#9C77F5]/28 bg-[#9C77F5]/10 font-medium text-[#5B3FC9] dark:border-[#9C77F5]/35 dark:bg-[#9C77F5]/14 dark:text-[#E9D5FF]'
-                  : 'border-transparent bg-transparent font-medium text-[#64748B] hover:bg-black/4 hover:text-[#475569] dark:text-[#94A3B8] dark:hover:bg-white/5 dark:hover:text-[#CBD5E1]',
-              )}
+              className={cn(pillTabBaseClass, mode === 'templates' ? pillTabActiveClass : pillTabInactiveClass)}
             >
               Plantillas
             </button>

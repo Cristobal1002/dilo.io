@@ -8,6 +8,7 @@ export const FLOW_TEMPLATE_IDS = [
   'pre-diagnostico-legal',
   'captura-datos-organizaciones',
   'evangelizacion-iglesias',
+  'solicitud-soporte',
 ] as const
 
 export type FlowTemplateId = (typeof FLOW_TEMPLATE_IDS)[number]

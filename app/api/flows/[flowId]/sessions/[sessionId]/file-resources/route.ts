@@ -11,7 +11,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 export const GET = withApiHandler(async (_req: NextRequest, { auth, params }) => {
   const { flowId, sessionId } = params
 
-  const access = await findDashboardFlow(flowId, auth.orgId)
+  const access = await findDashboardFlow(flowId, auth.org.id)
   if (!access) throw new NotFoundError('Flow')
 
   const session = await db.query.sessions.findFirst({

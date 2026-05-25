@@ -29,6 +29,13 @@
       "when": 1776715000000,
       "tag": "0003_step_branch_label_color",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779673355488,
+      "tag": "0004_many_mojo",
+      "breakpoints": true
     }
   ]
 }

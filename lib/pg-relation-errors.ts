@@ -25,6 +25,10 @@ function collectErrorText(err: unknown): string {
   return parts.join(' ')
 }
 
+export function isMissingRelation(err: unknown, relation: string): boolean {
+  return isMissingRelationMessage(collectErrorText(err), relation)
+}
+
 function isMissingRelationMessage(blob: string, relation: string): boolean {
   if (/\b42P01\b/.test(blob)) return true
   const escaped = relation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -36,8 +40,7 @@ function isMissingRelationMessage(blob: string, relation: string): boolean {
  * en caso contrario relanza el error original.
  */
 export function rethrowUnlessMissingRelation(err: unknown, relation: string): never {
-  const blob = collectErrorText(err)
-  if (isMissingRelationMessage(blob, relation)) {
+  if (isMissingRelation(err, relation)) {
     throw new SchemaOutdatedError(
       `Falta la tabla «${relation}» en la base de datos. En producción ejecuta «npm run db:push» (con el DATABASE_URL de Vercel) o aplica la migración db/migrations/0004_org_integration_credentials.sql.`,
     )

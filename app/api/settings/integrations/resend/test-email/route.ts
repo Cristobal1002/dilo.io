@@ -7,7 +7,7 @@ import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { buildTestEmail } from '@/lib/email-templates/test-email'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { Resend } from 'resend'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 const Body = z
   .object({
@@ -30,7 +30,7 @@ export const POST = withApiHandler(async (req, { auth }) => {
   const toEmail =
     parsed.data?.toEmail?.trim() ||
     (await db.query.users.findFirst({
-      where: eq(users.clerkId, auth.userId),
+      where: and(eq(users.clerkId, auth.userId), eq(users.organizationId, auth.org.id)),
       columns: { email: true },
     }))?.email
 

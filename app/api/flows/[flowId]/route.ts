@@ -53,6 +53,8 @@ const SettingsPatchSchema = z
     /** YouTube, Vimeo, Loom, o .gif / .mp4 / .webm en https. Vacío/null borra. */
     demo_video_url: optionalDemoVideoUrl,
     whatsapp: FlowWhatsAppSettingsSchema.optional(),
+    /** `support` → al completar sesión se crea un caso en la bandeja Soporte. */
+    purpose: z.enum(['support']).nullable().optional(),
   })
   .strict()
 

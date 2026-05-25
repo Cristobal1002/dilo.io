@@ -200,12 +200,7 @@ function Nav({ t, isDark, toggleTheme }: { t: ThemeTokens; isDark: boolean; togg
       {/* Main bar */}
       <div style={{ maxWidth: 1140, margin: '0 auto', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
         {/* Logo */}
-        <DiloBrandLockup
-          imageHeight={40}
-          gapClassName="gap-[10px]"
-          wordmarkClassName="font-bold"
-          wordmarkStyle={{ fontSize: 30, color: t.text, letterSpacing: '-.5px' }}
-        />
+        <DiloBrandLockup imageHeight={40} logoForDarkBackground={isDark} />
 
         {/* Desktop links */}
         <div className="landing-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -958,12 +953,7 @@ function Footer({ t }: { t: ThemeTokens }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 40, marginBottom: 48 }}>
           <div style={{ maxWidth: 220 }}>
             <div style={{ marginBottom: 16 }}>
-              <DiloBrandLockup
-                imageHeight={35}
-                gapClassName="gap-[10px]"
-                wordmarkClassName="font-bold"
-                wordmarkStyle={{ fontSize: 27.5, color: '#fff', letterSpacing: '-.5px' }}
-              />
+              <DiloBrandLockup imageHeight={35} onDarkBackground />
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,.35)', lineHeight: 1.7 }}>Flows conversacionales que convierten más, con menos fricción.</p>
           </div>

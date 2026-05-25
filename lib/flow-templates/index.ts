@@ -5,6 +5,7 @@ import { inmobiliariaTemplate } from './inmobiliaria'
 import { legalTemplate } from './legal'
 import { onboardingTemplate } from './onboarding'
 import { organizacionesTemplate } from './organizaciones'
+import { supportRequestTemplate } from './support'
 import type { FlowTemplateDefinition, FlowTemplateId } from './types'
 
 export { TB } from './branch-presets'
@@ -18,6 +19,7 @@ const FLOW_TEMPLATES_INTERNAL: FlowTemplateDefinition[] = [
   legalTemplate,
   organizacionesTemplate,
   evangelizacionIglesiasTemplate,
+  supportRequestTemplate,
 ]
 
 const byId = new Map(FLOW_TEMPLATES_INTERNAL.map((t) => [t.id, t]))

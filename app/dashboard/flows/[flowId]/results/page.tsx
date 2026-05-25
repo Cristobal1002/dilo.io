@@ -7,6 +7,7 @@ import { results, sessions } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { getFlowResultsAnalytics } from '@/lib/flow-results-analytics'
 import { getFlowResultsDetailTable } from '@/lib/flow-results-detail-table'
+import { dashboardPageWideClass } from '@/lib/dashboard-page-layout'
 import { FlowResultsView } from './flow-results-view'
 
 export default async function FlowResultsPage({ params }: { params: Promise<{ flowId: string }> }) {
@@ -14,7 +15,7 @@ export default async function FlowResultsPage({ params }: { params: Promise<{ fl
   const { userId, orgId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const access = await findDashboardFlow(flowId, orgId ?? userId)
+  const access = await findDashboardFlow(flowId)
   if (!access) notFound()
 
   const rows = await db
@@ -64,7 +65,7 @@ export default async function FlowResultsPage({ params }: { params: Promise<{ fl
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-8 text-sm text-[#6B7280] dark:text-[#9CA3AF] sm:px-6 lg:px-8">
+        <div className={`${dashboardPageWideClass} flex-1 text-sm text-[#6B7280] dark:text-[#9CA3AF]`}>
           Cargando resultados…
         </div>
       }

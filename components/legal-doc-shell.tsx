@@ -32,11 +32,7 @@ export function LegalDocShell({ children, crossLink }: LegalDocShellProps) {
             href="/"
             className="flex min-w-0 items-center gap-2 rounded-xl py-1 pr-2 outline-offset-4 transition-opacity hover:opacity-90"
           >
-            <DiloBrandLockup
-              imageHeight={32}
-              gapClassName="gap-[10px]"
-              wordmarkClassName="text-lg font-bold tracking-tight text-[#111827] dark:text-[#F9FAFB]"
-            />
+            <DiloBrandLockup imageHeight={32} />
           </Link>
           <Link
             href="/"

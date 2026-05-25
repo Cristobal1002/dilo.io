@@ -275,7 +275,7 @@ export function NewFlowConversation() {
       )}
     >
       <div className="shrink-0 border-b border-[#9C77F5]/15 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-[#2A2F3F] dark:bg-[#1A1D29]/85">
-        <div className="mx-auto flex max-w-xl items-center justify-between gap-2">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9C77F5]">Nuevo flow</p>
             <p className="text-xs text-muted-foreground">Experiencia tipo chat · mismo producto que verá tu cliente</p>
@@ -288,7 +288,7 @@ export function NewFlowConversation() {
 
       <div
         ref={scrollRef}
-        className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-4"
+        className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-4"
       >
         {bootError ? (
           <p className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-center text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
@@ -319,7 +319,7 @@ export function NewFlowConversation() {
       </div>
 
       <div className="shrink-0 border-t border-border bg-white/90 px-3 py-3 backdrop-blur-md dark:border-[#2A2F3F] dark:bg-[#1A1D29]/95 sm:px-4">
-        <div className="mx-auto w-full max-w-xl space-y-3">
+        <div className="mx-auto w-full max-w-2xl space-y-3">
           {error ? (
             <p className="text-center text-xs font-medium text-red-600 dark:text-red-400" role="alert">
               {error}

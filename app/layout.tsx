@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { Space_Grotesk } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { esES } from '@clerk/localizations'
+import { NextSSRPlugin } from '@uploadthing/react/next-ssr-plugin'
+import { extractRouterConfig } from 'uploadthing/server'
+import { ourFileRouter } from '@/app/api/uploadthing/core'
 import { diloClerkAppearance } from '@/lib/clerk-appearance'
 import { ToastProvider } from '@/components/ui/toast'
 import './globals.css'
@@ -64,7 +67,7 @@ function JsonLd() {
         '@type': 'Organization',
         name: 'Dilo',
         url: 'https://getdilo.io',
-        logo: 'https://getdilo.io/rsz_dilo.png',
+        logo: 'https://getdilo.io/logo-dilo-fondo-claro.svg',
       },
     ],
   }
@@ -87,6 +90,7 @@ export default function RootLayout({
     <ClerkProvider localization={esES} appearance={diloClerkAppearance}>
       <html lang="es">
         <body className={`${diloSans.variable} font-sans antialiased`}>
+          <NextSSRPlugin routerConfig={extractRouterConfig(ourFileRouter)} />
           <JsonLd />
           <ToastProvider>
             {children}

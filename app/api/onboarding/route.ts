@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { clerkClient } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { users, organizations } from '@/db/schema'
@@ -40,11 +40,15 @@ export const POST = withApiHandler(
       await db
         .update(users)
         .set(userUpdate)
-        .where(eq(users.clerkId, userId))
+        .where(and(eq(users.clerkId, userId), eq(users.organizationId, org.id)))
     }
 
-    // 2. Update organization onboarding data
-    const onboardingData: Record<string, unknown> = {}
+    // 2. Update organization onboarding data (workspace activo)
+    const existingOnboarding =
+      org.onboardingData && typeof org.onboardingData === 'object'
+        ? (org.onboardingData as Record<string, unknown>)
+        : {}
+    const onboardingData: Record<string, unknown> = { ...existingOnboarding }
     if (businessType) onboardingData.businessType = businessType
     if (useCase) onboardingData.useCase = useCase
     if (teamSize) onboardingData.teamSize = teamSize

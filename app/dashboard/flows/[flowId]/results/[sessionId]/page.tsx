@@ -7,6 +7,7 @@ import { answers, results, sessions, stepOptions, steps } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { RecalculateSessionAnalysisButton } from '@/components/recalculate-session-analysis-button'
 import { formatFlowAnswerDisplay } from '@/lib/format-flow-answer'
+import { dashboardPageNarrowClass } from '@/lib/dashboard-page-layout'
 
 const classificationConfig = {
   hot: {
@@ -46,7 +47,7 @@ export default async function SessionDetailPage({
   const { userId, orgId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const access = await findDashboardFlow(flowId, orgId ?? userId)
+  const access = await findDashboardFlow(flowId)
   if (!access) notFound()
 
   const sessionRow = await db.query.sessions.findFirst({
@@ -87,7 +88,7 @@ export default async function SessionDetailPage({
     : null
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-6">
+    <div className={`${dashboardPageNarrowClass} flex flex-col gap-6`}>
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
