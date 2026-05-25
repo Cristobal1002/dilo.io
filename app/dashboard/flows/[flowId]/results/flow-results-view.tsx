@@ -15,6 +15,7 @@ import {
   TableCellsIcon,
 } from '@heroicons/react/24/outline'
 import { readApiResult } from '@/lib/read-api-result'
+import { downloadSessionFileGroups } from '@/lib/download-session-file-resources'
 import { dashboardPageWideClass } from '@/lib/dashboard-page-layout'
 import { cn } from '@/lib/utils'
 import { downloadDetailTableExcel } from '@/lib/export-flow-results-detail-excel'
@@ -194,16 +195,6 @@ const rowMenuItemDisabled =
 
 const rowMenuIcon = 'h-5 w-5 shrink-0'
 
-function triggerAnchorDownload(href: string, filename: string) {
-  const a = document.createElement('a')
-  a.href = href
-  a.download = filename
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
-
 function computeMenuPosition(trigger: DOMRect) {
   const menuWidth = 260
   const margin = 8
@@ -296,38 +287,7 @@ function DetailSessionRowMenu({
     }
     const parsed = await readApiResult<FileRes>(res)
     if (!parsed.ok) return
-    const { groups } = parsed.data
-    const fileCount = groups.reduce((n, g) => n + g.files.length, 0)
-    if (fileCount === 0) return
-    const used = new Map<string, number>()
-    const nextFilename = (base: string) => {
-      const safe = base.trim() || 'archivo'
-      const k = used.get(safe) ?? 0
-      used.set(safe, k + 1)
-      if (k === 0) return safe
-      const dot = safe.lastIndexOf('.')
-      if (dot > 0) return `${safe.slice(0, dot)} (${k + 1})${safe.slice(dot)}`
-      return `${safe} (${k + 1})`
-    }
-    for (const g of groups) {
-      for (const f of g.files) {
-        const filename = nextFilename(f.name)
-        if (f.kind === 'dataUrl') {
-          triggerAnchorDownload(f.href, filename)
-          continue
-        }
-        try {
-          const fr = await fetch(f.href, { mode: 'cors' })
-          if (!fr.ok) throw new Error('bad status')
-          const blob = await fr.blob()
-          const obj = URL.createObjectURL(blob)
-          triggerAnchorDownload(obj, filename)
-          URL.revokeObjectURL(obj)
-        } catch {
-          window.open(f.href, '_blank', 'noopener,noreferrer')
-        }
-      }
-    }
+    await downloadSessionFileGroups(parsed.data.groups)
   }, [close, flowId, row.sessionId])
 
   const portal =

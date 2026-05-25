@@ -6,6 +6,7 @@ import { db } from '@/db'
 import { answers, results, sessions, stepOptions, steps } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { RecalculateSessionAnalysisButton } from '@/components/recalculate-session-analysis-button'
+import { SessionFileAttachments } from '@/components/session-file-attachments'
 import { formatFlowAnswerDisplay } from '@/lib/format-flow-answer'
 import { dashboardPageNarrowClass } from '@/lib/dashboard-page-layout'
 
@@ -79,8 +80,13 @@ export default async function SessionDetailPage({
     where: eq(answers.sessionId, sessionId),
   })
   const answerByStep: Record<string, string | null> = {}
+  const fileAnswersByStep: Record<string, string | null> = {}
   for (const a of answerRows) {
     answerByStep[a.stepId] = a.value ?? null
+    const step = stepRows.find((s) => s.id === a.stepId)
+    if (step?.type === 'file') {
+      fileAnswersByStep[a.stepId] = a.value ?? null
+    }
   }
 
   const cfg = result?.classification
@@ -151,6 +157,12 @@ export default async function SessionDetailPage({
           <RecalculateSessionAnalysisButton flowId={flowId} sessionId={sessionId} />
         </div>
       )}
+
+      <SessionFileAttachments
+        flowId={flowId}
+        sessionId={sessionId}
+        fileAnswersByStep={fileAnswersByStep}
+      />
 
       {/* Respuestas */}
       <div>
