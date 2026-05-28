@@ -55,6 +55,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
 
   const mail = await sendSupportValueReportEmail({
     to: parsed.data.to.trim(),
+    organizationId: auth.org.id,
     organizationName: orgRow?.name ?? 'Tu proveedor',
     preview,
     narrativeMarkdown: parsed.data.narrativeMarkdown,

@@ -55,6 +55,7 @@ export const POST = withApiHandler(async (_req: NextRequest, { auth, params }) =
     })
     const mail = await sendSupportApprovalRequestEmail({
       to: row.requesterEmail.trim(),
+      organizationId: org.id,
       organizationName: orgRow?.name ?? 'Tu proveedor',
       caseNumber: row.caseNumber,
       subject: row.subject,

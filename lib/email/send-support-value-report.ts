@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 import { createLogger } from '@/lib/logger'
-import { resolveServerResendFrom } from '@/lib/email/resend-from'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { formatUsd, type SupportValueReportPreview } from '@/lib/support-value-report-shared'
 
 const log = createLogger('email/support-value-report')
@@ -53,19 +53,20 @@ function summaryTableHtml(preview: SupportValueReportPreview): string {
 
 export async function sendSupportValueReportEmail(args: {
   to: string
+  organizationId: string
   organizationName: string
   preview: SupportValueReportPreview
   narrativeMarkdown: string
   clientCompany: string | null
 }): Promise<{ sent: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  const from = resolveServerResendFrom()
-  if (!apiKey || !from) {
+  const cfg = await resolveResendSendConfig(args.organizationId)
+  if (!cfg) {
     return { sent: false, error: 'Resend no configurado en el servidor.' }
   }
 
+  const from = `${args.organizationName} <${cfg.from}>`
   const scope = args.clientCompany ? ` — ${args.clientCompany}` : ''
-  const resend = new Resend(apiKey)
+  const resend = new Resend(cfg.apiKey)
   const html = `
     <p style="font-size:14px;color:#64748B;">${escapeHtml(args.organizationName)}</p>
     <h1 style="margin:8px 0 16px;font-size:22px;color:#111827;">Informe de valor${escapeHtml(scope)}</h1>

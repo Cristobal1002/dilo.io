@@ -1,23 +1,24 @@
 import { Resend } from 'resend'
 import { createLogger } from '@/lib/logger'
-import { resolveServerResendFrom } from '@/lib/email/resend-from'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 
 const log = createLogger('email/support-approval')
 
 export async function sendSupportApprovalRequestEmail(args: {
   to: string
+  organizationId: string
   organizationName: string
   caseNumber: number
   subject: string
   reviewUrl: string
 }): Promise<{ sent: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  const from = resolveServerResendFrom()
-  if (!apiKey || !from) {
+  const cfg = await resolveResendSendConfig(args.organizationId)
+  if (!cfg) {
     return { sent: false, error: 'Resend no configurado en el servidor.' }
   }
 
-  const resend = new Resend(apiKey)
+  const from = `${args.organizationName} <${cfg.from}>`
+  const resend = new Resend(cfg.apiKey)
   const html = `
     <p>Hola,</p>
     <p><strong>${args.organizationName}</strong> terminó el trabajo en tu solicitud <strong>#${args.caseNumber}</strong>:</p>
