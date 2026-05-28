@@ -18,8 +18,10 @@ export const supportRequestTemplate: FlowTemplateDefinition = {
     settings: {
       language: 'es',
       purpose: 'support',
+      allow_multiple_submissions: true,
+      submit_another_label: 'Enviar otro caso de soporte',
       completion_message:
-        'Recibimos tu solicitud. Te contactaremos por correo con el número de caso y los próximos pasos.',
+        'Recibimos tu solicitud. Te contactaremos por correo con los próximos pasos. Si tienes otro tema, puedes enviar otra solicitud con el mismo enlace.',
       transition_style: 'ai',
       tone: esTone,
       chat_intro:

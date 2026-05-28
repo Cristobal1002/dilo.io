@@ -56,6 +56,9 @@ export const FlowGenerationSchema = z.object({
       chat_intro: z.string().max(2000),
       /** `support` → crea casos en la bandeja Soporte al completar sesión. */
       purpose: z.enum(['support']).optional(),
+      /** Mismo enlace: el visitante puede enviar otra respuesta al terminar (estilo Google Forms). */
+      allow_multiple_submissions: z.boolean().optional(),
+      submit_another_label: z.string().max(120).optional(),
     }),
     scoring_criteria: z.object({
       hot: z.string(),

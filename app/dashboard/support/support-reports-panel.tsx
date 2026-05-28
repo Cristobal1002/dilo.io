@@ -10,14 +10,14 @@ type MonthOption = { value: string; label: string }
 type PreviewResponse = {
   preview: SupportValueReportPreview
   monthOptions: MonthOption[]
-  companyOptions: string[]
+  companyOptions: { id: string; name: string }[]
 }
 
 export default function SupportReportsPanel() {
   const [month, setMonth] = useState('')
-  const [clientCompany, setClientCompany] = useState('')
+  const [clientId, setClientId] = useState('')
   const [monthOptions, setMonthOptions] = useState<MonthOption[]>([])
-  const [companyOptions, setCompanyOptions] = useState<string[]>([])
+  const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string }[]>([])
   const [preview, setPreview] = useState<SupportValueReportPreview | null>(null)
   const [narrative, setNarrative] = useState('')
   const [sendTo, setSendTo] = useState('')
@@ -33,7 +33,7 @@ export default function SupportReportsPanel() {
     setMsg(null)
     try {
       const p = new URLSearchParams({ month })
-      if (clientCompany.trim()) p.set('clientCompany', clientCompany.trim())
+      if (clientId.trim()) p.set('clientId', clientId.trim())
       const res = await fetch(`/api/support/reports/preview?${p}`)
       const r = await readApiResult<PreviewResponse>(res)
       if (!r.ok) {
@@ -47,7 +47,7 @@ export default function SupportReportsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [month, clientCompany])
+  }, [month, clientId])
 
   useEffect(() => {
     const now = new Date()
@@ -57,7 +57,7 @@ export default function SupportReportsPanel() {
 
   useEffect(() => {
     if (month) void loadPreview()
-  }, [month, clientCompany, loadPreview])
+  }, [month, clientId, loadPreview])
 
   const generateReport = async () => {
     setGenBusy(true)
@@ -69,7 +69,7 @@ export default function SupportReportsPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           month,
-          clientCompany: clientCompany.trim() === '' ? null : clientCompany.trim(),
+          clientId: clientId.trim() === '' ? null : clientId.trim(),
         }),
       })
       const r = await readApiResult<{
@@ -109,7 +109,7 @@ export default function SupportReportsPanel() {
           month,
           to,
           narrativeMarkdown: narrative,
-          clientCompany: clientCompany.trim() === '' ? null : clientCompany.trim(),
+          clientId: clientId.trim() === '' ? null : clientId.trim(),
         }),
       })
       const r = await readApiResult<{ message: string }>(res)
@@ -162,14 +162,14 @@ export default function SupportReportsPanel() {
           <label className="block min-w-[200px] flex-1 text-[10px] font-medium text-[#64748B]">
             Empresa (opcional)
             <select
-              value={clientCompany}
-              onChange={(e) => setClientCompany(e.target.value)}
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
               className="mt-1 w-full rounded-xl border border-[#E8EAEF] bg-white px-3 py-2 text-sm dark:border-[#2A2F3F] dark:bg-[#252936]"
             >
               <option value="">Todas las empresas</option>
               {companyOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>

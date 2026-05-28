@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DEFAULT_OUTREACH_COLD_EMAIL_MARKDOWN } from '@/lib/outreach-cold-email-body'
 import { readApiResult } from '@/lib/read-api-result'
+import {
+  DEFAULT_SUBMIT_ANOTHER_SUPPORT_LABEL,
+  getFlowSubmissionSettings,
+} from '@/lib/flow-submission-settings'
 import { isSupportFlow } from '@/lib/support-flow-purpose'
 import type { FlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
 import { cn } from '@/lib/utils'
@@ -123,10 +127,16 @@ export function ConnectorsForm({
   const [outreachErr, setOutreachErr] = useState<string | null>(null)
   const [outreachOk, setOutreachOk] = useState<string | null>(null)
 
+  const initialSubmission = getFlowSubmissionSettings(initialFlowSettings)
   const [supportEnabled, setSupportEnabled] = useState(() => isSupportFlow(initialFlowSettings))
+  const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(
+    initialSubmission.allowMultipleSubmissions,
+  )
+  const [submitAnotherLabel, setSubmitAnotherLabel] = useState(initialSubmission.submitAnotherLabel)
   const [supportBusy, setSupportBusy] = useState(false)
   const [supportErr, setSupportErr] = useState<string | null>(null)
   const [supportOk, setSupportOk] = useState<string | null>(null)
+  const [supportCompanyBusy, setSupportCompanyBusy] = useState(false)
 
   const [webhooksState, setWebhooksState] = useState(initialWebhooks)
   const [hooksBusy, setHooksBusy] = useState(false)
@@ -308,31 +318,74 @@ export function ConnectorsForm({
   const whatsappReady = whatsappConnected
   const templateCustomized = Boolean(outreachMd.trim() || outreachCta.trim())
 
-  async function saveSupportPurpose(enabled: boolean) {
+  async function saveSupportSettings(patch: {
+    purpose?: boolean
+    allowMultiple?: boolean
+    submitAnotherLabel?: string
+  }) {
     setSupportBusy(true)
     setSupportErr(null)
     setSupportOk(null)
     try {
+      const settings: Record<string, unknown> = {}
+      if (patch.purpose !== undefined) {
+        settings.purpose = patch.purpose ? 'support' : null
+      }
+      if (patch.allowMultiple !== undefined) {
+        settings.allow_multiple_submissions = patch.allowMultiple
+      }
+      if (patch.submitAnotherLabel !== undefined) {
+        const t = patch.submitAnotherLabel.trim()
+        settings.submit_another_label = t === '' ? null : t
+      }
       const res = await fetch(`/api/flows/${flowId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { purpose: enabled ? 'support' : null } }),
+        body: JSON.stringify({ settings }),
       })
       const r = await readApiResult<{ flow: unknown }>(res)
       if (!r.ok) {
         setSupportErr(r.message)
         setSupportEnabled(isSupportFlow(initialFlowSettings))
+        setAllowMultipleSubmissions(initialSubmission.allowMultipleSubmissions)
+        setSubmitAnotherLabel(initialSubmission.submitAnotherLabel)
         return
       }
-      setSupportEnabled(enabled)
-      setSupportOk(
-        enabled
-          ? 'Al completar una sesión se creará un caso en Soporte.'
-          : 'Este flow ya no creará casos automáticos.',
-      )
+      if (patch.purpose !== undefined) {
+        setSupportEnabled(patch.purpose)
+      }
+      if (patch.allowMultiple !== undefined) {
+        setAllowMultipleSubmissions(patch.allowMultiple)
+      }
+      if (patch.submitAnotherLabel !== undefined) {
+        setSubmitAnotherLabel(
+          patch.submitAnotherLabel.trim() || DEFAULT_SUBMIT_ANOTHER_SUPPORT_LABEL,
+        )
+      }
+      setSupportOk('Configuración de soporte guardada.')
       router.refresh()
     } finally {
       setSupportBusy(false)
+    }
+  }
+
+  async function refreshCompanyStep() {
+    setSupportCompanyBusy(true)
+    setSupportErr(null)
+    setSupportOk(null)
+    try {
+      const res = await fetch(`/api/flows/${flowId}/support/company-step`, { method: 'POST' })
+      const r = await readApiResult<{ updated: boolean; clients: number }>(res)
+      if (!r.ok) {
+        setSupportErr(r.message)
+        return
+      }
+      setSupportOk(
+        `Lista de clientes aplicada a la pregunta “Empresa” (${r.data.clients} opción(es)). Ahora el flow guarda el clientId como value.`,
+      )
+      router.refresh()
+    } finally {
+      setSupportCompanyBusy(false)
     }
   }
 
@@ -600,21 +653,77 @@ export function ConnectorsForm({
             <strong>empresa</strong> (<code className="text-[10px]">empresa</code> o{' '}
             <code className="text-[10px]">compania</code>), más <code className="text-[10px]">asunto</code>,{' '}
             <code className="text-[10px]">descripcion</code>, <code className="text-[10px]">urgencia</code>.
+            Con el mismo enlace, el visitante puede enviar varias solicitudes (como Google Forms).
           </>
         }
       >
-        <label className="flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            checked={supportEnabled}
-            disabled={supportBusy}
-            onChange={(e) => void saveSupportPurpose(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#9C77F5]"
-          />
-          <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
-            Crear caso de soporte al completar el flow
-          </span>
-        </label>
+        <div className="space-y-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={supportEnabled}
+              disabled={supportBusy}
+              onChange={(e) => void saveSupportSettings({ purpose: e.target.checked })}
+              className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#9C77F5]"
+            />
+            <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
+              Crear caso de soporte al completar el flow
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={allowMultipleSubmissions}
+              disabled={supportBusy}
+              onChange={(e) => void saveSupportSettings({ allowMultiple: e.target.checked })}
+              className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#9C77F5]"
+            />
+            <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
+              Permitir varias respuestas con el mismo enlace
+              <span className="mt-0.5 block text-xs text-[#64748B] dark:text-[#94A3B8]">
+                Tras enviar, verán un botón para abrir otro caso sin compartir un link nuevo.
+              </span>
+            </span>
+          </label>
+          {allowMultipleSubmissions ? (
+            <label className="block text-xs font-medium text-[#64748B] dark:text-[#94A3B8]">
+              Texto del botón al terminar
+              <input
+                type="text"
+                value={submitAnotherLabel}
+                disabled={supportBusy}
+                onChange={(e) => setSubmitAnotherLabel(e.target.value)}
+                onBlur={() =>
+                  void saveSupportSettings({ submitAnotherLabel })
+                }
+                placeholder={DEFAULT_SUBMIT_ANOTHER_SUPPORT_LABEL}
+                className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+              />
+            </label>
+          ) : null}
+
+          <div className="rounded-xl border border-[#E8EAEF] bg-white p-3 dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+            <p className="text-xs font-semibold text-[#1A1A1A] dark:text-[#F8F9FB]">Modo pro: Clientes canónicos</p>
+            <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
+              Convierte la pregunta <code className="text-[10px]">empresa</code> a un <strong>select</strong> cuyas
+              opciones usan <strong>value = clientId</strong>. Esto evita variaciones tipo “HSG Synergy” vs
+              “hsg_synsergy” en informes.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={supportCompanyBusy}
+                onClick={() => void refreshCompanyStep()}
+                className="rounded-xl bg-[#0f172a] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-[#334155]"
+              >
+                {supportCompanyBusy ? 'Actualizando…' : 'Actualizar opciones de Empresa desde Clientes'}
+              </button>
+              <Link href="/dashboard/support?view=clients" className="text-xs font-semibold text-[#6B4DD4] hover:underline">
+                Gestionar clientes
+              </Link>
+            </div>
+          </div>
+        </div>
         {supportErr ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{supportErr}</p> : null}
         {supportOk ? <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">{supportOk}</p> : null}
       </Section>

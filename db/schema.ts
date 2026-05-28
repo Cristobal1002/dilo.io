@@ -355,6 +355,29 @@ import {
   )
 
   /**
+   * Clientes (empresas) por workspace.
+   * Se usan como entidad canónica para soporte e informes mensuales.
+   */
+  export const clients = pgTable(
+    'clients',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      name:           text('name').notNull(),
+      /** Slug canónico (único por org). */
+      slug:           text('slug').notNull(),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+      updatedAt:      timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      uniqueIndex('clients_org_slug_uidx').on(t.organizationId, t.slug),
+      index('clients_org_name_idx').on(t.organizationId, t.name),
+    ],
+  )
+
+  /**
    * Casos de soporte por workspace (bandeja Soporte).
    * Status: new | in_progress | waiting | resolved | closed
    */
@@ -377,6 +400,8 @@ import {
       requesterName:    text('requester_name'),
       requesterEmail:   text('requester_email'),
       requesterPhone:   text('requester_phone'),
+      /** Cliente canónico (para agrupar informes/contratos). */
+      clientId:         uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
       /** Empresa/cliente del solicitante (desde el flow: variable `cliente`, `empresa`, etc.). */
       clientCompany:    text('client_company'),
       assignedUserId:   uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -400,6 +425,7 @@ import {
     (t) => [
       index('support_cases_org_status_idx').on(t.organizationId, t.status),
       index('support_cases_org_activity_idx').on(t.organizationId, t.lastActivityAt),
+      index('support_cases_org_client_idx').on(t.organizationId, t.clientId),
       uniqueIndex('support_cases_org_number_uidx').on(t.organizationId, t.caseNumber),
       uniqueIndex('support_cases_session_uidx')
         .on(t.sessionId)

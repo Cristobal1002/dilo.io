@@ -4,6 +4,7 @@ import { answers, flows, results, sessions, stepOptions, steps, supportCases } f
 import { createLogger } from '@/lib/logger'
 import { isSupportFlow } from '@/lib/support-flow-purpose'
 import { createSupportCaseFromSession } from '@/lib/support-case-from-session'
+import { ensureClientByName, getClientNameById, isUuidLike } from '@/lib/support-clients'
 import {
   buildStructuredFromSteps,
   buildStructuredRawFromSteps,
@@ -91,7 +92,7 @@ export async function syncSupportCasesForOrganization(
 
   const existingCases = await db.query.supportCases.findMany({
     where: eq(supportCases.organizationId, organizationId),
-    columns: { id: true, sessionId: true, type: true, priority: true },
+    columns: { id: true, sessionId: true, type: true, priority: true, clientCompany: true, clientId: true },
   })
   const caseBySession = new Map(
     existingCases.filter((c) => c.sessionId).map((c) => [c.sessionId!, c]),
@@ -126,15 +127,63 @@ export async function syncSupportCasesForOrganization(
 
     const mappedType = mapSupportTypeFromAnswer(typeRaw)
     const mappedPriority = mapSupportPriorityFromAnswer(priorityRaw)
+    const clientAnswer =
+      pickAnswer(structuredRaw, [
+        'empresa',
+        'compania',
+        'compañia',
+        'company',
+        'client_company',
+        'nombre_empresa',
+        'organizacion',
+        'organización',
+      ]) ??
+      pickAnswer(structuredDisplay, [
+        'empresa',
+        'compania',
+        'compañia',
+        'company',
+        'client_company',
+        'nombre_empresa',
+        'organizacion',
+        'organización',
+      ])
+
+    let mappedClientId: string | null = null
+    let mappedClientCompany: string | null = null
+    if (clientAnswer?.trim()) {
+      if (isUuidLike(clientAnswer.trim())) {
+        const name = await getClientNameById({
+          organizationId,
+          clientId: clientAnswer.trim(),
+        })
+        if (name) {
+          mappedClientId = clientAnswer.trim()
+          mappedClientCompany = name
+        }
+      }
+      if (!mappedClientId) {
+        const c = await ensureClientByName({ organizationId, name: clientAnswer.trim() })
+        mappedClientId = c.id
+        mappedClientCompany = c.name
+      }
+    }
 
     const existing = caseBySession.get(session.id)
     if (existing) {
-      if (existing.type !== mappedType || existing.priority !== mappedPriority) {
+      const companyChanged =
+        Boolean(mappedClientCompany?.trim()) &&
+        ((existing.clientCompany ?? null) !== (mappedClientCompany?.trim() || null) ||
+          (existing.clientId ?? null) !== (mappedClientId ?? null))
+
+      if (existing.type !== mappedType || existing.priority !== mappedPriority || companyChanged) {
         await db
           .update(supportCases)
           .set({
             type: mappedType,
             priority: mappedPriority,
+            clientId: companyChanged ? mappedClientId : existing.clientId,
+            clientCompany: companyChanged ? mappedClientCompany!.trim().slice(0, 200) : existing.clientCompany,
             updatedAt: new Date(),
           })
           .where(eq(supportCases.id, existing.id))
@@ -161,7 +210,8 @@ export async function syncSupportCasesForOrganization(
       flowName: flow.name,
       flowSettings: flow.settings,
       sessionId: session.id,
-      structuredAnswers: structuredRaw,
+      structuredAnswersRaw: structuredRaw,
+      structuredAnswersDisplay: structuredDisplay,
       contact,
       summaryFallback: result?.summary ?? null,
     })

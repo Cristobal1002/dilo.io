@@ -5,16 +5,17 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { pillTabActiveClass, pillTabBaseClass, pillTabInactiveClass } from '@/lib/pill-tab-styles'
 import { cn } from '@/lib/utils'
 import SupportReportsPanel from './support-reports-panel'
+import SupportClientsPanel from './support-clients-panel'
 import SupportTable, {
   type SupportCaseOverview,
   type SupportFlowOption,
 } from './support-table'
 import type { SupportAssigneeFilter, SupportFilterStatus } from '@/lib/support'
 
-export type SupportView = 'cases' | 'reports'
+export type SupportView = 'cases' | 'reports' | 'clients'
 
 function isSupportView(v: string | null): v is SupportView {
-  return v === 'cases' || v === 'reports'
+  return v === 'cases' || v === 'reports' || v === 'clients'
 }
 
 export default function SupportPageClient({
@@ -75,10 +76,19 @@ export default function SupportPageClient({
         >
           Informes
         </button>
+        <button
+          type="button"
+          onClick={() => setView('clients')}
+          className={cn(pillTabBaseClass, view === 'clients' ? pillTabActiveClass : pillTabInactiveClass)}
+        >
+          Clientes
+        </button>
       </div>
 
       {view === 'reports' ? (
         <SupportReportsPanel />
+      ) : view === 'clients' ? (
+        <SupportClientsPanel />
       ) : (
         <SupportTable
           initialCases={initialCases}

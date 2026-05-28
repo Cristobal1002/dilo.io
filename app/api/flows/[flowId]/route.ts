@@ -55,6 +55,8 @@ const SettingsPatchSchema = z
     whatsapp: FlowWhatsAppSettingsSchema.optional(),
     /** `support` → al completar sesión se crea un caso en la bandeja Soporte. */
     purpose: z.enum(['support']).nullable().optional(),
+    allow_multiple_submissions: z.boolean().optional(),
+    submit_another_label: z.union([z.string().max(120), z.null()]).optional(),
   })
   .strict()
 

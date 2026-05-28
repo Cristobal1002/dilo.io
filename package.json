@@ -10,7 +10,9 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
-    "db:seed": "dotenv -e .env.local -- tsx db/seed-plans.ts"
+    "db:seed": "dotenv -e .env.local -- tsx db/seed-plans.ts",
+    "db:support:diagnose": "dotenv -e .env.local -- tsx db/diagnose-support-sessions.ts",
+    "db:support:sync": "dotenv -e .env.local -- tsx db/diagnose-support-sessions.ts --sync"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

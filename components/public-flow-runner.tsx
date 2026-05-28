@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronLeftIcon, MoonIcon, PencilSquareIcon, PhotoIcon, SunIcon } from '@heroicons/react/24/outline'
+import { getFlowSubmissionSettings } from '@/lib/flow-submission-settings'
 import { readApiResult } from '@/lib/read-api-result'
 import type { PublicFlowRecord, PublicFlowStep } from '@/lib/load-published-flow'
 import { DILO_THEME_CHANGE_EVENT } from '@/lib/theme-event'
@@ -463,6 +464,10 @@ function FlowDoneCelebration({
   completion,
   showSummary,
   onToggleSummary,
+  allowMultipleSubmissions,
+  submitAnotherLabel,
+  onSubmitAnother,
+  submitAnotherBusy,
   isEmbed,
 }: {
   flow: PublicFlowRecord
@@ -471,6 +476,10 @@ function FlowDoneCelebration({
   completion: string | null
   showSummary: boolean
   onToggleSummary: () => void
+  allowMultipleSubmissions: boolean
+  submitAnotherLabel: string
+  onSubmitAnother: () => void
+  submitAnotherBusy: boolean
   isEmbed?: boolean
 }) {
   const rows = steps.filter((s) => stepIsAnswered(s, answers))
@@ -518,6 +527,21 @@ function FlowDoneCelebration({
             {completion ?? 'Gracias por completar el flow. Tus respuestas ya están guardadas.'}
           </p>
           <div className="mt-8 flex flex-col items-center gap-3">
+            {allowMultipleSubmissions ? (
+              <>
+                <button
+                  type="button"
+                  disabled={submitAnotherBusy}
+                  onClick={onSubmitAnother}
+                  className="rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-8 py-3.5 text-sm font-bold text-white shadow-[0_8px_28px_rgba(156,119,245,0.45)] transition hover:shadow-[0_12px_36px_rgba(156,119,245,0.55)] disabled:opacity-50"
+                >
+                  {submitAnotherBusy ? 'Preparando…' : submitAnotherLabel}
+                </button>
+                <p className="max-w-xs text-xs text-[#64748B] dark:text-[#94A3B8]">
+                  Cada envío crea una solicitud nueva. Puedes usar el mismo enlace las veces que necesites.
+                </p>
+              </>
+            ) : null}
             <button
               type="button"
               onClick={onToggleSummary}
@@ -560,19 +584,31 @@ function WelcomeScreen({
   stepCount,
   resumeAvailable,
   chatProgressPaused,
+  priorSubmissionCompleted,
+  allowMultipleSubmissions,
+  submitAnotherLabel,
+  submitAnotherBusy,
   onStartFresh,
   onResume,
   onDiscard,
   onReturnToChat,
+  onSubmitAnother,
+  onViewPreviousSubmission,
 }: {
   flow: PublicFlowRecord
   stepCount: number
   resumeAvailable: boolean
   chatProgressPaused: boolean
+  priorSubmissionCompleted: boolean
+  allowMultipleSubmissions: boolean
+  submitAnotherLabel: string
+  submitAnotherBusy: boolean
   onStartFresh: () => void
   onResume: () => void
   onDiscard: () => void
   onReturnToChat: () => void
+  onSubmitAnother: () => void
+  onViewPreviousSubmission: () => void
 }) {
   const w = welcomeCopy(flow, stepCount)
   const demoVideoUrl = readDemoVideoUrlFromSettings(flow.settings)
@@ -599,6 +635,16 @@ function WelcomeScreen({
         </div>
       ) : null}
       <p className="mb-8 max-w-md text-base leading-relaxed text-[#5B5670] dark:text-[#9CA3AF]">{w.tagline}</p>
+      {priorSubmissionCompleted && allowMultipleSubmissions ? (
+        <div className="mb-8 w-full max-w-md rounded-2xl border border-[#9C77F5]/20 bg-[#F3EEFF]/80 px-5 py-4 text-left dark:border-[#9C77F5]/30 dark:bg-[#252936]/90">
+          <p className="text-sm font-semibold text-[#6B4DD4] dark:text-[#D4C4FC]">
+            Ya enviaste una solicitud con este enlace
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-[#5B5670] dark:text-[#9CA3AF]">
+            Puedes registrar otro caso sin necesidad de un enlace nuevo, como en Google Forms.
+          </p>
+        </div>
+      ) : null}
       <div className="mb-9 flex flex-wrap justify-center gap-2">
         {[`⏱️ ${w.timeLabel}`, `💬 ~${stepCount} pasos`, `🎯 ${w.tonePill}`].map((tag) => (
           <span
@@ -610,7 +656,25 @@ function WelcomeScreen({
         ))}
       </div>
       <div className="flex flex-col items-center gap-3">
-        {chatProgressPaused ? (
+        {priorSubmissionCompleted && allowMultipleSubmissions ? (
+          <>
+            <button
+              type="button"
+              disabled={submitAnotherBusy}
+              onClick={onSubmitAnother}
+              className="rounded-full bg-linear-to-br from-[#9C77F5] to-[#7B5BD4] px-10 py-4 text-[15px] font-bold text-white shadow-[0_8px_28px_rgba(156,119,245,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(156,119,245,0.5)] disabled:opacity-50"
+            >
+              {submitAnotherBusy ? 'Preparando…' : submitAnotherLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onViewPreviousSubmission}
+              className="rounded-full border-2 border-[#9C77F5]/40 bg-white/90 px-7 py-3 text-sm font-bold text-[#6B4DD4] dark:border-[#9C77F5]/50 dark:bg-[#1A1D29]/90 dark:text-[#D4C4FC]"
+            >
+              Ver mi envío anterior
+            </button>
+          </>
+        ) : chatProgressPaused ? (
           <>
             <button
               type="button"
@@ -704,6 +768,8 @@ export function PublicFlowRunner({
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [showDoneSummary, setShowDoneSummary] = useState(false)
+  const [submitAnotherBusy, setSubmitAnotherBusy] = useState(false)
+  const [priorSubmissionCompleted, setPriorSubmissionCompleted] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [textInput, setTextInput] = useState('')
   const [selected, setSelected] = useState<string[]>([])
@@ -864,9 +930,19 @@ export function PublicFlowRunner({
             if (done) {
               setToken(t)
               setAnswers(norm)
+              setShowDoneSummary(false)
+              if (getFlowSubmissionSettings(flow.settings).allowMultipleSubmissions) {
+                setPriorSubmissionCompleted(true)
+                setResumeAvailable(false)
+                setResumePayload(null)
+                setStepIdx(0)
+                setMessages([])
+                setPhase('welcome')
+                return
+              }
               setMessages(buildFullThread(steps, norm))
               setStepIdx(Math.max(0, steps.length - 1))
-              setShowDoneSummary(false)
+              setPriorSubmissionCompleted(false)
               setPhase('done')
               return
             }
@@ -918,6 +994,7 @@ export function PublicFlowRunner({
       setAnswers({})
       setEditingStepId(null)
       setShowDoneSummary(false)
+      setPriorSubmissionCompleted(false)
       setStepIdx(0)
       setIsTyping(true)
       setPhase('chat')
@@ -1318,6 +1395,44 @@ export function PublicFlowRunner({
   }, [isTyping, phase, stepIdx, steps, flow, editingStepId, cancelEdit])
 
   const completion = useMemo(() => completionFromSettings(flow.settings), [flow.settings])
+  const submissionSettings = useMemo(
+    () => getFlowSubmissionSettings(flow.settings),
+    [flow.settings],
+  )
+
+  const handleSubmitAnother = useCallback(async () => {
+    const st = steps
+    if (st.length === 0) return
+    setSubmitAnotherBusy(true)
+    setErrorMsg('')
+    try {
+      try {
+        sessionStorage.removeItem(sessionStorageKey(flowId))
+      } catch {
+        /* ignore */
+      }
+      setResumePayload(null)
+      setResumeAvailable(false)
+      setPriorSubmissionCompleted(false)
+      const pr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions`, { method: 'POST' })
+      const postRes = await readApiResult<{ session: { token: string } }>(pr)
+      if (!postRes.ok) {
+        setErrorMsg(postRes.message)
+        setPhase('error')
+        return
+      }
+      enterChatFresh(st, postRes.data.session.token)
+    } finally {
+      setSubmitAnotherBusy(false)
+    }
+  }, [flowId, steps, enterChatFresh])
+
+  const handleViewPreviousSubmission = useCallback(() => {
+    setMessages(buildFullThread(steps, answers))
+    setStepIdx(Math.max(0, steps.length - 1))
+    setShowDoneSummary(false)
+    setPhase('done')
+  }, [steps, answers])
 
   if (phase === 'loading') {
     return (
@@ -1363,11 +1478,20 @@ export function PublicFlowRunner({
           flow={flow}
           stepCount={steps.length}
           resumeAvailable={resumeAvailable}
-          chatProgressPaused={Boolean(token && (messages.length > 0 || Object.keys(answers).length > 0))}
+          chatProgressPaused={
+            !priorSubmissionCompleted &&
+            Boolean(token && (messages.length > 0 || Object.keys(answers).length > 0))
+          }
+          priorSubmissionCompleted={priorSubmissionCompleted}
+          allowMultipleSubmissions={submissionSettings.allowMultipleSubmissions}
+          submitAnotherLabel={submissionSettings.submitAnotherLabel}
+          submitAnotherBusy={submitAnotherBusy}
           onStartFresh={() => void handleWelcomeStartFresh()}
           onResume={handleWelcomeResume}
           onDiscard={() => void handleDiscardDraft()}
           onReturnToChat={handleWelcomeReturnToChat}
+          onSubmitAnother={() => void handleSubmitAnother()}
+          onViewPreviousSubmission={handleViewPreviousSubmission}
         />
       </div>
     )
@@ -1382,6 +1506,10 @@ export function PublicFlowRunner({
         completion={completion}
         showSummary={showDoneSummary}
         onToggleSummary={() => setShowDoneSummary((s) => !s)}
+        allowMultipleSubmissions={submissionSettings.allowMultipleSubmissions}
+        submitAnotherLabel={submissionSettings.submitAnotherLabel}
+        onSubmitAnother={() => void handleSubmitAnother()}
+        submitAnotherBusy={submitAnotherBusy}
         isEmbed={isEmbed}
       />
     )

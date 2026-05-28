@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { organizations, supportCases } from '@/db/schema'
+import { clients, organizations, supportCases } from '@/db/schema'
 import {
   type SupportReportCaseLine,
   type SupportReportCompanyGroup,
@@ -41,7 +41,7 @@ function toIso(d: unknown): string | null {
 export async function loadSupportValueReportPreview(args: {
   organizationId: string
   month: string
-  clientCompany?: string | null
+  clientId?: string | null
 }): Promise<SupportValueReportPreview | null> {
   const parsed = parseReportMonth(args.month)
   if (!parsed) return null
@@ -77,9 +77,9 @@ export async function loadSupportValueReportPreview(args: {
     activityInMonth,
   ]
 
-  const companyFilter = args.clientCompany?.trim()
-  if (companyFilter) {
-    whereParts.push(eq(supportCases.clientCompany, companyFilter))
+  const clientIdFilter = args.clientId?.trim()
+  if (clientIdFilter) {
+    whereParts.push(eq(supportCases.clientId, clientIdFilter))
   }
 
   const rows = await db
@@ -89,19 +89,28 @@ export async function loadSupportValueReportPreview(args: {
       subject: supportCases.subject,
       hoursSpent: supportCases.hoursSpent,
       status: supportCases.status,
-      clientCompany: supportCases.clientCompany,
+      clientId: supportCases.clientId,
+      clientName: clients.name,
+      clientCompanyFallback: supportCases.clientCompany,
       resolvedAt: supportCases.resolvedAt,
     })
     .from(supportCases)
+    .leftJoin(
+      clients,
+      and(eq(clients.id, supportCases.clientId), eq(clients.organizationId, supportCases.organizationId)),
+    )
     .where(and(...whereParts))
-    .orderBy(supportCases.clientCompany, supportCases.caseNumber)
+    .orderBy(clients.name, supportCases.caseNumber)
 
   const byCompany = new Map<string, SupportReportCaseLine[]>()
 
   for (const r of rows) {
     const hours = Number(r.hoursSpent) || 0
     if (hours <= 0) continue
-    const company = r.clientCompany?.trim() || 'Sin empresa'
+    const company =
+      r.clientName?.trim() ||
+      r.clientCompanyFallback?.trim() ||
+      (r.clientId ? 'Cliente' : 'Sin empresa')
     const list = byCompany.get(company) ?? []
     list.push({
       id: r.id,

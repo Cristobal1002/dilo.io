@@ -357,14 +357,16 @@ export async function processSessionCompletion(
       log.error({ err, sessionId: sessionRow.id }, 'sendWhatsAppOnSessionComplete failed')
     })
 
-    const structuredAnswers = buildStructuredRawFromSteps(stepRows, answerByStep)
+    const structuredAnswersRaw = buildStructuredRawFromSteps(stepRows, answerByStep)
+    const structuredAnswersDisplay = buildStructuredFromSteps(stepRows, answerByStep)
     void createSupportCaseFromSession({
       organizationId: flowRow.organizationId,
       flowId: flowRow.id,
       flowName: flowRow.name,
       flowSettings: flowRow.settings,
       sessionId: sessionRow.id,
-      structuredAnswers,
+      structuredAnswersRaw,
+      structuredAnswersDisplay,
       contact,
       summaryFallback: resultRow.summary,
     }).catch((err) => {

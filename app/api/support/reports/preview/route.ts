@@ -4,10 +4,13 @@ import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
 import { loadSupportValueReportPreview, listRecentReportMonths, parseReportMonth } from '@/lib/support-value-report'
 import { withApiHandler } from '@/lib/with-api-handler'
+import { db } from '@/db'
+import { clients } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 
 const Query = z.object({
   month: z.string().max(7).optional(),
-  clientCompany: z.string().max(200).optional(),
+  clientId: z.string().uuid().optional(),
 })
 
 export const GET = withApiHandler(async (req: NextRequest, { auth }) => {
@@ -24,24 +27,25 @@ export const GET = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Mes inválido (usa formato YYYY-MM)')
   }
 
-  const clientCompany = parsed.data.clientCompany?.trim() || null
+  const clientId = parsed.data.clientId?.trim() || null
 
   const preview = await loadSupportValueReportPreview({
     organizationId: auth.org.id,
     month,
-    clientCompany,
+    clientId,
   })
 
   if (!preview) {
     throw new ValidationError('Mes inválido')
   }
 
-  const companiesInPeriod = await loadSupportValueReportPreview({
-    organizationId: auth.org.id,
-    month,
+  // Options: lista de clientes canónicos (tabla clients) + fallback por casos sin clientId si existieran.
+  const rows = await db.query.clients.findMany({
+    where: eq(clients.organizationId, auth.org.id),
+    columns: { id: true, name: true },
+    orderBy: (t, { asc }) => [asc(t.name)],
   })
-
-  const companyOptions = (companiesInPeriod?.companies ?? []).map((c) => c.clientCompany)
+  const companyOptions = rows.map((c) => ({ id: c.id, name: c.name }))
 
   return apiSuccess({
     preview,

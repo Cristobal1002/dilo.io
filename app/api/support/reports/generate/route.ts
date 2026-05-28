@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { generateText } from 'ai'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { organizations } from '@/db/schema'
+import { clients, organizations } from '@/db/schema'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
 import { assertGenerativeAiConfigured, getStructuredOutputModel } from '@/lib/ai-model'
@@ -16,7 +16,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 
 const Body = z.object({
   month: z.string().max(7),
-  clientCompany: z.string().max(200).nullable().optional(),
+  clientId: z.string().uuid().nullable().optional(),
 })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
@@ -31,12 +31,18 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Mes inválido (usa formato YYYY-MM)')
   }
 
-  const clientCompany = parsed.data.clientCompany?.trim() || null
+  const clientId = parsed.data.clientId?.trim() || null
+  const clientCompany = clientId
+    ? (await db.query.clients.findFirst({
+        where: and(eq(clients.id, clientId), eq(clients.organizationId, auth.org.id)),
+        columns: { name: true },
+      }))?.name ?? null
+    : null
 
   const preview = await loadSupportValueReportPreview({
     organizationId: auth.org.id,
     month,
-    clientCompany,
+    clientId,
   })
 
   if (!preview) {
@@ -81,6 +87,6 @@ export const POST = withApiHandler(async (req: NextRequest, { auth }) => {
   return apiSuccess({
     preview,
     narrativeMarkdown,
-    clientCompany,
+    clientId,
   })
 }, { requireAuth: true })
