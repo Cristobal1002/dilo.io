@@ -27,6 +27,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "gray-matter": "^4.0.3",
+    "image-size": "^2.0.2",
     "libphonenumber-js": "^1.12.41",
     "next": "16.2.4",
     "next-mdx-remote": "^6.0.0",

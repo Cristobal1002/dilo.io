@@ -12,6 +12,45 @@ export const ORG_LOGO = {
   hint: 'PNG, JPG, WebP o SVG. Recomendado: 400×120 px (horizontal, fondo transparente si aplica).',
 } as const
 
+function validateDimensions(width: number, height: number): string | null {
+  if (width < ORG_LOGO.minWidth || height < ORG_LOGO.minHeight) {
+    return `Mínimo ${ORG_LOGO.minWidth}×${ORG_LOGO.minHeight} px.`
+  }
+  if (width > ORG_LOGO.maxWidth || height > ORG_LOGO.maxHeight) {
+    return `Máximo ${ORG_LOGO.maxWidth}×${ORG_LOGO.maxHeight} px.`
+  }
+  const ratio = width / height
+  if (ratio < ORG_LOGO.minAspectRatio || ratio > ORG_LOGO.maxAspectRatio) {
+    return 'Usa un logo horizontal (proporción entre 2:1 y 6:1).'
+  }
+  return null
+}
+
+async function readRasterDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  // Navegador: createImageBitmap
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file)
+      const { width, height } = bitmap
+      bitmap.close()
+      return { width, height }
+    } catch {
+      return null
+    }
+  }
+
+  // Servidor (Node/Vercel): createImageBitmap no está disponible
+  try {
+    const { imageSize } = await import('image-size')
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const size = imageSize(buffer)
+    if (!size.width || !size.height) return null
+    return { width: size.width, height: size.height }
+  } catch {
+    return null
+  }
+}
+
 export async function validateOrganizationLogoFile(file: File): Promise<string | null> {
   if (!ORG_LOGO.acceptMime.includes(file.type as (typeof ORG_LOGO.acceptMime)[number])) {
     return 'Formato no permitido. Usa PNG, JPG, WebP o SVG.'
@@ -21,22 +60,10 @@ export async function validateOrganizationLogoFile(file: File): Promise<string |
   }
   if (file.type === 'image/svg+xml') return null
 
-  try {
-    const bitmap = await createImageBitmap(file)
-    const { width, height } = bitmap
-    bitmap.close()
-    if (width < ORG_LOGO.minWidth || height < ORG_LOGO.minHeight) {
-      return `Mínimo ${ORG_LOGO.minWidth}×${ORG_LOGO.minHeight} px.`
-    }
-    if (width > ORG_LOGO.maxWidth || height > ORG_LOGO.maxHeight) {
-      return `Máximo ${ORG_LOGO.maxWidth}×${ORG_LOGO.maxHeight} px.`
-    }
-    const ratio = width / height
-    if (ratio < ORG_LOGO.minAspectRatio || ratio > ORG_LOGO.maxAspectRatio) {
-      return 'Usa un logo horizontal (proporción entre 2:1 y 6:1).'
-    }
-    return null
-  } catch {
+  const dims = await readRasterDimensions(file)
+  if (!dims) {
     return 'No se pudo leer la imagen.'
   }
+
+  return validateDimensions(dims.width, dims.height)
 }
