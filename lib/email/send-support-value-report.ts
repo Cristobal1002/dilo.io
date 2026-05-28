@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { createLogger } from '@/lib/logger'
 import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { formatUsd, type SupportValueReportPreview } from '@/lib/support-value-report-shared'
+import { absoluteSiteOrigin } from '@/lib/site-url'
 
 const log = createLogger('email/support-value-report')
 
@@ -88,6 +89,35 @@ function markdownToPrettyHtml(md: string): string {
   return out.join('')
 }
 
+function diloPromoFooterHtml(): string {
+  const origin = absoluteSiteOrigin()
+  const href = escapeHtml(origin)
+  return `
+    <div style="max-width:680px;margin:14px auto 0;">
+      <div style="border:1px solid #E9D5FF;background:linear-gradient(135deg,#FAF5FF 0%,#F8FAFC 100%);border-radius:16px;padding:18px 20px;text-align:center;">
+        <div style="font-size:13px;line-height:1.5;color:#6B4DD4;font-weight:800;letter-spacing:-0.01em;">
+          ✨ Hecho con <a href="${href}" style="color:#6B4DD4;text-decoration:none;font-weight:900;">Dilo</a>
+        </div>
+        <p style="margin:10px 0 0;font-size:13px;line-height:1.55;color:#475569;max-width:520px;margin-left:auto;margin-right:auto;">
+          Crea <strong style="color:#334155;">formularios conversacionales</strong>, recibe solicitudes en una bandeja de soporte y genera
+          <strong style="color:#334155;">informes de gestión</strong> como este — sin hojas de cálculo ni tickets perdidos.
+        </p>
+        <p style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#64748B;">
+          📋 Flows en minutos · 🎫 Casos y horas · 📊 Informes para gerencia
+        </p>
+        <p style="margin:14px 0 0;">
+          <a href="${href}" style="display:inline-block;padding:10px 18px;background:#9C77F5;color:#FFFFFF;text-decoration:none;border-radius:10px;font-size:13px;font-weight:700;">
+            Conoce Dilo →
+          </a>
+        </p>
+        <p style="margin:10px 0 0;font-size:11px;color:#94A3B8;">
+          <a href="${href}" style="color:#94A3B8;text-decoration:underline;">${href.replace(/^https:\/\//, '')}</a>
+        </p>
+      </div>
+    </div>
+  `.trim()
+}
+
 function summaryTableHtml(preview: SupportValueReportPreview): string {
   const rows = preview.companies
     .map(
@@ -164,9 +194,7 @@ export async function sendSupportValueReportEmail(args: {
         ${markdownToPrettyHtml(args.narrativeMarkdown)}
       </div>
     </div>
-    <div style="max-width:680px;margin:10px auto 0;color:#94A3B8;font-size:11px;line-height:1.4;text-align:center;">
-      Generado desde Dilo.
-    </div>
+    ${diloPromoFooterHtml()}
   </div>
   `.trim()
 
