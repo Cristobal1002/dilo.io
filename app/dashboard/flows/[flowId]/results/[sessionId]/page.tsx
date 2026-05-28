@@ -6,6 +6,7 @@ import { db } from '@/db'
 import { answers, results, sessions, stepOptions, steps } from '@/db/schema'
 import { findDashboardFlow } from '@/lib/dashboard-flow-access'
 import { RecalculateSessionAnalysisButton } from '@/components/recalculate-session-analysis-button'
+import { GenerateQuoteFromSession } from '@/components/generate-quote-from-session'
 import { SessionFileAttachments } from '@/components/session-file-attachments'
 import { formatFlowAnswerDisplay } from '@/lib/format-flow-answer'
 import { dashboardPageNarrowClass } from '@/lib/dashboard-page-layout'
@@ -157,6 +158,10 @@ export default async function SessionDetailPage({
           <RecalculateSessionAnalysisButton flowId={flowId} sessionId={sessionId} />
         </div>
       )}
+
+      <div className="flex flex-col gap-4 print:hidden">
+        <GenerateQuoteFromSession flowId={flowId} sessionId={sessionId} />
+      </div>
 
       <SessionFileAttachments
         flowId={flowId}

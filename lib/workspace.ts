@@ -12,6 +12,21 @@ import type { OrgRole } from '@/lib/org-role'
 
 const log = createLogger('workspace')
 
+function isOrganizationsSlugConflict(err: unknown): boolean {
+  if (!err || typeof err !== 'object' || !('code' in err)) return false
+  if (String((err as { code: unknown }).code) !== '23505') return false
+  const constraint =
+    'constraint' in err ? String((err as { constraint: unknown }).constraint) : ''
+  return !constraint || constraint === 'organizations_slug_unique'
+}
+
+async function findOrganizationByClerkSlug(clerkUserId: string) {
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.slug, clerkUserId),
+  })
+  return org ?? null
+}
+
 async function countFlowsForOrg(organizationId: string): Promise<number> {
   const [row] = await db
     .select({ count: count() })
@@ -87,12 +102,25 @@ export async function ensureWorkspaceForUser(
 
   if (!org) {
     const displayName = name?.trim() || 'Mi workspace'
-    const [created] = await db
-      .insert(organizations)
-      .values({ name: displayName, slug: clerkUserId })
-      .returning()
-    org = created
-    log.info({ clerkUserId, orgId: org.id }, 'Created primary workspace')
+    org = await findOrganizationByClerkSlug(clerkUserId)
+
+    if (!org) {
+      try {
+        const [created] = await db
+          .insert(organizations)
+          .values({ name: displayName, slug: clerkUserId })
+          .returning()
+        org = created
+        log.info({ clerkUserId, orgId: org.id }, 'Created primary workspace')
+      } catch (err) {
+        if (!isOrganizationsSlugConflict(err)) throw err
+        org = await findOrganizationByClerkSlug(clerkUserId)
+        if (!org) throw err
+        log.debug({ clerkUserId, orgId: org.id }, 'Reused workspace after slug conflict')
+      }
+    } else {
+      log.debug({ clerkUserId, orgId: org.id }, 'Linked existing workspace by slug')
+    }
 
     await db
       .insert(users)

@@ -13,6 +13,13 @@ type OrgPayload = {
   outreachColdEmailCtaLabel: string | null
   supportContractPrompt: string | null
   supportHourlyRateUsd: number | null
+  legalName: string | null
+  taxId: string | null
+  billingEmail: string | null
+  billingPhone: string | null
+  billingAddress: string | null
+  billingCity: string | null
+  quotePrefix: string | null
   logoUploadConfigured?: boolean
 }
 
@@ -24,6 +31,13 @@ export function OrganizationSettingsForm() {
   const [outreachCtaLabel, setOutreachCtaLabel] = useState('')
   const [supportContractPrompt, setSupportContractPrompt] = useState('')
   const [supportHourlyRateUsd, setSupportHourlyRateUsd] = useState('')
+  const [legalName, setLegalName] = useState('')
+  const [taxId, setTaxId] = useState('')
+  const [billingEmail, setBillingEmail] = useState('')
+  const [billingPhone, setBillingPhone] = useState('')
+  const [billingAddress, setBillingAddress] = useState('')
+  const [billingCity, setBillingCity] = useState('')
+  const [quotePrefix, setQuotePrefix] = useState('COT')
   const [logoUploadConfigured, setLogoUploadConfigured] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -45,6 +59,13 @@ export function OrganizationSettingsForm() {
         setSupportHourlyRateUsd(
           r.data.supportHourlyRateUsd != null ? String(r.data.supportHourlyRateUsd) : '',
         )
+        setLegalName(r.data.legalName ?? '')
+        setTaxId(r.data.taxId ?? '')
+        setBillingEmail(r.data.billingEmail ?? '')
+        setBillingPhone(r.data.billingPhone ?? '')
+        setBillingAddress(r.data.billingAddress ?? '')
+        setBillingCity(r.data.billingCity ?? '')
+        setQuotePrefix(r.data.quotePrefix ?? 'COT')
         setLogoUploadConfigured(r.data.logoUploadConfigured ?? false)
       } else {
         setMsg(r.message)
@@ -83,6 +104,13 @@ export function OrganizationSettingsForm() {
           supportContractPrompt.trim() === '' ? null : supportContractPrompt,
         supportHourlyRateUsd:
           supportHourlyRateUsd.trim() === '' ? null : parseFloat(supportHourlyRateUsd),
+        legalName: legalName.trim() === '' ? null : legalName,
+        taxId: taxId.trim() === '' ? null : taxId,
+        billingEmail: billingEmail.trim() === '' ? null : billingEmail,
+        billingPhone: billingPhone.trim() === '' ? null : billingPhone,
+        billingAddress: billingAddress.trim() === '' ? null : billingAddress,
+        billingCity: billingCity.trim() === '' ? null : billingCity,
+        quotePrefix: quotePrefix.trim() === '' ? null : quotePrefix,
       })
       if (!r.ok) {
         setMsg(r.message)
@@ -97,6 +125,13 @@ export function OrganizationSettingsForm() {
       setSupportHourlyRateUsd(
         r.data.supportHourlyRateUsd != null ? String(r.data.supportHourlyRateUsd) : '',
       )
+      setLegalName(r.data.legalName ?? '')
+      setTaxId(r.data.taxId ?? '')
+      setBillingEmail(r.data.billingEmail ?? '')
+      setBillingPhone(r.data.billingPhone ?? '')
+      setBillingAddress(r.data.billingAddress ?? '')
+      setBillingCity(r.data.billingCity ?? '')
+      setQuotePrefix(r.data.quotePrefix ?? 'COT')
       setMsg('Guardado.')
     } finally {
       setBusy(false)
@@ -176,6 +211,83 @@ export function OrganizationSettingsForm() {
           className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm text-[#111827] outline-none ring-[#9C77F5]/30 focus:border-[#9C77F5]/40 focus:ring-2 dark:border-[#2A2F3F] dark:bg-[#151828] dark:text-[#F8F9FB]"
         />
       </label>
+
+      <div className="mt-8 border-t border-[#E8EAEF] pt-6 dark:border-[#2A2F3F]">
+        <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F8F9FB]">
+          Datos para cotizaciones
+        </h3>
+        <p className="mt-1 text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+          Aparecen en el encabezado de cada cotización (logo arriba). El prompt de IA se define en cada
+          cotización al generarla desde Resultados.
+        </p>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Razón social</span>
+          <input
+            type="text"
+            value={legalName}
+            onChange={(e) => setLegalName(e.target.value)}
+            placeholder="Ej. Servicios y soluciones en pro del tiempo SAS"
+            className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+          />
+        </label>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">NIT</span>
+            <input
+              type="text"
+              value={taxId}
+              onChange={(e) => setTaxId(e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Prefijo cotización</span>
+            <input
+              type="text"
+              value={quotePrefix}
+              onChange={(e) => setQuotePrefix(e.target.value)}
+              placeholder="COT"
+              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Email comercial</span>
+            <input
+              type="email"
+              value={billingEmail}
+              onChange={(e) => setBillingEmail(e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Teléfono</span>
+            <input
+              type="text"
+              value={billingPhone}
+              onChange={(e) => setBillingPhone(e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+            />
+          </label>
+        </div>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Dirección</span>
+          <input
+            type="text"
+            value={billingAddress}
+            onChange={(e) => setBillingAddress(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+          />
+        </label>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-[#4B5563] dark:text-[#9CA3AF]">Ciudad</span>
+          <input
+            type="text"
+            value={billingCity}
+            onChange={(e) => setBillingCity(e.target.value)}
+            className="mt-1.5 w-full max-w-xs rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-2.5 text-sm dark:border-[#2A2F3F] dark:bg-[#151828]"
+          />
+        </label>
+      </div>
 
       <div className="mt-8 border-t border-[#E8EAEF] pt-6 dark:border-[#2A2F3F]">
         <h3 className="text-sm font-semibold text-[#111827] dark:text-[#F8F9FB]">

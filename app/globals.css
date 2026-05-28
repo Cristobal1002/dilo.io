@@ -117,6 +117,189 @@ body {
   background: rgba(156,119,245,0.10);
 }
 
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+  .quote-print-area,
+  .quote-print-area * {
+    visibility: visible;
+  }
+  .quote-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-doc {
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #111827 !important;
+    font-size: 9px !important;
+  }
+
+  .quote-print-header {
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  .quote-print-title p {
+    color: #111827 !important;
+  }
+
+  .quote-print-table thead th {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #d1d5db !important;
+  }
+
+  .quote-print-table tbody td,
+  .quote-print-table tbody th {
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  input,
+  textarea,
+  select {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    color: #111827 !important;
+    outline: none !important;
+    font: inherit !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: transparent !important;
+  }
+
+  /* Compact invoice-like spacing */
+  .quote-print-table th,
+  .quote-print-table td {
+    padding: 6px 6px !important;
+    vertical-align: top !important;
+    word-break: break-word !important;
+  }
+
+  .quote-print-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  /* Keep table header readable */
+  .quote-print-table thead th {
+    font-size: 9px !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  /* Smaller body text (rows), keep header size */
+  .quote-print-table tbody td,
+  .quote-print-table tbody th,
+  .quote-print-text {
+    font-size: 8px !important;
+    line-height: 1.22 !important;
+  }
+
+  /* Section headers like CONTACTO / FECHAS */
+  .quote-print-section-label {
+    font-size: 12px !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  /* Put dates side-by-side in print */
+  .quote-print-dates {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Column widths (invoice-like) */
+  .quote-print-table th:nth-child(1),
+  .quote-print-table td:nth-child(1) {
+    width: 16% !important;
+  }
+  .quote-print-table th:nth-child(2),
+  .quote-print-table td:nth-child(2) {
+    width: 10% !important;
+  }
+  .quote-print-table th:nth-child(3),
+  .quote-print-table td:nth-child(3) {
+    width: 10% !important;
+  }
+  .quote-print-table th:nth-child(4),
+  .quote-print-table td:nth-child(4) {
+    width: 6% !important;
+  }
+  .quote-print-table th:nth-child(5),
+  .quote-print-table td:nth-child(5) {
+    width: 6% !important;
+  }
+  .quote-print-table th:nth-child(6),
+  .quote-print-table td:nth-child(6) {
+    width: 40% !important;
+  }
+  .quote-print-table th:nth-child(7),
+  .quote-print-table td:nth-child(7) {
+    width: 6% !important;
+  }
+  .quote-print-table th:nth-child(8),
+  .quote-print-table td:nth-child(8) {
+    width: 10% !important;
+  }
+
+  .quote-print-table td:nth-child(8) {
+    white-space: nowrap !important;
+  }
+
+  /* Plain text blocks for print */
+  .quote-print-text {
+    line-height: 1.25 !important;
+    color: #111827 !important;
+  }
+
+  .quote-print-num {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  .quote-print-desc,
+  .quote-print-notes {
+    white-space: pre-wrap !important;
+  }
+
+  /* Prevent inputs from rendering as "boxes" in some browsers */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+  }
+
+  /* Make links look like text on paper */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
+
 .dilo-prose img {
   max-width: 100%;
   height: auto;

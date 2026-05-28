@@ -49,6 +49,17 @@ const optionalOutreachCtaLabel = z
     return t === '' ? null : t
   })
 
+const optionalText = (max: number) =>
+  z
+    .union([z.string().max(max), z.null()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined
+      if (v === null) return null
+      const t = v.trim()
+      return t === '' ? null : t
+    })
+
 const optionalSupportContractPrompt = z
   .union([z.string().max(12000), z.null()])
   .optional()
@@ -80,16 +91,17 @@ const PatchBody = z
     outreachColdEmailCtaLabel: optionalOutreachCtaLabel,
     supportContractPrompt: optionalSupportContractPrompt,
     supportHourlyRateUsd: optionalHourlyRate,
+    legalName: optionalText(300),
+    taxId: optionalText(80),
+    billingEmail: optionalText(320),
+    billingPhone: optionalText(80),
+    billingAddress: optionalText(500),
+    billingCity: optionalText(120),
+    quotePrefix: optionalText(20),
   })
   .refine(
     (d) =>
-      d.name !== undefined ||
-      d.logoUrl !== undefined ||
-      d.websiteUrl !== undefined ||
-      d.outreachColdEmailBodyMarkdown !== undefined ||
-      d.outreachColdEmailCtaLabel !== undefined ||
-      d.supportContractPrompt !== undefined ||
-      d.supportHourlyRateUsd !== undefined,
+      Object.values(d).some((v) => v !== undefined),
     { message: 'Envía al menos un campo para actualizar' },
   )
 
@@ -103,6 +115,13 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth }) => {
     outreachColdEmailCtaLabel: org.outreachColdEmailCtaLabel ?? null,
     supportContractPrompt: org.supportContractPrompt ?? null,
     supportHourlyRateUsd: org.supportHourlyRateUsd ?? null,
+    legalName: org.legalName ?? null,
+    taxId: org.taxId ?? null,
+    billingEmail: org.billingEmail ?? null,
+    billingPhone: org.billingPhone ?? null,
+    billingAddress: org.billingAddress ?? null,
+    billingCity: org.billingCity ?? null,
+    quotePrefix: org.quotePrefix ?? 'COT',
     logoUploadConfigured: isUploadthingConfigured(),
   })
 }, { requireAuth: true })
@@ -124,6 +143,13 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     outreachColdEmailCtaLabel,
     supportContractPrompt,
     supportHourlyRateUsd,
+    legalName,
+    taxId,
+    billingEmail,
+    billingPhone,
+    billingAddress,
+    billingCity,
+    quotePrefix,
   } = parsed.data
   const patch: Partial<typeof organizations.$inferInsert> = {}
   if (name !== undefined) patch.name = name
@@ -141,6 +167,13 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
   if (supportHourlyRateUsd !== undefined) {
     patch.supportHourlyRateUsd = supportHourlyRateUsd
   }
+  if (legalName !== undefined) patch.legalName = legalName
+  if (taxId !== undefined) patch.taxId = taxId
+  if (billingEmail !== undefined) patch.billingEmail = billingEmail
+  if (billingPhone !== undefined) patch.billingPhone = billingPhone
+  if (billingAddress !== undefined) patch.billingAddress = billingAddress
+  if (billingCity !== undefined) patch.billingCity = billingCity
+  if (quotePrefix !== undefined) patch.quotePrefix = quotePrefix ?? 'COT'
 
   try {
     await db.update(organizations).set(patch).where(eq(organizations.id, auth.org.id))
@@ -157,6 +190,13 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
       outreachColdEmailCtaLabel: organizations.outreachColdEmailCtaLabel,
       supportContractPrompt: organizations.supportContractPrompt,
       supportHourlyRateUsd: organizations.supportHourlyRateUsd,
+      legalName: organizations.legalName,
+      taxId: organizations.taxId,
+      billingEmail: organizations.billingEmail,
+      billingPhone: organizations.billingPhone,
+      billingAddress: organizations.billingAddress,
+      billingCity: organizations.billingCity,
+      quotePrefix: organizations.quotePrefix,
     })
     .from(organizations)
     .where(eq(organizations.id, auth.org.id))
@@ -170,5 +210,12 @@ export const PATCH = withApiHandler(async (req: NextRequest, { auth }) => {
     outreachColdEmailCtaLabel: row?.outreachColdEmailCtaLabel ?? null,
     supportContractPrompt: row?.supportContractPrompt ?? null,
     supportHourlyRateUsd: row?.supportHourlyRateUsd ?? null,
+    legalName: row?.legalName ?? null,
+    taxId: row?.taxId ?? null,
+    billingEmail: row?.billingEmail ?? null,
+    billingPhone: row?.billingPhone ?? null,
+    billingAddress: row?.billingAddress ?? null,
+    billingCity: row?.billingCity ?? null,
+    quotePrefix: row?.quotePrefix ?? 'COT',
   })
 }, { requireAuth: true })

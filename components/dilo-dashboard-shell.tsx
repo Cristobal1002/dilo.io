@@ -13,6 +13,7 @@ import {
   EnvelopeOpenIcon,
   FolderOpenIcon,
   LifebuoyIcon,
+  DocumentTextIcon,
   MoonIcon,
   PuzzlePieceIcon,
   SparklesIcon,
@@ -60,6 +61,7 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname === '/dashboard') return 'Mis flows'
   if (pathname.startsWith('/dashboard/outreach')) return 'Outreach'
   if (pathname.startsWith('/dashboard/support')) return 'Soporte'
+  if (pathname.startsWith('/dashboard/quotes')) return 'Cotizaciones'
   if (pathname.startsWith('/dashboard/account')) return 'Mi cuenta'
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
@@ -289,6 +291,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const misFlowsActive = pathname === '/dashboard'
   const outreachActive = pathname.startsWith('/dashboard/outreach')
   const supportActive = pathname.startsWith('/dashboard/support')
+  const quotesActive = pathname.startsWith('/dashboard/quotes')
   const newFlowActive = pathname.startsWith('/dashboard/flows/new')
   const editorTool = flowId ? tool : null
   const createIaHref = flowId ? `/dashboard/flows/${flowId}?tool=ia` : '/dashboard/flows/new'
@@ -414,6 +417,16 @@ export default function DiloDashboardShell({ children }: { children: React.React
               >
                 <LifebuoyIcon className="w-5 h-5 shrink-0" />
                 {!isSidebarCollapsed && <span className="flex-1 text-left">Soporte</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/dashboard/quotes"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(quotesActive, isSidebarCollapsed)}
+              >
+                <DocumentTextIcon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Cotizaciones</span>}
               </Link>
             </li>
           </ul>

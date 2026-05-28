@@ -52,6 +52,15 @@ import {
     /** Tarifa USD/hora explícita; si null, el informe solo muestra horas salvo que el prompt indique otra cosa. */
     supportHourlyRateUsd: real('support_hourly_rate_usd'),
 
+    /** Perfil en cotizaciones PDF / editor. */
+    legalName:          text('legal_name'),
+    taxId:              text('tax_id'),
+    billingEmail:       text('billing_email'),
+    billingPhone:       text('billing_phone'),
+    billingAddress:     text('billing_address'),
+    billingCity:        text('billing_city'),
+    quotePrefix:        text('quote_prefix').default('COT'),
+
     // ── Plan & billing ──────────────────────────────────────
     plan:                  text('plan').notNull().default('free'), // FK se agrega después del seed — ver paso 2 de setup
     planStartedAt:         timestamp('plan_started_at'),
@@ -398,6 +407,40 @@ import {
       uniqueIndex('support_cases_approval_token_uidx')
         .on(t.clientApprovalToken)
         .where(sql`${t.clientApprovalToken} IS NOT NULL`),
+    ],
+  )
+
+  /**
+   * Cotizaciones editables por workspace (generadas con IA desde sesiones o en blanco).
+   */
+  export const quotes = pgTable(
+    'quotes',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      quoteNumber:    integer('quote_number').notNull(),
+      status:         text('status').notNull().default('draft'),
+      flowId:         uuid('flow_id').references(() => flows.id, { onDelete: 'set null' }),
+      sessionId:      uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+      clientName:     text('client_name'),
+      clientTaxId:    text('client_tax_id'),
+      clientPhone:    text('client_phone'),
+      clientEmail:    text('client_email'),
+      issueDate:      timestamp('issue_date').notNull().defaultNow(),
+      dueDate:        timestamp('due_date'),
+      lineItems:      jsonb('line_items').notNull().default([]),
+      /** Instrucciones para IA al generar o regenerar esta cotización (interno, no va al PDF). */
+      aiPrompt:       text('ai_prompt'),
+      notes:          text('notes'),
+      globalDiscountPercent: real('global_discount_percent').notNull().default(0),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+      updatedAt:      timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      uniqueIndex('quotes_org_number_uidx').on(t.organizationId, t.quoteNumber),
+      index('quotes_org_updated_idx').on(t.organizationId, t.updatedAt),
     ],
   )
 
