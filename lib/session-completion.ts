@@ -18,8 +18,11 @@ import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
 import { createSupportCaseFromSession } from '@/lib/support-case-from-session'
 import { sendWhatsAppOnSessionComplete } from '@/lib/whatsapp/on-session-complete'
-import { formatFileAnswerForBubble, isFilePayload } from '@/lib/public-flow-file-helpers'
-import { formatMultiAnswerForDisplay, formatSelectAnswerForDisplay } from '@/lib/step-choice-helpers'
+import {
+  buildStructuredFromSteps,
+  buildStructuredRawFromSteps,
+  type SupportStepRow,
+} from '@/lib/support-session-structured'
 
 const log = createLogger('session-completion')
 
@@ -37,13 +40,7 @@ function normalizeAnalysisScore(score: number | null): number | null {
   return Math.max(0, Math.min(100, Math.round(score)))
 }
 
-type StepRow = {
-  id: string
-  type: string
-  question: string
-  variableName: string
-  options: { label: string; value: string }[]
-}
+type StepRow = SupportStepRow
 
 function parseScoringCriteria(raw: unknown): {
   hot: string
@@ -65,31 +62,6 @@ function parseScoringCriteria(raw: unknown): {
     cold: typeof o.cold === 'string' && o.cold.trim() ? o.cold.trim() : defaults.cold,
     objective: typeof o.objective === 'string' && o.objective.trim() ? o.objective.trim() : null,
   }
-}
-
-function displayAnswer(step: StepRow, raw: string | null): string {
-  if (raw == null || raw === '') return '(sin respuesta)'
-  if (step.type === 'file') {
-    try {
-      const p = JSON.parse(raw) as unknown
-      if (isFilePayload(p)) return formatFileAnswerForBubble(p)
-    } catch {
-      /* ignore */
-    }
-    return raw
-  }
-  if (step.type === 'multi_select') {
-    return formatMultiAnswerForDisplay(raw, step.options)
-  }
-  if (step.type === 'select') {
-    return formatSelectAnswerForDisplay(raw, step.options)
-  }
-  if (step.type === 'yes_no') {
-    if (raw === 'yes') return 'Sí'
-    if (raw === 'no') return 'No'
-    return raw
-  }
-  return raw
 }
 
 async function loadStepsForFlow(flowId: string): Promise<StepRow[]> {
@@ -115,22 +87,14 @@ async function loadStepsForFlow(flowId: string): Promise<StepRow[]> {
 }
 
 function buildTranscript(stepRows: StepRow[], answerByStep: Record<string, string | null>): string {
+  const structured = buildStructuredFromSteps(stepRows, answerByStep)
   const lines: string[] = []
   for (const s of stepRows) {
-    const v = answerByStep[s.id] ?? null
     lines.push(`Pregunta (${s.variableName}): ${s.question}`)
-    lines.push(`Respuesta: ${displayAnswer(s, v)}`)
+    lines.push(`Respuesta: ${structured[s.variableName] ?? '(sin respuesta)'}`)
     lines.push('')
   }
   return lines.join('\n').trim()
-}
-
-function buildStructuredFromSteps(stepRows: StepRow[], answerByStep: Record<string, string | null>) {
-  const out: Record<string, string> = {}
-  for (const s of stepRows) {
-    out[s.variableName] = displayAnswer(s, answerByStep[s.id] ?? null)
-  }
-  return out
 }
 
 function extractLeadContact(
@@ -141,17 +105,17 @@ function extractLeadContact(
   for (const s of stepRows) {
     const v = answerByStep[s.id]
     if (v == null || v === '') continue
-    if (s.type === 'email' && !out.email) out.email = displayAnswer(s, v)
-    if (s.type === 'phone' && !out.phone) out.phone = displayAnswer(s, v)
+    if (s.type === 'email' && !out.email) out.email = v.trim()
+    if (s.type === 'phone' && !out.phone) out.phone = v.trim()
     if (s.type === 'text' && /name|nombre|full/i.test(s.variableName) && !out.name) {
-      out.name = displayAnswer(s, v)
+      out.name = v.trim()
     }
   }
   if (!out.name) {
     const firstText = stepRows.find((s) => s.type === 'text' && answerByStep[s.id])
     if (firstText) {
       const v = answerByStep[firstText.id]
-      if (v) out.name = displayAnswer(firstText, v)
+      if (v) out.name = v.trim()
     }
   }
   return out
@@ -393,7 +357,7 @@ export async function processSessionCompletion(
       log.error({ err, sessionId: sessionRow.id }, 'sendWhatsAppOnSessionComplete failed')
     })
 
-    const structuredAnswers = buildStructuredFromSteps(stepRows, answerByStep)
+    const structuredAnswers = buildStructuredRawFromSteps(stepRows, answerByStep)
     void createSupportCaseFromSession({
       organizationId: flowRow.organizationId,
       flowId: flowRow.id,

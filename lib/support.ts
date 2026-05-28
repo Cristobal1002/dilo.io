@@ -97,19 +97,38 @@ export function supportPriorityPillClass(priority: string): string {
   return map[priority] ?? map.medium
 }
 
-/** Mapeo desde valores de plantilla de flow. */
+/** Mapeo desde valor de opción (`soporte`) o etiqueta mostrada (`Soporte técnico`). */
 export function mapSupportTypeFromAnswer(raw: string | null | undefined): SupportCaseType {
   const v = (raw ?? '').trim().toLowerCase()
-  if (v === 'soporte' || v === 'support') return 'support'
-  if (v === 'mejora' || v === 'improvement') return 'improvement'
-  if (v === 'consulta' || v === 'inquiry') return 'inquiry'
+  if (!v || v === '(sin respuesta)') return 'other'
+  if (
+    v === 'soporte' ||
+    v === 'support' ||
+    v.startsWith('soporte') ||
+    v.includes('soporte técnico') ||
+    v.includes('soporte tecnico')
+  ) {
+    return 'support'
+  }
+  if (
+    v === 'mejora' ||
+    v === 'improvement' ||
+    v.includes('mejora') ||
+    v.includes('funcionalidad')
+  ) {
+    return 'improvement'
+  }
+  if (v === 'consulta' || v === 'inquiry' || v.startsWith('consulta')) return 'inquiry'
+  if (v === 'otro' || v === 'other') return 'other'
   return 'other'
 }
 
 export function mapSupportPriorityFromAnswer(raw: string | null | undefined): SupportPriority {
   const v = (raw ?? '').trim().toLowerCase()
-  if (v === 'alta' || v === 'high') return 'high'
-  if (v === 'baja' || v === 'low') return 'low'
+  if (!v || v === '(sin respuesta)') return 'medium'
+  if (v === 'alta' || v === 'high' || v.startsWith('alta') || v.includes('bloquea')) return 'high'
+  if (v === 'baja' || v === 'low' || v.startsWith('baja')) return 'low'
+  if (v === 'media' || v === 'medium' || v.startsWith('media')) return 'medium'
   return 'medium'
 }
 

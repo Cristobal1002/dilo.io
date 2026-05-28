@@ -135,6 +135,7 @@ export default function SupportTable({
   const [reviewUrl, setReviewUrl] = useState<string | null>(null)
   const [saveBusy, setSaveBusy] = useState(false)
   const [approvalBusy, setApprovalBusy] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
 
   useEffect(() => {
     setQDraft(initialQ)
@@ -458,10 +459,52 @@ export default function SupportTable({
         ))}
       </div>
 
-      <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-        Mostrando {initialCases.length} de {initialTotal} casos
-        {totalPages > 1 ? ` · página ${initialPage} de ${totalPages}` : null}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+          Mostrando {initialCases.length} de {initialTotal} casos
+          {totalPages > 1 ? ` · página ${initialPage} de ${totalPages}` : null}
+        </p>
+        <button
+          type="button"
+          disabled={syncBusy}
+          onClick={() => {
+            void (async () => {
+              setSyncBusy(true)
+              setMsg(null)
+              try {
+                const res = await fetch('/api/support/cases/sync', { method: 'POST' })
+                const r = await readApiResult<{
+                  created: number
+                  typesUpdated: number
+                  skipped: number
+                }>(res)
+                if (!r.ok) {
+                  setMsg(r.message)
+                  return
+                }
+                const { created, typesUpdated } = r.data
+                if (created > 0 || typesUpdated > 0) {
+                  router.refresh()
+                  setSaveOkMsg(
+                    created > 0 && typesUpdated > 0
+                      ? `Sincronizado: ${created} caso(s) nuevos, ${typesUpdated} tipo(s) corregidos.`
+                      : created > 0
+                        ? `Sincronizado: ${created} caso(s) creados desde sesiones.`
+                        : `Tipos actualizados en ${typesUpdated} caso(s).`,
+                  )
+                } else {
+                  setSaveOkMsg('Todo al día: no había casos ni tipos por corregir.')
+                }
+              } finally {
+                setSyncBusy(false)
+              }
+            })()
+          }}
+          className="rounded-lg border border-[#E8EAEF] px-3 py-1.5 text-xs font-semibold text-[#6B4DD4] disabled:opacity-50 dark:border-[#2A2F3F] dark:text-[#D4C4FC]"
+        >
+          {syncBusy ? 'Sincronizando…' : 'Sincronizar sesiones'}
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-2xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
         <table className="w-full min-w-[960px] text-left text-sm">
