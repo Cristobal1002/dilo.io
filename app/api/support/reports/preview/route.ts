@@ -2,7 +2,12 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
-import { loadSupportValueReportPreview, listRecentReportMonths, parseReportMonth } from '@/lib/support-value-report'
+import {
+  loadSupportValueReportPreview,
+  loadSupportValueReportTrend,
+  listRecentReportMonths,
+  parseReportMonth,
+} from '@/lib/support-value-report'
 import { withApiHandler } from '@/lib/with-api-handler'
 import { db } from '@/db'
 import { clients } from '@/db/schema'
@@ -39,6 +44,17 @@ export const GET = withApiHandler(async (req: NextRequest, { auth }) => {
     throw new ValidationError('Mes inválido')
   }
 
+  const trend = await loadSupportValueReportTrend({
+    organizationId: auth.org.id,
+    month,
+    monthsBack: 3,
+    clientId,
+  })
+
+  if (!trend) {
+    throw new ValidationError('No se pudo cargar la tendencia')
+  }
+
   // Options: lista de clientes canónicos (tabla clients) + fallback por casos sin clientId si existieran.
   const rows = await db.query.clients.findMany({
     where: eq(clients.organizationId, auth.org.id),
@@ -49,6 +65,7 @@ export const GET = withApiHandler(async (req: NextRequest, { auth }) => {
 
   return apiSuccess({
     preview,
+    trend,
     monthOptions: listRecentReportMonths(18),
     companyOptions,
   })

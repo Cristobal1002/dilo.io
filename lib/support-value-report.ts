@@ -38,6 +38,94 @@ function toIso(d: unknown): string | null {
   return null
 }
 
+function monthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const m0 = year * 12 + (month - 1) + delta
+  const y = Math.floor(m0 / 12)
+  const m = (m0 % 12) + 1
+  return { year: y, month: m }
+}
+
+export type SupportValueReportTrendPoint = {
+  month: string
+  monthLabel: string
+  totalCases: number
+  totalHours: number
+  improvements: number
+  support: number
+  estimatedValueUsd: number | null
+}
+
+export async function loadSupportValueReportTrend(args: {
+  organizationId: string
+  month: string
+  monthsBack?: number
+  clientId?: string | null
+}): Promise<SupportValueReportTrendPoint[] | null> {
+  const parsed = parseReportMonth(args.month)
+  if (!parsed) return null
+
+  const monthsBack = args.monthsBack ?? 3
+  const points: SupportValueReportTrendPoint[] = []
+
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const { year, month } = shiftMonth(parsed.year, parsed.month, -i)
+    const m = monthKey(year, month)
+    const preview = await loadSupportValueReportPreview({
+      organizationId: args.organizationId,
+      month: m,
+      clientId: args.clientId ?? null,
+    })
+    if (!preview) return null
+
+    // Conteos por tipo (solo para casos reportables y con horas > 0, consistente con preview)
+    const { start, end, label } = monthBoundsUtc(year, month)
+    const activityInMonth = or(
+      and(gte(supportCases.resolvedAt, start), lt(supportCases.resolvedAt, end)),
+      and(
+        isNull(supportCases.resolvedAt),
+        gte(supportCases.lastActivityAt, start),
+        lt(supportCases.lastActivityAt, end),
+      ),
+    )!
+
+    const whereParts = [
+      eq(supportCases.organizationId, args.organizationId),
+      inArray(supportCases.status, [...REPORTABLE_STATUSES]),
+      sql`${supportCases.hoursSpent} IS NOT NULL AND ${supportCases.hoursSpent} > 0`,
+      activityInMonth,
+    ]
+    if (args.clientId?.trim()) whereParts.push(eq(supportCases.clientId, args.clientId.trim()))
+
+    const typeRows = await db
+      .select({
+        type: supportCases.type,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(supportCases)
+      .where(and(...whereParts))
+      .groupBy(supportCases.type)
+
+    const improvements = typeRows.find((r) => r.type === 'improvement')?.n ?? 0
+    const support = typeRows.find((r) => r.type === 'support')?.n ?? 0
+
+    points.push({
+      month: m,
+      monthLabel: preview.monthLabel,
+      totalCases: preview.totalCases,
+      totalHours: preview.totalHours,
+      improvements,
+      support,
+      estimatedValueUsd: preview.estimatedValueUsd,
+    })
+  }
+
+  return points
+}
+
 export async function loadSupportValueReportPreview(args: {
   organizationId: string
   month: string

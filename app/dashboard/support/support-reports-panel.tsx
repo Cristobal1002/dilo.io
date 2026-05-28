@@ -6,9 +6,19 @@ import { readApiResult } from '@/lib/read-api-result'
 import { formatUsd, type SupportValueReportPreview } from '@/lib/support-value-report-shared'
 
 type MonthOption = { value: string; label: string }
+type TrendPoint = {
+  month: string
+  monthLabel: string
+  totalCases: number
+  totalHours: number
+  improvements: number
+  support: number
+  estimatedValueUsd: number | null
+}
 
 type PreviewResponse = {
   preview: SupportValueReportPreview
+  trend: TrendPoint[]
   monthOptions: MonthOption[]
   companyOptions: { id: string; name: string }[]
 }
@@ -19,6 +29,7 @@ export default function SupportReportsPanel() {
   const [monthOptions, setMonthOptions] = useState<MonthOption[]>([])
   const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string }[]>([])
   const [preview, setPreview] = useState<SupportValueReportPreview | null>(null)
+  const [trend, setTrend] = useState<TrendPoint[] | null>(null)
   const [narrative, setNarrative] = useState('')
   const [sendTo, setSendTo] = useState('')
   const [loading, setLoading] = useState(true)
@@ -39,9 +50,11 @@ export default function SupportReportsPanel() {
       if (!r.ok) {
         setMsg(r.message)
         setPreview(null)
+        setTrend(null)
         return
       }
       setPreview(r.data.preview)
+      setTrend(r.data.trend)
       setMonthOptions(r.data.monthOptions)
       setCompanyOptions(r.data.companyOptions)
     } finally {
@@ -219,6 +232,40 @@ export default function SupportReportsPanel() {
               ) : null}
             </div>
           </div>
+
+          {trend && trend.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-[#E8EAEF] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+              <div className="border-b border-[#E8EAEF] px-4 py-3 text-xs font-semibold text-[#1A1A1A] dark:border-[#2A2F3F] dark:text-[#F8F9FB]">
+                Tendencia (últimos 3 meses)
+              </div>
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#E8EAEF] text-[10px] font-semibold uppercase text-[#94A3B8] dark:border-[#2A2F3F]">
+                    <th className="px-4 py-2">Mes</th>
+                    <th className="px-4 py-2 text-right">Casos</th>
+                    <th className="px-4 py-2 text-right">Horas</th>
+                    <th className="px-4 py-2 text-right">Mejoras</th>
+                    <th className="px-4 py-2 text-right">Soporte</th>
+                    <th className="px-4 py-2 text-right">Valor est.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trend.map((p) => (
+                    <tr key={p.month} className="border-b border-[#E8EAEF]/60 dark:border-[#2A2F3F]/60">
+                      <td className="px-4 py-2 font-medium text-[#1A1A1A] dark:text-[#F8F9FB]">{p.monthLabel}</td>
+                      <td className="px-4 py-2 text-right text-[#475569] dark:text-[#CBD5E1]">{p.totalCases}</td>
+                      <td className="px-4 py-2 text-right text-[#475569] dark:text-[#CBD5E1]">{p.totalHours}</td>
+                      <td className="px-4 py-2 text-right text-[#475569] dark:text-[#CBD5E1]">{p.improvements}</td>
+                      <td className="px-4 py-2 text-right text-[#475569] dark:text-[#CBD5E1]">{p.support}</td>
+                      <td className="px-4 py-2 text-right text-[#475569] dark:text-[#CBD5E1]">
+                        {formatUsd(p.estimatedValueUsd)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           {preview.totalCases === 0 ? (
             <p className="text-sm text-[#64748B]">
