@@ -223,6 +223,8 @@ export async function syncSupportCasesForOrganization(
         sessionId: session.id,
         type: mappedType,
         priority: mappedPriority,
+        clientId: mappedClientId,
+        clientCompany: mappedClientCompany,
       })
     } else {
       skipped++
