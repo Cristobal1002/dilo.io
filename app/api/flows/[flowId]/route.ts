@@ -50,6 +50,8 @@ const SettingsPatchSchema = z
     tone: z.string().max(220).optional(),
     chat_intro: z.string().max(4000).optional(),
     hide_branding: z.boolean().optional(),
+    /** Logo en bienvenida y cabecera del chat público. Por defecto visible si hay URL. */
+    show_logo: z.boolean().optional(),
     /** YouTube, Vimeo, Loom, o .gif / .mp4 / .webm en https. Vacío/null borra. */
     demo_video_url: optionalDemoVideoUrl,
     whatsapp: FlowWhatsAppSettingsSchema.optional(),

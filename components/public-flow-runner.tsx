@@ -32,6 +32,7 @@ import {
   selectionNeedsOtherDetail,
 } from '@/lib/step-choice-helpers'
 import { isStepSkippedByRules, nextStepIndexAfterAnswer } from '@/lib/step-skip'
+import { publicFlowLogoForDisplay } from '@/lib/public-flow-logo'
 
 const THEME_KEY = 'theme'
 
@@ -291,12 +292,6 @@ function completionFromSettings(settings: unknown) {
   return typeof m === 'string' && m.trim() ? m.trim() : null
 }
 
-function chatLogoUrl(flow: PublicFlowRecord): string | null {
-  const o = flow.settings && typeof flow.settings === 'object' ? (flow.settings as Record<string, unknown>) : {}
-  const u = o.logo_url
-  return typeof u === 'string' && /^https?:\/\//.test(u) ? u : null
-}
-
 function FlowChatHeader({
   flow,
   stepIdx,
@@ -319,7 +314,7 @@ function FlowChatHeader({
   const n = totalSteps > 0 ? Math.min(idx + 1, totalSteps) : 0
   const pct = totalSteps > 0 ? Math.round((n / totalSteps) * 100) : 0
   const showBack = !isTyping && !isDone && stepIdx >= 0
-  const logo = chatLogoUrl(flow)
+  const logo = publicFlowLogoForDisplay(flow.settings)
 
   return (
     <header className="sticky top-0 z-10 shrink-0 border-b border-[#9C77F5]/12 bg-linear-to-b from-[rgba(250,247,255,0.95)] to-[rgba(250,247,255,0.68)] pt-[max(6px,env(safe-area-inset-top))] backdrop-blur-md dark:border-[#2A2F3F] dark:from-[rgba(26,29,41,0.96)] dark:to-[rgba(26,29,41,0.76)]">
@@ -612,9 +607,18 @@ function WelcomeScreen({
 }) {
   const w = welcomeCopy(flow, stepCount)
   const demoVideoUrl = readDemoVideoUrlFromSettings(flow.settings)
+  const logo = publicFlowLogoForDisplay(flow.settings)
   return (
     <div className="flex min-h-dvh flex-col px-5 py-10 text-center">
       <div className="flex flex-1 flex-col items-center justify-center">
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo}
+          alt=""
+          className="mb-4 h-10 w-auto max-w-[min(72vw,220px)] object-contain object-center sm:h-11"
+        />
+      ) : null}
       <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#7B5BD4] opacity-90 dark:text-[#D4C4FC]">
         {w.label}
       </p>

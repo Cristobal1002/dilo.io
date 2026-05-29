@@ -91,6 +91,8 @@ export type FlowPresentationSettings = {
   tone?: string
   transition_style?: 'ai' | 'none'
   hide_branding?: boolean
+  /** Logo en enlace público (bienvenida + chat). Por defecto visible. */
+  show_logo?: boolean
   estimated_minutes_min?: number
   estimated_minutes_max?: number
   /** Primer mensaje del chat público; vacío → la app arma saludo desde la descripción. */
@@ -191,6 +193,7 @@ function parsePresentationSettings(raw: FlowWorkspaceFlow['settings'], workspace
   return {
     tagline: typeof o.tagline === 'string' && o.tagline.trim() ? o.tagline.trim() : defaultTag,
     logoUrl: fromFlow ?? fromWorkspace,
+    showLogo: o.show_logo !== false,
     label: typeof o.presentation_label === 'string' && o.presentation_label.trim()
       ? o.presentation_label.trim()
       : 'Bienvenida',
@@ -259,6 +262,8 @@ function FlowPresentationPreview({
   })
   const [demoVideoSaving, setDemoVideoSaving] = useState(false)
   const [demoVideoError, setDemoVideoError] = useState<string | null>(null)
+  const [showLogo, setShowLogo] = useState(() => pres.showLogo)
+  const [showLogoSaving, setShowLogoSaving] = useState(false)
 
   useEffect(() => {
     const o =
@@ -267,7 +272,33 @@ function FlowPresentationPreview({
     setTransitionAi(o.transition_style === 'ai')
     setChatIntroDraft(typeof o.chat_intro === 'string' ? o.chat_intro : '')
     setDemoVideoDraft(typeof o.demo_video_url === 'string' ? o.demo_video_url : '')
+    setShowLogo(o.show_logo !== false)
   }, [flow.settings])
+
+  const saveShowLogo = useCallback(
+    async (next: boolean) => {
+      setShowLogo(next)
+      setShowLogoSaving(true)
+      try {
+        const res = await fetch(`/api/flows/${flow.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: { show_logo: next } }),
+        })
+        const result = await readApiResult(res)
+        if (!result.ok) {
+          setShowLogo(!next)
+          return
+        }
+        router.refresh()
+      } catch {
+        setShowLogo(!next)
+      } finally {
+        setShowLogoSaving(false)
+      }
+    },
+    [flow.id, router],
+  )
 
   const saveAssistant = useCallback(async () => {
     setAssistError(null)
@@ -451,14 +482,14 @@ function FlowPresentationPreview({
       </div>
 
       <div className="mx-auto flex max-w-md flex-col items-center text-center">
-        {pres.logoUrl ? (
+        {pres.logoUrl && showLogo ? (
           // eslint-disable-next-line @next/next/no-img-element -- URL de marca configurable en settings
           <img
             src={pres.logoUrl}
             alt=""
             className="mb-3 h-10 w-auto max-w-[220px] object-contain object-center"
           />
-        ) : (
+        ) : pres.logoUrl && !showLogo ? null : (
           <div className="mb-3 select-none">
             <p className="text-[1.65rem] font-black leading-none tracking-tight">
               <span className="bg-linear-to-r from-[#9C77F5] via-[#8B5CF6] to-[#00d4b0] bg-clip-text text-transparent">
@@ -467,6 +498,21 @@ function FlowPresentationPreview({
             </p>
           </div>
         )}
+
+        {pres.logoUrl ? (
+          <label className="mb-4 flex max-w-sm cursor-pointer items-center justify-center gap-2.5 text-left">
+            <input
+              type="checkbox"
+              checked={showLogo}
+              disabled={showLogoSaving}
+              onChange={(e) => void saveShowLogo(e.target.checked)}
+              className="h-4 w-4 shrink-0 rounded border-[#CBD5E1] text-dilo-600 focus:ring-dilo-500"
+            />
+            <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+              Mostrar logo en el enlace público (bienvenida y chat)
+            </span>
+          </label>
+        ) : null}
 
         <p className="mb-6 max-w-sm text-xs leading-snug text-[#6B7280] dark:text-[#9CA3AF]">{pres.tagline}</p>
 
