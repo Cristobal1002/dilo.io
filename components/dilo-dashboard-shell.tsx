@@ -7,6 +7,8 @@ import { useClerk, useUser } from '@clerk/nextjs'
 import {
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
+  GlobeAltIcon,
+  BuildingOffice2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
@@ -58,10 +60,13 @@ function flowIdFromPath(pathname: string): string | null {
 }
 
 function breadcrumbLabel(pathname: string): string {
+  if (pathname.startsWith('/dashboard/clients')) return 'Clientes'
   if (pathname === '/dashboard') return 'Mis flows'
   if (pathname.startsWith('/dashboard/outreach')) return 'Outreach'
   if (pathname.startsWith('/dashboard/support')) return 'Soporte'
   if (pathname.startsWith('/dashboard/quotes')) return 'Cotizaciones'
+  if (pathname.startsWith('/dashboard/settings/connections')) return 'Métodos de conexión'
+  if (pathname.startsWith('/dashboard/settings/knowledge')) return 'Base de conocimiento'
   if (pathname.startsWith('/dashboard/account')) return 'Mi cuenta'
   if (pathname.startsWith('/dashboard/flows/new')) return 'Nuevo flow'
   if (pathname.match(/^\/dashboard\/flows\/[^/]+$/)) return 'Editor'
@@ -291,6 +296,7 @@ export default function DiloDashboardShell({ children }: { children: React.React
   const misFlowsActive = pathname === '/dashboard'
   const outreachActive = pathname.startsWith('/dashboard/outreach')
   const supportActive = pathname.startsWith('/dashboard/support')
+  const clientsActive = pathname.startsWith('/dashboard/clients')
   const quotesActive = pathname.startsWith('/dashboard/quotes')
   const newFlowActive = pathname.startsWith('/dashboard/flows/new')
   const editorTool = flowId ? tool : null
@@ -303,6 +309,8 @@ export default function DiloDashboardShell({ children }: { children: React.React
     pathname.startsWith('/dashboard/settings/organization') ||
     pathname.startsWith('/dashboard/settings/team')
   const settingsIntegrationsActive = pathname.startsWith('/dashboard/settings/integrations')
+  const settingsConnectionsActive = pathname.startsWith('/dashboard/settings/connections')
+  const settingsKnowledgeActive = pathname.startsWith('/dashboard/settings/knowledge')
   const canManageIntegrationsNav = orgRole === 'owner' || orgRole === 'admin'
 
   const navBtn = (active: boolean, collapsed: boolean, extra?: string) =>
@@ -391,22 +399,22 @@ export default function DiloDashboardShell({ children }: { children: React.React
           <ul className="space-y-1">
             <li>
               <Link
+                href="/dashboard/clients"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(clientsActive, isSidebarCollapsed)}
+              >
+                <BuildingOffice2Icon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Clientes</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
                 href="/dashboard"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={navBtn(misFlowsActive, isSidebarCollapsed)}
               >
                 <FolderOpenIcon className="w-5 h-5 shrink-0" />
                 {!isSidebarCollapsed && <span className="flex-1 text-left">Mis flows</span>}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/dashboard/outreach"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={navBtn(outreachActive, isSidebarCollapsed)}
-              >
-                <EnvelopeOpenIcon className="w-5 h-5 shrink-0" />
-                {!isSidebarCollapsed && <span className="flex-1 text-left">Outreach</span>}
               </Link>
             </li>
             <li>
@@ -427,6 +435,16 @@ export default function DiloDashboardShell({ children }: { children: React.React
               >
                 <DocumentTextIcon className="w-5 h-5 shrink-0" />
                 {!isSidebarCollapsed && <span className="flex-1 text-left">Cotizaciones</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/dashboard/outreach"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={navBtn(outreachActive, isSidebarCollapsed)}
+              >
+                <EnvelopeOpenIcon className="w-5 h-5 shrink-0" />
+                {!isSidebarCollapsed && <span className="flex-1 text-left">Outreach</span>}
               </Link>
             </li>
           </ul>
@@ -514,16 +532,38 @@ export default function DiloDashboardShell({ children }: { children: React.React
               </Link>
             </li>
             {meLoaded && canManageIntegrationsNav ? (
-              <li>
-                <Link
-                  href="/dashboard/settings/integrations"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={navBtn(settingsIntegrationsActive, isSidebarCollapsed)}
-                >
-                  <PuzzlePieceIcon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span className="flex-1 text-left">Integraciones</span>}
-                </Link>
-              </li>
+              <>
+                <li>
+                  <Link
+                    href="/dashboard/settings/connections/embed"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={navBtn(settingsConnectionsActive, isSidebarCollapsed)}
+                  >
+                    <GlobeAltIcon className="w-5 h-5 shrink-0" />
+                    {!isSidebarCollapsed && <span className="flex-1 text-left">Conexiones</span>}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/dashboard/settings/knowledge"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={navBtn(settingsKnowledgeActive, isSidebarCollapsed)}
+                  >
+                    <DocumentTextIcon className="w-5 h-5 shrink-0" />
+                    {!isSidebarCollapsed && <span className="flex-1 text-left">Conocimiento</span>}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/dashboard/settings/integrations"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={navBtn(settingsIntegrationsActive, isSidebarCollapsed)}
+                  >
+                    <PuzzlePieceIcon className="w-5 h-5 shrink-0" />
+                    {!isSidebarCollapsed && <span className="flex-1 text-left">Integraciones</span>}
+                  </Link>
+                </li>
+              </>
             ) : null}
           </ul>
 

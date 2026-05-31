@@ -368,12 +368,57 @@ import {
       name:           text('name').notNull(),
       /** Slug canónico (único por org). */
       slug:           text('slug').notNull(),
+      legalName:      text('legal_name'),
+      /** ID en el sistema del partner (tenant). Único por org si está presente. */
+      externalId:     text('external_id'),
+      /** nit_co | ruc_pe | rfc_mx | rut_cl | cuit_ar | ruc_ec | rif_ve | rtn_hn | cedula_juridica_cr | generic */
+      taxIdType:      text('tax_id_type'),
+      taxId:          text('tax_id'),
+      email:          text('email'),
+      phone:          text('phone'),
+      website:        text('website'),
+      addressLine1:   text('address_line1'),
+      addressLine2:   text('address_line2'),
+      city:           text('city'),
+      stateRegion:    text('state_region'),
+      postalCode:     text('postal_code'),
+      /** ISO 3166-1 alpha-2 (CO, MX, PE, …). */
+      countryCode:    text('country_code'),
+      notes:          text('notes'),
+      status:         text('status').notNull().default('active'),
+      embedAllowedDomains: jsonb('embed_allowed_domains').notNull().default([]),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
       updatedAt:      timestamp('updated_at').notNull().defaultNow(),
     },
     (t) => [
       uniqueIndex('clients_org_slug_uidx').on(t.organizationId, t.slug),
+      uniqueIndex('clients_org_external_id_uidx')
+        .on(t.organizationId, t.externalId)
+        .where(sql`${t.externalId} IS NOT NULL`),
       index('clients_org_name_idx').on(t.organizationId, t.name),
+      index('clients_org_tax_id_idx').on(t.organizationId, t.taxId),
+    ],
+  )
+
+  /** Artículos de base de conocimiento (deflexión antes de soporte). */
+  export const knowledgeArticles = pgTable(
+    'knowledge_articles',
+    {
+      id:             uuid('id').primaryKey().defaultRandom(),
+      organizationId: uuid('organization_id')
+        .notNull()
+        .references(() => organizations.id, { onDelete: 'cascade' }),
+      /** null = visible para toda la org; si hay valor, solo ese cliente (embed). */
+      clientId:       uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+      title:          text('title').notNull(),
+      body:           text('body').notNull(),
+      status:         text('status').notNull().default('published'),
+      createdAt:      timestamp('created_at').notNull().defaultNow(),
+      updatedAt:      timestamp('updated_at').notNull().defaultNow(),
+    },
+    (t) => [
+      index('knowledge_articles_org_idx').on(t.organizationId, t.status),
+      index('knowledge_articles_org_client_idx').on(t.organizationId, t.clientId),
     ],
   )
 

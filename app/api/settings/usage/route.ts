@@ -6,6 +6,7 @@ import { withApiHandler } from '@/lib/with-api-handler'
 import { apiSuccess } from '@/lib/api-response'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
 import { requireOrgRoles } from '@/lib/org-role'
+import { isStripeConfigured } from '@/lib/stripe-config'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('settings/usage')
@@ -79,6 +80,11 @@ export const GET = withApiHandler(
 
     return apiSuccess({
       plan: org.plan,
+      billing: {
+        stripeConfigured: isStripeConfigured(),
+        hasStripeCustomer: Boolean(org.stripeCustomerId),
+        hasActiveSubscription: Boolean(org.stripeSubscriptionId),
+      },
       planMeta: {
         startedAt: org.planStartedAt ?? null,
         trialEndsAt: org.trialEndsAt ?? null,

@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { supportCases } from '@/db/schema'
 import { createLogger } from '@/lib/logger'
 import { isSupportFlow } from '@/lib/support-flow-purpose'
+import { shouldCreateSupportCase } from '@/lib/session-deflection'
 import { ensureClientByName, getClientNameById, isUuidLike } from '@/lib/support-clients'
 import {
   mapSupportPriorityFromAnswer,
@@ -75,12 +76,19 @@ export async function createSupportCaseFromSession(args: {
   flowName: string
   flowSettings: unknown
   sessionId: string
+  sessionMetadata?: unknown
   structuredAnswersRaw: Record<string, string>
   structuredAnswersDisplay?: Record<string, string> | null
   contact: { name?: string; email?: string; phone?: string }
   summaryFallback?: string | null
+  /** Desde metadata.embedContext de la sesión (embed multi-tenant). */
+  sessionClientId?: string | null
 }): Promise<{ created: boolean; caseId?: string }> {
   if (!isSupportFlow(args.flowSettings)) {
+    return { created: false }
+  }
+
+  if (!shouldCreateSupportCase({ flowSettings: args.flowSettings, sessionMetadata: args.sessionMetadata })) {
     return { created: false }
   }
 
@@ -133,8 +141,20 @@ export async function createSupportCaseFromSession(args: {
   let clientId: string | null = null
   let clientCompany: string | null = null
 
+  // Embed: clientId fijado al crear la sesión (dashboard multi-tenant del partner).
+  if (args.sessionClientId && isUuidLike(args.sessionClientId)) {
+    const name = await getClientNameById({
+      organizationId: args.organizationId,
+      clientId: args.sessionClientId.trim(),
+    })
+    if (name) {
+      clientId = args.sessionClientId.trim()
+      clientCompany = name
+    }
+  }
+
   // Pro mode: el step "empresa" puede guardar clientId (uuid) como value.
-  if (clientAnswer && isUuidLike(clientAnswer)) {
+  if (!clientId && clientAnswer && isUuidLike(clientAnswer)) {
     const name = await getClientNameById({
       organizationId: args.organizationId,
       clientId: clientAnswer.trim(),

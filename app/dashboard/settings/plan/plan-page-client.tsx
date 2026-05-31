@@ -1,17 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { ChartBarIcon, BoltIcon, UsersIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { ChartBarIcon, BoltIcon, UsersIcon, SparklesIcon, CreditCardIcon } from '@heroicons/react/24/outline'
 import { PLAN_LABELS, PLAN_COLORS, formatLimit, type Plan } from '@/lib/plan-limits'
 
 type UsageData = {
   plan: Plan
+  billing?: {
+    stripeConfigured: boolean
+    hasStripeCustomer: boolean
+    hasActiveSubscription: boolean
+  }
   usage: {
     flows: { count: number; limit: number }
     sessionsThisMonth: { count: number; limit: number }
     members: { count: number; limit: number }
   }
 }
+
+const UPGRADE_PLANS: { id: Exclude<Plan, 'free'>; label: string; price: string }[] = [
+  { id: 'pro', label: 'Pro', price: '$29/mes' },
+  { id: 'agency', label: 'Agency', price: '$99/mes' },
+]
 
 function UsageBar({
   label,
@@ -102,21 +113,81 @@ function SkeletonCard() {
   )
 }
 
+async function startCheckout(planId: Exclude<Plan, 'free'>): Promise<string> {
+  const res = await fetch('/api/billing/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ planId }),
+  })
+  const json = await res.json()
+  if (!json.success || !json.data?.url) {
+    throw new Error(json.error?.message ?? 'No se pudo iniciar el checkout')
+  }
+  return json.data.url as string
+}
+
+async function openPortal(): Promise<string> {
+  const res = await fetch('/api/billing/portal', { method: 'POST' })
+  const json = await res.json()
+  if (!json.success || !json.data?.url) {
+    throw new Error(json.error?.message ?? 'No se pudo abrir el portal de facturación')
+  }
+  return json.data.url as string
+}
+
 export default function PlanPageClient() {
+  const searchParams = useSearchParams()
+  const checkoutStatus = searchParams.get('checkout')
+
   const [data, setData] = useState<UsageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [billingAction, setBillingAction] = useState<string | null>(null)
+  const [billingError, setBillingError] = useState('')
 
-  useEffect(() => {
-    fetch('/api/settings/usage')
+  const loadUsage = useCallback(() => {
+    return fetch('/api/settings/usage')
       .then((r) => r.json())
       .then((res) => {
         if (res.success) setData(res.data)
         else setError('No se pudo cargar la información de uso.')
       })
       .catch(() => setError('No se pudo cargar la información de uso.'))
-      .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    loadUsage().finally(() => setLoading(false))
+  }, [loadUsage])
+
+  useEffect(() => {
+    if (checkoutStatus === 'success') {
+      loadUsage()
+    }
+  }, [checkoutStatus, loadUsage])
+
+  const handleCheckout = async (planId: Exclude<Plan, 'free'>) => {
+    setBillingError('')
+    setBillingAction(planId)
+    try {
+      const url = await startCheckout(planId)
+      window.location.href = url
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Error al iniciar checkout')
+      setBillingAction(null)
+    }
+  }
+
+  const handlePortal = async () => {
+    setBillingError('')
+    setBillingAction('portal')
+    try {
+      const url = await openPortal()
+      window.location.href = url
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Error al abrir el portal')
+      setBillingAction(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -136,8 +207,12 @@ export default function PlanPageClient() {
     )
   }
 
-  const { plan, usage } = data
+  const { plan, usage, billing } = data
   const features = PLAN_FEATURES[plan] ?? PLAN_FEATURES.free
+  const stripeReady = billing?.stripeConfigured ?? false
+  const canManageSubscription = billing?.hasStripeCustomer ?? false
+  const showUpgrade = plan === 'free' && stripeReady
+  const showPortal = canManageSubscription && stripeReady
 
   return (
     <div className="space-y-5">
@@ -147,6 +222,24 @@ export default function PlanPageClient() {
           Tu plan actual y consumo del mes.
         </p>
       </div>
+
+      {checkoutStatus === 'success' && (
+        <div className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-4 py-3 text-sm text-[#065F46] dark:border-[#065F46]/40 dark:bg-[#064E3B]/20 dark:text-[#A7F3D0]">
+          Pago recibido. Tu plan se actualizará en unos segundos cuando Stripe confirme la suscripción.
+        </div>
+      )}
+
+      {checkoutStatus === 'cancel' && (
+        <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E] dark:border-[#92400E]/40 dark:bg-[#78350F]/20 dark:text-[#FDE68A]">
+          Checkout cancelado. Puedes intentarlo de nuevo cuando quieras.
+        </div>
+      )}
+
+      {billingError && (
+        <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#991B1B] dark:border-[#991B1B]/40 dark:bg-[#7F1D1D]/20 dark:text-[#FECACA]">
+          {billingError}
+        </div>
+      )}
 
       {/* Current plan */}
       <div className="rounded-xl border border-[#E5E7EB] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29] p-6">
@@ -162,14 +255,17 @@ export default function PlanPageClient() {
               <PlanBadge plan={plan} />
             </div>
           </div>
-          {plan === 'free' && (
-            <a
-              href="mailto:hola@modecaitech.com?subject=Quiero actualizar mi plan"
-              className="flex items-center gap-1.5 rounded-lg bg-[#7C3AED] px-4 py-2 text-xs font-medium text-white hover:bg-[#6D28D9] transition-colors shrink-0"
+
+          {showPortal && (
+            <button
+              type="button"
+              onClick={handlePortal}
+              disabled={billingAction !== null}
+              className="flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-4 py-2 text-xs font-medium text-[#374151] hover:bg-[#F9FAFB] transition-colors shrink-0 disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#1A1D29] dark:text-[#D1D5DB] dark:hover:bg-[#252936]"
             >
-              <SparklesIcon className="h-3.5 w-3.5" />
-              Mejorar plan
-            </a>
+              <CreditCardIcon className="h-3.5 w-3.5" />
+              {billingAction === 'portal' ? 'Abriendo…' : 'Gestionar suscripción'}
+            </button>
           )}
         </div>
 
@@ -185,6 +281,34 @@ export default function PlanPageClient() {
           </ul>
         </div>
       </div>
+
+      {showUpgrade && (
+        <div className="rounded-xl border border-[#E5E7EB] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29] p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <SparklesIcon className="h-4 w-4 text-[#7C3AED]" />
+            <p className="text-xs font-medium uppercase tracking-wider text-[#9CA3AF] dark:text-[#6B7280]">
+              Mejorar plan
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {UPGRADE_PLANS.map(({ id, label, price }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleCheckout(id)}
+                disabled={billingAction !== null}
+                className="flex flex-col items-start rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-4 py-4 text-left transition-colors hover:border-[#7C3AED]/40 hover:bg-[#F5F3FF] disabled:opacity-50 dark:border-[#2A2F3F] dark:bg-[#252936] dark:hover:border-[#7C3AED]/40 dark:hover:bg-[#2A2540]"
+              >
+                <span className="text-sm font-semibold text-[#111827] dark:text-[#F9FAFB]">{label}</span>
+                <span className="mt-0.5 text-xs text-[#6B7280] dark:text-[#9CA3AF]">{price}</span>
+                <span className="mt-3 text-xs font-medium text-[#7C3AED]">
+                  {billingAction === id ? 'Redirigiendo…' : 'Suscribirse →'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Usage */}
       <div className="rounded-xl border border-[#E5E7EB] bg-white dark:border-[#2A2F3F] dark:bg-[#1A1D29] p-6">
@@ -211,7 +335,7 @@ export default function PlanPageClient() {
         />
       </div>
 
-      {plan === 'free' && (
+      {!stripeReady && plan === 'free' && (
         <p className="text-xs text-[#9CA3AF] dark:text-[#6B7280]">
           ¿Necesitas más? Escríbenos a{' '}
           <a href="mailto:hola@modecaitech.com" className="text-[#7C3AED] hover:underline">

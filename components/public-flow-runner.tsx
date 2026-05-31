@@ -32,7 +32,11 @@ import {
   selectionNeedsOtherDetail,
 } from '@/lib/step-choice-helpers'
 import { isStepSkippedByRules, nextStepIndexAfterAnswer } from '@/lib/step-skip'
+import { isStepSkippedByEmbedClientContext } from '@/lib/client-context-step'
+import type { SessionEmbedContext } from '@/lib/embed-context'
 import { publicFlowLogoForDisplay } from '@/lib/public-flow-logo'
+import { PublicFlowDeflection } from '@/components/public-flow-deflection'
+import { shouldDeflectBeforeForm } from '@/lib/support-mode'
 
 const THEME_KEY = 'theme'
 
@@ -178,12 +182,55 @@ function stepIsAnswered(step: PublicFlowStep, answers: Record<string, string>) {
   return true
 }
 
-function firstOpenStep(steps: PublicFlowStep[], answers: Record<string, string>) {
+function shouldSkipStep(
+  step: PublicFlowStep,
+  answers: Record<string, string>,
+  allSteps: PublicFlowStep[],
+  embedClientId: string | null,
+): boolean {
+  if (isStepSkippedByEmbedClientContext(step, embedClientId)) return true
+  return isStepSkippedByRules(step, answers, allSteps)
+}
+
+function firstOpenStep(steps: PublicFlowStep[], answers: Record<string, string>, embedClientId: string | null) {
   for (let i = 0; i < steps.length; i++) {
-    if (isStepSkippedByRules(steps[i], answers, steps)) continue
+    if (shouldSkipStep(steps[i], answers, steps, embedClientId)) continue
     if (!stepIsAnswered(steps[i], answers)) return i
   }
   return steps.length
+}
+
+function nextVisibleStepIndex(
+  fromIdx: number,
+  steps: PublicFlowStep[],
+  answers: Record<string, string>,
+  embedClientId: string | null,
+): number {
+  let j = nextStepIndexAfterAnswer(fromIdx, steps, answers)
+  while (j < steps.length && shouldSkipStep(steps[j], answers, steps, embedClientId)) {
+    j += 1
+  }
+  return j
+}
+
+async function createFlowSession(args: {
+  flowId: string
+  embedContext: SessionEmbedContext | null | undefined
+  embedQuery?: { ctx?: string | null; client?: string | null; externalId?: string | null }
+}) {
+  const payload: Record<string, unknown> = {}
+  if (args.embedContext || args.embedQuery?.ctx || args.embedQuery?.externalId || args.embedQuery?.client) {
+    payload.embedContext = {
+      clientId: args.embedContext?.clientId ?? args.embedQuery?.client ?? undefined,
+      ctx: args.embedQuery?.ctx ?? undefined,
+      externalId: args.embedQuery?.externalId ?? undefined,
+    }
+  }
+  return fetch(`/api/f/${encodeURIComponent(args.flowId)}/sessions`, {
+    method: 'POST',
+    headers: Object.keys(payload).length ? { 'Content-Type': 'application/json' } : undefined,
+    body: Object.keys(payload).length ? JSON.stringify(payload) : undefined,
+  })
 }
 
 async function fetchAcknowledge(params: {
@@ -232,12 +279,17 @@ function readTransitionSettings(flow: PublicFlowRecord): { style: 'ai' | 'none';
   return { style, tone }
 }
 
-function rebuildMessages(currentStepIdx: number, steps: PublicFlowStep[], answers: Record<string, string>) {
+function rebuildMessages(
+  currentStepIdx: number,
+  steps: PublicFlowStep[],
+  answers: Record<string, string>,
+  embedClientId: string | null,
+) {
   const lead = buildLead(steps, answers)
   const out: Msg[] = []
   for (let i = 0; i < currentStepIdx; i++) {
     const s = steps[i]
-    if (isStepSkippedByRules(s, answers, steps)) continue
+    if (shouldSkipStep(s, answers, steps, embedClientId)) continue
     out.push({ id: uid(), role: 'assistant', content: interpolate(s.question, lead) })
     if (stepIsAnswered(s, answers)) {
       const stored = answers[s.id] ?? ''
@@ -245,18 +297,18 @@ function rebuildMessages(currentStepIdx: number, steps: PublicFlowStep[], answer
     }
   }
   const cur = steps[currentStepIdx]
-  if (cur && !isStepSkippedByRules(cur, answers, steps)) {
+  if (cur && !shouldSkipStep(cur, answers, steps, embedClientId)) {
     out.push({ id: uid(), role: 'assistant', content: interpolate(cur.question, lead) })
   }
   return out
 }
 
-function buildFullThread(steps: PublicFlowStep[], answers: Record<string, string>) {
+function buildFullThread(steps: PublicFlowStep[], answers: Record<string, string>, embedClientId: string | null) {
   const lead = buildLead(steps, answers)
   const out: Msg[] = []
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i]
-    if (isStepSkippedByRules(s, answers, steps)) continue
+    if (shouldSkipStep(s, answers, steps, embedClientId)) continue
     out.push({ id: uid(), role: 'assistant', content: interpolate(s.question, lead) })
     if (stepIsAnswered(s, answers)) {
       const stored = answers[s.id] ?? ''
@@ -744,22 +796,28 @@ export function PublicFlowRunner({
   flowId,
   initialPayload,
   isEmbed = false,
+  embedContext = null,
+  embedQuery,
 }: {
   flowId: string
   initialPayload: PublicFlowInitialPayload
   isEmbed?: boolean
+  embedContext?: SessionEmbedContext | null
+  embedQuery?: { ctx?: string | null; client?: string | null; externalId?: string | null }
 }) {
   const { flow, steps } = initialPayload
+  const embedClientId = embedContext?.clientId ?? null
 
   useEffect(() => {
     const t = localStorage.getItem(THEME_KEY)
     document.documentElement.classList.toggle('dark', t === 'dark')
   }, [])
 
-  type Phase = 'loading' | 'error' | 'empty' | 'welcome' | 'chat' | 'done'
+  type Phase = 'loading' | 'error' | 'empty' | 'welcome' | 'deflection' | 'chat' | 'done'
   const [phase, setPhase] = useState<Phase>('loading')
   const [errorMsg, setErrorMsg] = useState('')
   const [token, setToken] = useState<string | null>(null)
+  const [deflectionCompletionMsg, setDeflectionCompletionMsg] = useState<string | null>(null)
   const [resumeAvailable, setResumeAvailable] = useState(false)
   const [resumePayload, setResumePayload] = useState<{
     answers: Record<string, string>
@@ -862,6 +920,25 @@ export function PublicFlowRunner({
     }
   }, [flowId, token])
 
+  const persistSessionMetadata = useCallback(
+    async (metadata: Record<string, unknown>, completed?: boolean) => {
+      const t = tokenRef.current
+      if (!t) return false
+      const res = await fetch(`/api/f/${flowId}/sessions/${encodeURIComponent(t)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          answers: stripFileDataUrlsFromAnswers(answersRef.current),
+          currentStepIndex: stepIdxRef.current,
+          completed: completed === true,
+          metadata,
+        }),
+      })
+      return res.ok
+    },
+    [flowId],
+  )
+
   useEffect(() => {
     if (!token || phase !== 'chat') return
     const tmr = setTimeout(() => {
@@ -944,13 +1021,13 @@ export function PublicFlowRunner({
                 setPhase('welcome')
                 return
               }
-              setMessages(buildFullThread(steps, norm))
+              setMessages(buildFullThread(steps, norm, embedClientId))
               setStepIdx(Math.max(0, steps.length - 1))
               setPriorSubmissionCompleted(false)
               setPhase('done')
               return
             }
-            const open = firstOpenStep(steps, norm)
+            const open = firstOpenStep(steps, norm, embedClientId)
             const touched =
               Object.keys(norm).length > 0 ||
               (typeof meta?.currentStepIndex === 'number' && meta.currentStepIndex > 0)
@@ -1003,7 +1080,7 @@ export function PublicFlowRunner({
       setIsTyping(true)
       setPhase('chat')
       setTimeout(() => {
-        setMessages(withOpeningLine(rebuildMessages(0, st, {}), flow))
+        setMessages(withOpeningLine(rebuildMessages(0, st, {}, embedClientId), flow))
         setIsTyping(false)
       }, 480)
     },
@@ -1017,7 +1094,7 @@ export function PublicFlowRunner({
       setShowDoneSummary(false)
       const idx = Math.min(open, st.length - 1)
       setStepIdx(idx)
-      setMessages(withOpeningLine(rebuildMessages(open, st, norm), flow))
+      setMessages(withOpeningLine(rebuildMessages(open, st, norm, embedClientId), flow))
       setPhase('chat')
     },
     [flow.id, flow],
@@ -1034,20 +1111,67 @@ export function PublicFlowRunner({
     } catch {
       /* ignore */
     }
-    const pr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions`, { method: 'POST' })
+    const pr = await createFlowSession({ flowId, embedContext, embedQuery })
     const postRes = await readApiResult<{ session: { token: string } }>(pr)
     if (!postRes.ok) {
       setErrorMsg(postRes.message)
       setPhase('error')
       return
     }
-    enterChatFresh(st, postRes.data.session.token)
+    const tok = postRes.data.session.token
+    setDeflectionCompletionMsg(null)
+    if (shouldDeflectBeforeForm(flow.settings)) {
+      try {
+        sessionStorage.setItem(sessionStorageKey(flowId), tok)
+      } catch {
+        /* ignore */
+      }
+      setToken(tok)
+      setPhase('deflection')
+      return
+    }
+    enterChatFresh(st, tok)
   }, [flow.id, flow, steps, token, resumeAvailable, flowId, enterChatFresh])
 
   const handleWelcomeResume = useCallback(() => {
     if (!resumePayload) return
     enterChatResume(steps, resumePayload.answers, resumePayload.open)
   }, [resumePayload, steps, enterChatResume])
+
+  const handleDeflectionResolved = useCallback(
+    async ({ query, answer }: { query: string; answer: string }) => {
+      const ok = await persistSessionMetadata(
+        {
+          deflectionOutcome: 'resolved',
+          deflectionQuery: query,
+          deflectionAnswer: answer,
+        },
+        true,
+      )
+      if (!ok) {
+        setErrorMsg('No se pudo guardar. Inténtalo de nuevo.')
+        setPhase('error')
+        return
+      }
+      setDeflectionCompletionMsg('Encontramos lo que necesitabas. Si surge algo más, estamos aquí.')
+      setPhase('done')
+    },
+    [persistSessionMetadata],
+  )
+
+  const handleDeflectionEscalate = useCallback(
+    async ({ query, answer }: { query: string; answer: string }) => {
+      const t = tokenRef.current
+      if (!t) return
+      await persistSessionMetadata({
+        deflectionOutcome: 'escalated',
+        deflectionQuery: query,
+        deflectionAnswer: answer,
+      })
+      enterChatFresh(steps, t)
+    },
+    [persistSessionMetadata, enterChatFresh, steps],
+  )
 
   const handleWelcomeReturnToChat = useCallback(() => {
     setEditingStepId(null)
@@ -1057,7 +1181,7 @@ export function PublicFlowRunner({
     setPendingFiles([])
     setFileErr('')
     setPhase('chat')
-    setMessages(withOpeningLine(rebuildMessages(stepIdx, steps, answers), flow))
+    setMessages(withOpeningLine(rebuildMessages(stepIdx, steps, answers, embedClientId), flow))
   }, [flow.id, flow, stepIdx, steps, answers])
 
   const handleDiscardDraft = useCallback(async () => {
@@ -1077,7 +1201,7 @@ export function PublicFlowRunner({
     setSelected([])
     setPendingFiles([])
     setFileErr('')
-    const pr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions`, { method: 'POST' })
+    const pr = await createFlowSession({ flowId, embedContext, embedQuery })
     const postRes = await readApiResult<{ session: { token: string } }>(pr)
     if (!postRes.ok) {
       setErrorMsg(postRes.message)
@@ -1188,7 +1312,7 @@ export function PublicFlowRunner({
         const nextAnswers = { ...answersRef.current, [sid]: value }
         setAnswers(nextAnswers)
         setMessages(
-          withOpeningLine(rebuildMessages(stepIdxRef.current, steps, nextAnswers), flow),
+          withOpeningLine(rebuildMessages(stepIdxRef.current, steps, nextAnswers, embedClientId), flow),
         )
         setEditingStepId(null)
         setTextInput('')
@@ -1208,7 +1332,7 @@ export function PublicFlowRunner({
       setAnswers(nextAnswers)
       const userLine = displayOverride ?? bubbleText(cur, value)
       setMessages((prev) => [...prev, { id: uid(), role: 'user', content: userLine, stepId: sid }])
-      const nextIdx = nextStepIndexAfterAnswer(stepIdxRef.current, steps, nextAnswers)
+      const nextIdx = nextVisibleStepIndex(stepIdxRef.current, steps, nextAnswers, embedClientId)
       if (nextIdx >= steps.length) {
         setIsTyping(true)
         setTimeout(() => {
@@ -1247,7 +1371,7 @@ export function PublicFlowRunner({
           }
           await new Promise((r) => setTimeout(r, 400))
           setStepIdx(nextIdx)
-          let msgs = withOpeningLine(rebuildMessages(nextIdx, steps, nextAnswers), flow)
+          let msgs = withOpeningLine(rebuildMessages(nextIdx, steps, nextAnswers, embedClientId), flow)
           if (ackMessage && nextIdx >= 1) {
             const lastAsst = msgs.map((m) => m.role).lastIndexOf('assistant')
             if (lastAsst >= 0) {
@@ -1389,7 +1513,7 @@ export function PublicFlowRunner({
     setAnswers(nextAnswers)
     setStepIdx(newIdx)
     setMessages(
-      withOpeningLine(rebuildMessages(newIdx, steps, nextAnswers), flow),
+      withOpeningLine(rebuildMessages(newIdx, steps, nextAnswers, embedClientId), flow),
     )
     setTextInput('')
     setSelected([])
@@ -1418,21 +1542,33 @@ export function PublicFlowRunner({
       setResumePayload(null)
       setResumeAvailable(false)
       setPriorSubmissionCompleted(false)
-      const pr = await fetch(`/api/f/${encodeURIComponent(flowId)}/sessions`, { method: 'POST' })
+      const pr = await createFlowSession({ flowId, embedContext, embedQuery })
       const postRes = await readApiResult<{ session: { token: string } }>(pr)
       if (!postRes.ok) {
         setErrorMsg(postRes.message)
         setPhase('error')
         return
       }
-      enterChatFresh(st, postRes.data.session.token)
+      setDeflectionCompletionMsg(null)
+      const tok = postRes.data.session.token
+      if (shouldDeflectBeforeForm(flow.settings)) {
+        try {
+          sessionStorage.setItem(sessionStorageKey(flowId), tok)
+        } catch {
+          /* ignore */
+        }
+        setToken(tok)
+        setPhase('deflection')
+        return
+      }
+      enterChatFresh(st, tok)
     } finally {
       setSubmitAnotherBusy(false)
     }
-  }, [flowId, steps, enterChatFresh])
+  }, [flowId, flow.settings, steps, enterChatFresh])
 
   const handleViewPreviousSubmission = useCallback(() => {
-    setMessages(buildFullThread(steps, answers))
+    setMessages(buildFullThread(steps, answers, embedClientId))
     setStepIdx(Math.max(0, steps.length - 1))
     setShowDoneSummary(false)
     setPhase('done')
@@ -1501,13 +1637,26 @@ export function PublicFlowRunner({
     )
   }
 
+  if (phase === 'deflection' && token) {
+    return (
+      <PublicFlowDeflection
+        flowId={flowId}
+        flowName={flow.name}
+        sessionToken={token}
+        isEmbed={isEmbed}
+        onResolved={handleDeflectionResolved}
+        onEscalate={handleDeflectionEscalate}
+      />
+    )
+  }
+
   if (phase === 'done') {
     return (
       <FlowDoneCelebration
         flow={flow}
         steps={steps}
         answers={answers}
-        completion={completion}
+        completion={deflectionCompletionMsg ?? completion}
         showSummary={showDoneSummary}
         onToggleSummary={() => setShowDoneSummary((s) => !s)}
         allowMultipleSubmissions={submissionSettings.allowMultipleSubmissions}

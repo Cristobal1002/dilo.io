@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { PublicFlowRunner } from '@/components/public-flow-runner'
 import { db } from '@/db'
 import { flows } from '@/db/schema'
+import { resolveEmbedContextForFlow } from '@/lib/embed-context'
 import { loadPublishedFlowWithSteps } from '@/lib/load-published-flow'
 
 export async function generateMetadata({
@@ -27,6 +28,13 @@ function EmbedUnavailable() {
       </p>
     </div>
   )
+}
+
+function firstQuery(sp: Record<string, string | string[] | undefined>, key: string): string | null {
+  const v = sp[key]
+  if (typeof v === 'string' && v.trim()) return v.trim()
+  if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim()
+  return null
 }
 
 export default async function PublicFlowPage({
@@ -53,11 +61,38 @@ export default async function PublicFlowPage({
   }
 
   let initialPayload
+  let organizationId: string
   try {
     initialPayload = await loadPublishedFlowWithSteps(flowId)
+    const flowRow = await db.query.flows.findFirst({
+      where: eq(flows.id, flowId),
+      columns: { organizationId: true },
+    })
+    if (!flowRow) notFound()
+    organizationId = flowRow.organizationId
   } catch {
     notFound()
   }
 
-  return <PublicFlowRunner flowId={flowId} initialPayload={initialPayload} isEmbed={isEmbed} />
+  const embedContext = await resolveEmbedContextForFlow({
+    flowId,
+    organizationId,
+    ctx: firstQuery(sp, 'ctx'),
+    client: firstQuery(sp, 'client'),
+    externalId: firstQuery(sp, 'external_id') ?? firstQuery(sp, 'externalId'),
+  })
+
+  return (
+    <PublicFlowRunner
+      flowId={flowId}
+      initialPayload={initialPayload}
+      isEmbed={isEmbed}
+      embedContext={embedContext}
+      embedQuery={{
+        ctx: firstQuery(sp, 'ctx'),
+        client: firstQuery(sp, 'client'),
+        externalId: firstQuery(sp, 'external_id') ?? firstQuery(sp, 'externalId'),
+      }}
+    />
+  )
 }

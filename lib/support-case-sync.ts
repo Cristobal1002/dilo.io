@@ -87,7 +87,7 @@ export async function syncSupportCasesForOrganization(
 
   const completedSessions = await db.query.sessions.findMany({
     where: and(eq(sessions.status, 'completed'), inArray(sessions.flowId, supportFlowIds)),
-    columns: { id: true, flowId: true, contact: true },
+    columns: { id: true, flowId: true, contact: true, metadata: true },
   })
 
   const existingCases = await db.query.supportCases.findMany({
@@ -210,6 +210,7 @@ export async function syncSupportCasesForOrganization(
       flowName: flow.name,
       flowSettings: flow.settings,
       sessionId: session.id,
+      sessionMetadata: session.metadata,
       structuredAnswersRaw: structuredRaw,
       structuredAnswersDisplay: structuredDisplay,
       contact,

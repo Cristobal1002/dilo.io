@@ -183,6 +183,12 @@ export const PUT = withApiHandler(
       prevMeta.currentStepIndex = parsed.data.currentStepIndex
     }
 
+    if (parsed.data.metadata && typeof parsed.data.metadata === 'object') {
+      for (const [k, v] of Object.entries(parsed.data.metadata)) {
+        prevMeta[k] = v
+      }
+    }
+
     const now = new Date()
     const completed = parsed.data.completed === true
 

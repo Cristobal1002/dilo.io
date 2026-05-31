@@ -10,6 +10,7 @@ import {
   getFlowSubmissionSettings,
 } from '@/lib/flow-submission-settings'
 import { isSupportFlow } from '@/lib/support-flow-purpose'
+import { getSupportMode, type SupportMode } from '@/lib/support-mode'
 import type { FlowWhatsAppSettings } from '@/lib/whatsapp/flow-settings'
 import { cn } from '@/lib/utils'
 
@@ -129,6 +130,7 @@ export function ConnectorsForm({
 
   const initialSubmission = getFlowSubmissionSettings(initialFlowSettings)
   const [supportEnabled, setSupportEnabled] = useState(() => isSupportFlow(initialFlowSettings))
+  const [supportMode, setSupportMode] = useState<SupportMode>(() => getSupportMode(initialFlowSettings))
   const [allowMultipleSubmissions, setAllowMultipleSubmissions] = useState(
     initialSubmission.allowMultipleSubmissions,
   )
@@ -322,6 +324,7 @@ export function ConnectorsForm({
     purpose?: boolean
     allowMultiple?: boolean
     submitAnotherLabel?: string
+    supportMode?: SupportMode
   }) {
     setSupportBusy(true)
     setSupportErr(null)
@@ -337,6 +340,9 @@ export function ConnectorsForm({
       if (patch.submitAnotherLabel !== undefined) {
         const t = patch.submitAnotherLabel.trim()
         settings.submit_another_label = t === '' ? null : t
+      }
+      if (patch.supportMode !== undefined) {
+        settings.support_mode = patch.supportMode
       }
       const res = await fetch(`/api/flows/${flowId}`, {
         method: 'PATCH',
@@ -361,6 +367,9 @@ export function ConnectorsForm({
         setSubmitAnotherLabel(
           patch.submitAnotherLabel.trim() || DEFAULT_SUBMIT_ANOTHER_SUPPORT_LABEL,
         )
+      }
+      if (patch.supportMode !== undefined) {
+        setSupportMode(patch.supportMode)
       }
       setSupportOk('Configuración de soporte guardada.')
       router.refresh()
@@ -670,6 +679,30 @@ export function ConnectorsForm({
               Crear caso de soporte al completar el flow
             </span>
           </label>
+          {supportEnabled ? (
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={supportMode === 'deflect_then_form'}
+                disabled={supportBusy}
+                onChange={(e) =>
+                  void saveSupportSettings({
+                    supportMode: e.target.checked ? 'deflect_then_form' : 'direct',
+                  })
+                }
+                className="mt-1 h-4 w-4 rounded border-[#CBD5E1] text-[#9C77F5]"
+              />
+              <span className="text-sm text-[#374151] dark:text-[#D1D5DB]">
+                Intentar resolver con base de conocimiento antes del formulario
+                <span className="mt-0.5 block text-xs text-[#64748B] dark:text-[#94A3B8]">
+                  El visitante describe su duda; si no basta, continúa al formulario y ahí se crea el caso.{' '}
+                  <Link href="/dashboard/settings/knowledge" className="font-semibold text-[#6B4DD4] hover:underline">
+                    Gestionar artículos →
+                  </Link>
+                </span>
+              </span>
+            </label>
+          ) : null}
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
@@ -718,8 +751,8 @@ export function ConnectorsForm({
               >
                 {supportCompanyBusy ? 'Actualizando…' : 'Actualizar opciones de Empresa desde Clientes'}
               </button>
-              <Link href="/dashboard/support?view=clients" className="text-xs font-semibold text-[#6B4DD4] hover:underline">
-                Gestionar clientes
+              <Link href="/dashboard/clients" className="text-xs font-semibold text-[#6B4DD4] hover:underline">
+                Gestionar clientes →
               </Link>
             </div>
           </div>

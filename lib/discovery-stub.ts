@@ -15,6 +15,7 @@ export const DiscoverySessionPutBodySchema = z.object({
   answers: z.record(z.string(), z.unknown()).optional(),
   currentStepIndex: z.number().finite().optional(),
   completed: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
 export type DiscoverySessionPutBody = z.infer<typeof DiscoverySessionPutBodySchema>

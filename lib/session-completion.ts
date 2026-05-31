@@ -17,6 +17,8 @@ import { getStructuredOutputModel } from '@/lib/ai-model'
 import { createLogger } from '@/lib/logger'
 import { notifyOrgUsersInstantLeadAlerts } from '@/lib/notifications/instant-lead-alerts'
 import { createSupportCaseFromSession } from '@/lib/support-case-from-session'
+import { readSessionEmbedContext } from '@/lib/embed-context'
+import { shouldSkipSessionAnalysis } from '@/lib/session-deflection'
 import { sendWhatsAppOnSessionComplete } from '@/lib/whatsapp/on-session-complete'
 import {
   buildStructuredFromSteps,
@@ -202,6 +204,11 @@ export async function processSessionCompletion(
     return
   }
 
+  if (shouldSkipSessionAnalysis(sessionRow.metadata)) {
+    log.info({ sessionId }, 'Session resolved via deflection; skipping analysis')
+    return
+  }
+
   const flowRow = await db.query.flows.findFirst({
     where: eq(flows.id, sessionRow.flowId),
   })
@@ -359,16 +366,19 @@ export async function processSessionCompletion(
 
     const structuredAnswersRaw = buildStructuredRawFromSteps(stepRows, answerByStep)
     const structuredAnswersDisplay = buildStructuredFromSteps(stepRows, answerByStep)
+    const embedCtx = readSessionEmbedContext(sessionRow.metadata)
     void createSupportCaseFromSession({
       organizationId: flowRow.organizationId,
       flowId: flowRow.id,
       flowName: flowRow.name,
       flowSettings: flowRow.settings,
       sessionId: sessionRow.id,
+      sessionMetadata: sessionRow.metadata,
       structuredAnswersRaw,
       structuredAnswersDisplay,
       contact,
       summaryFallback: resultRow.summary,
+      sessionClientId: embedCtx?.clientId ?? null,
     }).catch((err) => {
       log.error({ err, sessionId: sessionRow.id }, 'createSupportCaseFromSession failed')
     })

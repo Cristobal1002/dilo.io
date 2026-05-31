@@ -8,13 +8,14 @@ interface DiloModalProps {
   title: string
   children: React.ReactNode
   footer?: React.ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 const MAX_WIDTH = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
+  xl: 'max-w-xl',
 }
 
 /**
@@ -51,7 +52,7 @@ export function DiloModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center overflow-y-auto overscroll-y-contain px-4 py-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:justify-center sm:py-8">
+    <div className="fixed inset-0 z-100 flex flex-col items-center overflow-y-auto overscroll-y-contain px-4 py-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:justify-center sm:py-8">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"
