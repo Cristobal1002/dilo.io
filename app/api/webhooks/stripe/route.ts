@@ -6,6 +6,14 @@ import { getStripe } from '@/lib/stripe-client'
 
 const log = createLogger('webhooks/stripe')
 
+function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
+  const parent = invoice.parent
+  if (parent?.type !== 'subscription_details') return null
+  const subscription = parent.subscription_details?.subscription
+  if (!subscription) return null
+  return typeof subscription === 'string' ? subscription : subscription.id
+}
+
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest) {
           {
             invoiceId: invoice.id,
             customerId: invoice.customer,
-            subscriptionId: invoice.subscription,
+            subscriptionId: subscriptionIdFromInvoice(invoice),
           },
           'Stripe invoice payment failed',
         )
