@@ -16,6 +16,7 @@
 import { NextResponse } from 'next/server'
 import { upstreamErrorFromAiSdk, configurationErrorFromUnknown } from './ai-api-errors'
 import { AppError, isAppError, InternalError } from './errors'
+import { validationErrorFromStripe } from './stripe-errors'
 import { createLogger } from './logger'
 
 const log = createLogger('api-response')
@@ -68,6 +69,12 @@ export function handleApiError(err: unknown, context?: string): NextResponse {
   if (configErr) {
     log.warn({ code: configErr.code, context }, configErr.message)
     return apiError(configErr)
+  }
+
+  const stripeErr = validationErrorFromStripe(err)
+  if (stripeErr) {
+    log.warn({ code: stripeErr.code, context }, stripeErr.message)
+    return apiError(stripeErr)
   }
 
   const upstream = upstreamErrorFromAiSdk(err)

@@ -3,8 +3,8 @@ import { db } from '@/db'
 import { organizations } from '@/db/schema'
 import { apiSuccess } from '@/lib/api-response'
 import { ValidationError } from '@/lib/errors'
-import { env } from '@/lib/env'
 import { requireOrgRoles } from '@/lib/org-role'
+import { publicAppBaseUrl } from '@/lib/outreach'
 import { isStripeConfigured } from '@/lib/stripe-config'
 import { getStripe } from '@/lib/stripe-client'
 import { withApiHandler } from '@/lib/with-api-handler'
@@ -26,7 +26,7 @@ export const POST = withApiHandler(
       throw new ValidationError('No hay suscripción activa en Stripe para este workspace')
     }
 
-    const baseUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+    const baseUrl = publicAppBaseUrl()
     const session = await getStripe().billingPortal.sessions.create({
       customer: org.stripeCustomerId,
       return_url: `${baseUrl}/dashboard/account?tab=plan`,
