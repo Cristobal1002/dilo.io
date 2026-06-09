@@ -43,3 +43,9 @@ export function portalSignInUrl(returnPath = '/portal'): string {
 export function portalSignUpUrl(returnPath = '/portal'): string {
   return `/sign-up?redirect_url=${encodeURIComponent(returnPath)}`
 }
+
+/** Preserva `redirect_url` entre /sign-in y /sign-up. */
+export function authPathWithRedirect(basePath: '/sign-in' | '/sign-up', redirectUrl?: string | null): string {
+  if (!redirectUrl?.trim()) return basePath
+  return `${basePath}?redirect_url=${encodeURIComponent(normalizeRedirectPath(redirectUrl))}`
+}

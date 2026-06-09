@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { UserButton } from '@clerk/nextjs'
+import { SignOutButton, useAuth, UserButton } from '@clerk/nextjs'
+import { PortalAuthPrompt } from '@/components/portal/portal-auth-prompt'
 import { readApiResult } from '@/lib/read-api-result'
 import {
   CLIENT_PORTAL_ROLE_LABEL,
@@ -19,7 +19,7 @@ import {
   type SupportPriority,
   type SupportStatus,
 } from '@/lib/support'
-import { portalSignInUrl, portalSignUpUrl } from '@/lib/auth-redirect'
+import { portalSignInUrl } from '@/lib/auth-redirect'
 import { PORTAL_CLIENT_COOKIE } from '@/lib/portal-constants'
 import { cn } from '@/lib/utils'
 
@@ -63,6 +63,7 @@ function setClientCookie(clientId: string) {
 }
 
 export default function PortalPageClient() {
+  const { isSignedIn, isLoaded } = useAuth()
   const [me, setMe] = useState<PortalMe | null>(null)
   const [cases, setCases] = useState<PortalCase[]>([])
   const [role, setRole] = useState<ClientPortalRole>('viewer')
@@ -104,8 +105,15 @@ export default function PortalPageClient() {
   }, [filter, loadCases, loadMe])
 
   useEffect(() => {
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      setLoading(false)
+      setErr(null)
+      setMe(null)
+      return
+    }
     void refresh()
-  }, [refresh])
+  }, [isLoaded, isSignedIn, refresh])
 
   const selected = useMemo(
     () => cases.find((c) => c.id === selectedId) ?? null,
@@ -142,7 +150,7 @@ export default function PortalPageClient() {
     }
   }
 
-  if (loading && !me) {
+  if (!isLoaded || (loading && isSignedIn && !me)) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-12 text-center text-sm text-[#64748B]">
         Cargando portal…
@@ -150,22 +158,29 @@ export default function PortalPageClient() {
     )
   }
 
-  if (err && !me) {
+  if (!isSignedIn || (err && !me)) {
     return (
       <main className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="text-lg font-semibold text-[#111827] dark:text-[#F8F9FB]">Portal de soporte</h1>
-        <p className="mt-2 text-sm text-[#64748B]">{err}</p>
-        <div className="mt-6 flex flex-col gap-2">
-          <Link
-            href={portalSignInUrl('/portal')}
-            className="rounded-xl bg-[#9C77F5] px-4 py-3 text-sm font-semibold text-white"
-          >
-            Iniciar sesión
-          </Link>
-          <Link href={portalSignUpUrl('/portal')} className="text-sm text-[#7C3AED]">
-            Crear cuenta con mi correo de acceso
-          </Link>
-        </div>
+        {err && isSignedIn ? (
+          <p className="mt-2 text-sm text-[#64748B]">{err}</p>
+        ) : (
+          <p className="mt-2 text-sm text-[#64748B]">
+            Inicia sesión con el correo al que te dieron acceso para ver los casos de tu empresa.
+          </p>
+        )}
+        {err && isSignedIn ? (
+          <SignOutButton redirectUrl={portalSignInUrl('/portal')}>
+            <button
+              type="button"
+              className="mt-6 rounded-xl bg-[#9C77F5] px-4 py-3 text-sm font-semibold text-white"
+            >
+              Cerrar sesión e iniciar con mi correo de acceso
+            </button>
+          </SignOutButton>
+        ) : (
+          <PortalAuthPrompt returnPath="/portal" />
+        )}
       </main>
     )
   }

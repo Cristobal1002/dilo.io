@@ -2,6 +2,7 @@ import { SignIn } from '@clerk/nextjs'
 import { AuthPageShell } from '@/components/auth-page-shell'
 import { diloClerkAppearance } from '@/lib/clerk-appearance'
 import {
+  authPathWithRedirect,
   isPortalContextRedirect,
   resolvePostSignInUrl,
   resolvePostSignUpUrl,
@@ -13,7 +14,7 @@ type Props = {
 
 export default async function SignInPage({ searchParams }: Props) {
   const { redirect_url: redirectUrl } = await searchParams
-  const fallbackRedirectUrl = resolvePostSignInUrl(redirectUrl)
+  const afterAuthUrl = resolvePostSignInUrl(redirectUrl)
   const portalFlow = isPortalContextRedirect(redirectUrl)
 
   return (
@@ -23,10 +24,11 @@ export default async function SignInPage({ searchParams }: Props) {
       <SignIn
         routing="path"
         path="/sign-in"
-        signUpUrl="/sign-up"
+        signUpUrl={authPathWithRedirect('/sign-up', redirectUrl)}
         appearance={diloClerkAppearance}
-        fallbackRedirectUrl={fallbackRedirectUrl}
+        fallbackRedirectUrl={afterAuthUrl}
         signUpFallbackRedirectUrl={resolvePostSignUpUrl(redirectUrl)}
+        {...(portalFlow ? { forceRedirectUrl: afterAuthUrl } : {})}
       />
     </AuthPageShell>
   )

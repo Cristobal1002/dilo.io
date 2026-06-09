@@ -1,7 +1,9 @@
 import { Resend } from 'resend'
 import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { isResendDomainNotVerifiedError } from '@/lib/email/resend-errors'
+import { portalSignInUrl } from '@/lib/auth-redirect'
 import { CLIENT_PORTAL_ROLE_LABEL, type ClientPortalRole } from '@/lib/client-portal-roles'
+import { publicAppBaseUrl } from '@/lib/outreach'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/client-portal-invite')
@@ -70,7 +72,7 @@ export async function sendClientPortalAccessEmail(params: {
   }
 
   const roleLabel = CLIENT_PORTAL_ROLE_LABEL[params.role]
-  const signInUrl = `${params.portalUrl.replace(/\/$/, '')}`
+  const signInUrl = `${publicAppBaseUrl()}${portalSignInUrl('/portal')}`
   const from = `${params.providerName} <${cfg.from}>`
   const resend = new Resend(cfg.apiKey)
   const { error } = await resend.emails.send({

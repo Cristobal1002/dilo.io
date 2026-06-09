@@ -4,8 +4,8 @@ import { useAuth, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+import { PortalAuthPrompt } from '@/components/portal/portal-auth-prompt'
 import { readApiResult } from '@/lib/read-api-result'
-import { portalSignInUrl, portalSignUpUrl } from '@/lib/auth-redirect'
 import { CLIENT_PORTAL_ROLE_LABEL, type ClientPortalRole } from '@/lib/client-portal-roles'
 
 type Preview = {
@@ -64,19 +64,19 @@ export default function PortalInviteAcceptPage() {
     return (
       <main className="mx-auto max-w-md px-4 py-16 text-center">
         <p className="text-sm text-red-600">{error}</p>
-        <Link href="/" className="mt-4 inline-block text-sm text-[#7C3AED]">
-          Ir al inicio
+        <Link href="/portal" className="mt-4 inline-block text-sm text-[#7C3AED]">
+          Ir al portal
         </Link>
       </main>
     )
   }
 
   const returnPath = `/portal-invite/${token}`
-  const signInUrl = portalSignInUrl(returnPath)
-  const signUpUrl = portalSignUpUrl(returnPath)
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? ''
   const roleLabel =
     CLIENT_PORTAL_ROLE_LABEL[preview?.role as ClientPortalRole] ?? preview?.role
+  const emailMatches =
+    preview != null && userEmail.toLowerCase() === preview.email.toLowerCase()
 
   return (
     <main className="mx-auto max-w-md px-4 py-16">
@@ -93,27 +93,14 @@ export default function PortalInviteAcceptPage() {
       {!isLoaded ? (
         <p className="mt-6 text-sm text-[#64748B]">Comprobando sesión…</p>
       ) : !isSignedIn ? (
-        <div className="mt-8 flex flex-col gap-3">
-          <Link
-            href={signUpUrl}
-            className="rounded-xl bg-[#9C77F5] px-4 py-3 text-center text-sm font-semibold text-white"
-          >
-            Crear cuenta y aceptar
-          </Link>
-          <Link href={signInUrl} className="text-center text-sm text-[#7C3AED]">
-            Ya tengo cuenta — iniciar sesión
-          </Link>
-        </div>
-      ) : (
+        <PortalAuthPrompt
+          returnPath={returnPath}
+          expectedEmail={preview?.email}
+          description="Crea tu cuenta o inicia sesión con el correo de la invitación. No verás el onboarding de Dilo."
+        />
+      ) : emailMatches ? (
         <div className="mt-8">
-          <p className="text-sm text-[#64748B]">
-            Sesión: {userEmail}
-            {preview && userEmail.toLowerCase() !== preview.email.toLowerCase() ? (
-              <span className="mt-2 block text-amber-700">
-                Debes usar el correo {preview.email} para aceptar esta invitación.
-              </span>
-            ) : null}
-          </p>
+          <PortalAuthPrompt returnPath={returnPath} expectedEmail={preview?.email} />
           <button
             type="button"
             disabled={busy}
@@ -123,6 +110,8 @@ export default function PortalInviteAcceptPage() {
             {busy ? 'Accediendo…' : 'Aceptar invitación'}
           </button>
         </div>
+      ) : (
+        <PortalAuthPrompt returnPath={returnPath} expectedEmail={preview?.email} />
       )}
     </main>
   )
