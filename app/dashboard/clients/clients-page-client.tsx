@@ -336,6 +336,8 @@ export default function ClientsPageClient() {
       <ClientFormModal
         open={modalOpen}
         editing={Boolean(editing)}
+        editingClientId={editing?.id ?? null}
+        editingClientName={editing?.name ?? null}
         saving={saving}
         form={form}
         onChange={patchForm}

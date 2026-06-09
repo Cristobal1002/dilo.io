@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { acceptPendingInvitesForEmail } from '@/lib/team-invitations'
+import { acceptPendingClientInvitesForEmail } from '@/lib/client-invitations'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhooks/clerk')
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
         const email = primaryEmail(data)
         if (email) {
           await acceptPendingInvitesForEmail(data.id, email, userName(data))
+          await acceptPendingClientInvitesForEmail(data.id, email, userName(data))
         }
         log.info({ clerkId: data.id, email }, 'user.created — pending invites processed')
         break

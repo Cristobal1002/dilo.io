@@ -386,6 +386,8 @@ import {
       countryCode:    text('country_code'),
       notes:          text('notes'),
       status:         text('status').notNull().default('active'),
+      /** Logo opcional en portal (si null, usa logo del workspace). */
+      logoUrl:        text('logo_url'),
       embedAllowedDomains: jsonb('embed_allowed_domains').notNull().default([]),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
       updatedAt:      timestamp('updated_at').notNull().defaultNow(),
@@ -399,6 +401,48 @@ import {
       index('clients_org_tax_id_idx').on(t.organizationId, t.taxId),
     ],
   )
+
+  /** Invitaciones al portal de cliente (sin acceso al workspace Mordecai). */
+  export const clientInvitations = pgTable('client_invitations', {
+    id:              uuid('id').primaryKey().defaultRandom(),
+    organizationId:  uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    clientId:        uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    email:           text('email').notNull(),
+    /** viewer | coordinator | manager */
+    role:            text('role').notNull(),
+    token:           text('token').notNull().unique(),
+    invitedByUserId: uuid('invited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt:       timestamp('expires_at').notNull(),
+    acceptedAt:      timestamp('accepted_at'),
+    revokedAt:       timestamp('revoked_at'),
+    createdAt:       timestamp('created_at').notNull().defaultNow(),
+  }, (t) => [
+    index('client_invites_client_email_idx').on(t.clientId, t.email),
+    index('client_invites_pending_idx').on(t.clientId, t.acceptedAt, t.revokedAt),
+  ])
+
+  /** Usuarios del portal de cliente (Clerk id; no fila en `users` del workspace). */
+  export const clientMembers = pgTable('client_members', {
+    id:             uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    clientId:       uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    clerkId:        text('clerk_id').notNull(),
+    email:          text('email').notNull(),
+    name:           text('name'),
+    role:           text('role').notNull(),
+    createdAt:      timestamp('created_at').notNull().defaultNow(),
+  }, (t) => [
+    uniqueIndex('client_members_client_clerk_uidx').on(t.clientId, t.clerkId),
+    index('client_members_clerk_idx').on(t.clerkId),
+  ])
 
   /** Artículos de base de conocimiento (deflexión antes de soporte). */
   export const knowledgeArticles = pgTable(
@@ -438,6 +482,8 @@ import {
       sessionId:        uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
       status:           text('status').notNull().default('new'),
       priority:         text('priority').notNull().default('medium'),
+      /** Urgencia reportada por el solicitante en el flow (no editable en bandeja). */
+      reportedPriority: text('reported_priority').notNull().default('medium'),
       /** support | improvement | inquiry | other */
       type:             text('type').notNull().default('support'),
       subject:          text('subject').notNull(),
@@ -451,6 +497,8 @@ import {
       clientCompany:    text('client_company'),
       assignedUserId:   uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
       internalNotes:    text('internal_notes'),
+      /** Notas visibles para el cliente en el portal. */
+      clientNotes:      text('client_notes'),
       resolutionNotes:  text('resolution_notes'),
       /** Horas dedicadas por el equipo (base para informe de valor). */
       hoursSpent:       real('hours_spent'),

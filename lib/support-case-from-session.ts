@@ -188,6 +188,7 @@ export async function createSupportCaseFromSession(args: {
         sessionId: args.sessionId,
         status: 'new',
         priority: mapSupportPriorityFromAnswer(priorityRaw),
+        reportedPriority: mapSupportPriorityFromAnswer(priorityRaw),
         type: mapSupportTypeFromAnswer(typeRaw),
         subject: subject.slice(0, 500),
         description: description?.slice(0, 8000) ?? null,

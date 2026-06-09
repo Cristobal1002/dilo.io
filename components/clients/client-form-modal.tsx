@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { DiloPhoneField, isValidPhoneNumber } from '@/components/dilo-phone-field'
 import { DiloModal } from '@/components/ui/modal'
+import { ClientPortalPanel } from '@/components/clients/client-portal-panel'
 import {
   CLIENT_TAX_ID_LABELS,
   type ClientTaxIdType,
@@ -129,6 +130,8 @@ function taxLabel(type: ClientTaxIdType, kind: ClientKind): string {
 type Props = {
   open: boolean
   editing: boolean
+  editingClientId?: string | null
+  editingClientName?: string | null
   saving: boolean
   form: ClientFormValues
   onChange: (patch: Partial<ClientFormValues>) => void
@@ -136,7 +139,17 @@ type Props = {
   onSave: () => void
 }
 
-export function ClientFormModal({ open, editing, saving, form, onChange, onClose, onSave }: Props) {
+export function ClientFormModal({
+  open,
+  editing,
+  editingClientId,
+  editingClientName,
+  saving,
+  form,
+  onChange,
+  onClose,
+  onSave,
+}: Props) {
   const [phoneInvalid, setPhoneInvalid] = useState(false)
 
   const regions = useMemo(() => {
@@ -416,6 +429,10 @@ export function ClientFormModal({ open, editing, saving, form, onChange, onClose
             />
           </FormField>
         </FormSection>
+
+        {editingClientId && editingClientName ? (
+          <ClientPortalPanel clientId={editingClientId} clientName={editingClientName} />
+        ) : null}
       </div>
     </DiloModal>
   )

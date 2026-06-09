@@ -106,3 +106,19 @@ Agrupación por **empresa** (`client_company`). Filtro opcional por una empresa.
 - Prompt de contrato distinto por empresa
 - PDF adjunto
 - SLA e ITIL
+
+## Portal de cliente (`/portal`)
+
+Contactos del cliente **no** entran al workspace Mordecai. Se invitan desde **Clientes → editar cliente → Portal de soporte**.
+
+| Rol | Permisos en portal |
+|-----|-------------------|
+| `viewer` | Ver casos |
+| `coordinator` | Ver + notas visibles al equipo |
+| `manager` | Ver + cambiar **prioridad operativa** + notas |
+
+- Invitación: `/portal-invite/{token}` (mismo Clerk, distinto de `/invite/{token}` del equipo).
+- Casos filtrados por `client_id`; UI Dilo con logo del cliente o del workspace.
+- **Urgencia reportada** (`reported_priority`): congelada desde el flow. **Prioridad operativa** (`priority`): la ordena gerente o tu equipo.
+
+Migración: `db/migrations/0022_client_portal.sql` → `npm run db:push`

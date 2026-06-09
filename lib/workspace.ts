@@ -6,6 +6,9 @@ import { and, count, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { flows, organizations, users } from '@/db/schema'
 import { acceptPendingInvitesForEmail } from '@/lib/team-invitations'
+import { acceptPendingClientInvitesForEmail } from '@/lib/client-invitations'
+import { listClientMembershipsForClerk } from '@/lib/client-members'
+import { PortalOnlyUserError } from '@/lib/errors'
 import { isMissingRelation } from '@/lib/pg-relation-errors'
 import { createLogger } from '@/lib/logger'
 import type { OrgRole } from '@/lib/org-role'
@@ -91,12 +94,25 @@ export async function ensureWorkspaceForUser(
       if (!isMissingRelation(err, 'organization_invitations')) throw err
       log.warn({}, 'organization_invitations missing — run npm run db:push')
     }
+    try {
+      await acceptPendingClientInvitesForEmail(clerkUserId, normalizedEmail, name)
+    } catch (err) {
+      if (!isMissingRelation(err, 'client_invitations')) throw err
+      log.warn({}, 'client_invitations missing — run npm run db:push')
+    }
   }
 
   const memberships = await db.query.users.findMany({
     where: eq(users.clerkId, clerkUserId),
     columns: { organizationId: true, role: true },
   })
+
+  if (memberships.length === 0) {
+    const portalMemberships = await listClientMembershipsForClerk(clerkUserId)
+    if (portalMemberships.length > 0) {
+      throw new PortalOnlyUserError()
+    }
+  }
 
   let org = await pickPrimaryOrganization(clerkUserId, memberships)
 

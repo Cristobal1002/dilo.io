@@ -4,7 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { DashboardLayoutFallback } from '@/components/dashboard-layout-fallback'
 import DiloDashboardShell from '@/components/dilo-dashboard-shell'
 import { getAuthContext, getAuthUserInOrg } from '@/lib/auth'
-import { UnauthorizedError } from '@/lib/errors'
+import { UnauthorizedError, PortalOnlyUserError } from '@/lib/errors'
 
 function hasOnboardingCompleted(
   user: { name: string | null; phone: string | null } | null | undefined,
@@ -29,6 +29,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         redirect('/onboarding')
       }
     } catch (e) {
+      if (e instanceof PortalOnlyUserError) {
+        redirect('/portal')
+      }
       if (e instanceof UnauthorizedError) {
         redirect('/sign-in')
       }

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import LandingPage from '@/components/landing/landing-page'
+import { resolveLandingPath } from '@/lib/portal-auth'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -34,6 +35,6 @@ export const metadata: Metadata = {
 
 export default async function RootPage() {
   const { userId } = await auth()
-  if (userId) redirect('/dashboard')
+  if (userId) redirect(await resolveLandingPath(userId))
   return <LandingPage />
 }

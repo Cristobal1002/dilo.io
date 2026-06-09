@@ -44,6 +44,13 @@ export class ForbiddenError extends AppError {
   }
 }
 
+/** 403 — Usuario solo tiene acceso al portal de cliente */
+export class PortalOnlyUserError extends AppError {
+  constructor(message = 'Tu acceso es por el portal de cliente') {
+    super(message, 403, 'PORTAL_ONLY')
+  }
+}
+
 /** 404 — Resource not found */
 export class NotFoundError extends AppError {
   constructor(resource = 'Recurso') {

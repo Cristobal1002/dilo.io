@@ -1,10 +1,23 @@
 import type { Plan } from '@/lib/plan-limits'
 
+/** Secret key limpia o null si falta / formato inválido. */
+export function stripeSecretKey(): string | null {
+  const key = process.env.STRIPE_SECRET_KEY?.trim()
+  if (!key) return null
+
+  if (/^pk_(test|live)_/.test(key)) {
+    return null
+  }
+
+  if (!/^sk_(test|live)_[A-Za-z0-9]+$/.test(key)) {
+    return null
+  }
+
+  return key
+}
+
 export function isStripeConfigured(): boolean {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY?.trim() &&
-      process.env.STRIPE_PRICE_PRO?.trim(),
-  )
+  return Boolean(stripeSecretKey() && process.env.STRIPE_PRICE_PRO?.trim())
 }
 
 export function stripePriceIdForPlan(planId: Exclude<Plan, 'free'>): string | null {

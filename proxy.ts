@@ -12,6 +12,8 @@ const isPublicRoute = createRouteMatcher([
   '/onboarding',          // accesible para usuarios autenticados sin perfil completo
   '/api/onboarding',
   '/invite/(.*)',
+  '/portal-invite/(.*)',
+  '/api/portal-invitations/(.*)',
   '/api/invitations/(.*)',
   '/support/review/(.*)',
   '/api/support/review/(.*)',

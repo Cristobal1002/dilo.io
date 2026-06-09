@@ -92,7 +92,7 @@ export async function syncSupportCasesForOrganization(
 
   const existingCases = await db.query.supportCases.findMany({
     where: eq(supportCases.organizationId, organizationId),
-    columns: { id: true, sessionId: true, type: true, priority: true, clientCompany: true, clientId: true },
+    columns: { id: true, sessionId: true, type: true, priority: true, reportedPriority: true, clientCompany: true, clientId: true },
   })
   const caseBySession = new Map(
     existingCases.filter((c) => c.sessionId).map((c) => [c.sessionId!, c]),
@@ -176,12 +176,16 @@ export async function syncSupportCasesForOrganization(
         ((existing.clientCompany ?? null) !== (mappedClientCompany?.trim() || null) ||
           (existing.clientId ?? null) !== (mappedClientId ?? null))
 
-      if (existing.type !== mappedType || existing.priority !== mappedPriority || companyChanged) {
+      if (
+        existing.type !== mappedType ||
+        existing.reportedPriority !== mappedPriority ||
+        companyChanged
+      ) {
         await db
           .update(supportCases)
           .set({
             type: mappedType,
-            priority: mappedPriority,
+            reportedPriority: mappedPriority,
             clientId: companyChanged ? mappedClientId : existing.clientId,
             clientCompany: companyChanged ? mappedClientCompany!.trim().slice(0, 200) : existing.clientCompany,
             updatedAt: new Date(),
@@ -224,6 +228,7 @@ export async function syncSupportCasesForOrganization(
         sessionId: session.id,
         type: mappedType,
         priority: mappedPriority,
+        reportedPriority: mappedPriority,
         clientId: mappedClientId,
         clientCompany: mappedClientCompany,
       })
