@@ -56,15 +56,24 @@ export async function hasClientPortalAccess(clerkId: string): Promise<boolean> {
 }
 
 export async function listClientMembersForClient(clientId: string) {
-  return db.query.clientMembers.findMany({
+  const rows = await db.query.clientMembers.findMany({
     where: eq(clientMembers.clientId, clientId),
     columns: {
       id: true,
       email: true,
       name: true,
       role: true,
+      clerkId: true,
       createdAt: true,
     },
     orderBy: (t, { desc }) => [desc(t.createdAt)],
   })
+  return rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+    createdAt: row.createdAt,
+    linked: Boolean(row.clerkId),
+  }))
 }

@@ -12,6 +12,7 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { acceptPendingInvitesForEmail } from '@/lib/team-invitations'
 import { acceptPendingClientInvitesForEmail } from '@/lib/client-invitations'
+import { linkPendingClientMembersByEmail } from '@/lib/client-portal-provision'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('webhooks/clerk')
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
         if (email) {
           await acceptPendingInvitesForEmail(data.id, email, userName(data))
           await acceptPendingClientInvitesForEmail(data.id, email, userName(data))
+          await linkPendingClientMembersByEmail(data.id, email, userName(data))
         }
         log.info({ clerkId: data.id, email }, 'user.created — pending invites processed')
         break

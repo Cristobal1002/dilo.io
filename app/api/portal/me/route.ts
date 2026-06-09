@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
 import { apiSuccess } from '@/lib/api-response'
+import { isPortalOnlyUser } from '@/lib/portal-auth'
 import { withPortalHandler } from '@/lib/with-portal-handler'
 
 export const GET = withPortalHandler(async (_req, { auth }) => {
   const logoUrl = auth.active.clientLogoUrl ?? auth.active.organizationLogoUrl
+  const canBootstrapWorkspace = await isPortalOnlyUser(auth.clerkUserId)
   return apiSuccess({
     user: {
       email: auth.email,
@@ -20,6 +22,7 @@ export const GET = withPortalHandler(async (_req, { auth }) => {
       providerName: auth.active.organizationName,
       logoUrl,
     },
+    canBootstrapWorkspace,
   })
 })
 

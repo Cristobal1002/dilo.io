@@ -81,10 +81,16 @@ export type WorkspaceContext = {
 /**
  * Resuelve o crea el workspace del usuario. Intenta aplicar invitaciones pendientes por email.
  */
+export type EnsureWorkspaceOptions = {
+  /** Crear workspace aunque el usuario solo tenga acceso al portal de cliente. */
+  forceCreate?: boolean
+}
+
 export async function ensureWorkspaceForUser(
   clerkUserId: string,
   email: string,
   name: string | null,
+  options?: EnsureWorkspaceOptions,
 ): Promise<WorkspaceContext> {
   const normalizedEmail = email.trim().toLowerCase()
   if (normalizedEmail) {
@@ -100,6 +106,13 @@ export async function ensureWorkspaceForUser(
       if (!isMissingRelation(err, 'client_invitations')) throw err
       log.warn({}, 'client_invitations missing — run npm run db:push')
     }
+    try {
+      const { linkPendingClientMembersByEmail } = await import('@/lib/client-portal-provision')
+      await linkPendingClientMembersByEmail(clerkUserId, normalizedEmail, name)
+    } catch (err) {
+      if (!isMissingRelation(err, 'client_members')) throw err
+      log.warn({}, 'client_members missing — run npm run db:push')
+    }
   }
 
   const memberships = await db.query.users.findMany({
@@ -107,7 +120,7 @@ export async function ensureWorkspaceForUser(
     columns: { organizationId: true, role: true },
   })
 
-  if (memberships.length === 0) {
+  if (memberships.length === 0 && !options?.forceCreate) {
     const portalMemberships = await listClientMembershipsForClerk(clerkUserId)
     if (portalMemberships.length > 0) {
       throw new PortalOnlyUserError()

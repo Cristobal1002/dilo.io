@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { readApiResult } from '@/lib/read-api-result'
+import { portalSignInUrl, portalSignUpUrl } from '@/lib/auth-redirect'
 import { CLIENT_PORTAL_ROLE_LABEL, type ClientPortalRole } from '@/lib/client-portal-roles'
 
 type Preview = {
@@ -70,8 +71,9 @@ export default function PortalInviteAcceptPage() {
     )
   }
 
-  const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(`/portal-invite/${token}`)}`
-  const signUpUrl = `/sign-up?redirect_url=${encodeURIComponent(`/portal-invite/${token}`)}`
+  const returnPath = `/portal-invite/${token}`
+  const signInUrl = portalSignInUrl(returnPath)
+  const signUpUrl = portalSignUpUrl(returnPath)
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? ''
   const roleLabel =
     CLIENT_PORTAL_ROLE_LABEL[preview?.role as ClientPortalRole] ?? preview?.role

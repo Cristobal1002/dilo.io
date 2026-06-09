@@ -71,6 +71,11 @@ export async function getPortalAuthContext(preferredClientId?: string | null): P
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null
 
+  const { linkPendingClientMembersByEmail } = await import('@/lib/client-portal-provision')
+  if (email) {
+    await linkPendingClientMembersByEmail(clerkUser.id, email, name)
+  }
+
   const memberships = await listClientMembershipsForClerk(clerkUser.id)
   if (memberships.length === 0) {
     throw new UnauthorizedError('No tienes acceso al portal de cliente')

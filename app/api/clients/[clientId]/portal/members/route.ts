@@ -16,6 +16,10 @@ import {
 import { ClientPortalInviteEmailError } from '@/lib/email/send-client-portal-invite'
 import { listClientMembersForClient } from '@/lib/client-members'
 import { removeClientMember } from '@/lib/client-members-store'
+import {
+  ClientPortalAccessLinkOnlyError,
+  provisionClientPortalMember,
+} from '@/lib/client-portal-provision'
 import { CLIENT_PORTAL_ROLES, isClientPortalRole } from '@/lib/client-portal-roles'
 import { withApiHandler } from '@/lib/with-api-handler'
 
@@ -39,9 +43,12 @@ export const GET = withApiHandler(async (_req: NextRequest, { auth, params }) =>
   return apiSuccess({ members, invitations, roles: CLIENT_PORTAL_ROLES })
 }, { requireAuth: true })
 
-const InviteBody = z.object({
+const MemberBody = z.object({
   email: z.string().email(),
   role: z.string().refine(isClientPortalRole, 'Rol inválido'),
+  mode: z.enum(['invite', 'direct']).default('invite'),
+  name: z.string().trim().max(200).optional(),
+  sendEmail: z.boolean().optional(),
 })
 
 export const POST = withApiHandler(async (req: NextRequest, { auth, params }) => {
@@ -49,10 +56,49 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
   const client = await getClientForOrg(params.clientId, auth.org.id)
   if (!client) throw new NotFoundError('Cliente')
 
-  const parsed = InviteBody.safeParse(await req.json())
+  const parsed = MemberBody.safeParse(await req.json())
   if (!parsed.success) throw new ValidationError('Datos inválidos')
 
   const me = await getAuthUserInOrg(auth)
+
+  if (parsed.data.mode === 'direct') {
+    try {
+      const result = await provisionClientPortalMember({
+        organizationId: auth.org.id,
+        clientId: client.id,
+        email: parsed.data.email,
+        name: parsed.data.name ?? null,
+        role: parsed.data.role,
+        sendEmail: parsed.data.sendEmail ?? true,
+      })
+      return apiSuccess({
+        member: {
+          id: result.member.id,
+          email: result.member.email,
+          role: result.member.role,
+          linked: Boolean(result.member.clerkId),
+        },
+        portalUrl: result.portalUrl,
+        emailed: result.emailed,
+        message: result.emailed
+          ? 'Acceso creado y correo enviado.'
+          : 'Acceso creado. Comparte el enlace al portal.',
+      })
+    } catch (err) {
+      if (err instanceof ClientPortalAccessLinkOnlyError) {
+        return apiSuccess({
+          member: { ...err.member, linked: false },
+          portalUrl: err.portalUrl,
+          linkOnly: true,
+          message: err.message,
+        })
+      }
+      if (err instanceof ClientPortalInviteEmailError) {
+        throw new ValidationError(err.message)
+      }
+      throw err
+    }
+  }
 
   try {
     const row = await createClientPortalInvitation({
@@ -68,6 +114,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         email: row.email,
         role: row.role,
       },
+      message: 'Invitación enviada.',
     })
   } catch (err) {
     if (err instanceof ClientPortalInviteLinkOnlyError) {

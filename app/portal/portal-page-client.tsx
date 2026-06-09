@@ -19,6 +19,7 @@ import {
   type SupportPriority,
   type SupportStatus,
 } from '@/lib/support'
+import { portalSignInUrl, portalSignUpUrl } from '@/lib/auth-redirect'
 import { PORTAL_CLIENT_COOKIE } from '@/lib/portal-constants'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,7 @@ type PortalMe = {
   memberships: { clientId: string; clientName: string; role: ClientPortalRole }[]
   branding: { clientName: string; providerName: string; logoUrl: string | null }
   user: { email: string; name: string | null }
+  canBootstrapWorkspace?: boolean
 }
 
 function formatDate(iso: string | null) {
@@ -151,10 +153,19 @@ export default function PortalPageClient() {
   if (err && !me) {
     return (
       <main className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-sm text-red-600">{err}</p>
-        <Link href="/" className="mt-4 inline-block text-sm text-[#7C3AED]">
-          Ir al inicio
-        </Link>
+        <h1 className="text-lg font-semibold text-[#111827] dark:text-[#F8F9FB]">Portal de soporte</h1>
+        <p className="mt-2 text-sm text-[#64748B]">{err}</p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Link
+            href={portalSignInUrl('/portal')}
+            className="rounded-xl bg-[#9C77F5] px-4 py-3 text-sm font-semibold text-white"
+          >
+            Iniciar sesión
+          </Link>
+          <Link href={portalSignUpUrl('/portal')} className="text-sm text-[#7C3AED]">
+            Crear cuenta con mi correo de acceso
+          </Link>
+        </div>
       </main>
     )
   }
@@ -358,6 +369,36 @@ export default function PortalPageClient() {
           )}
         </aside>
       </main>
+
+      {me?.canBootstrapWorkspace ? (
+        <footer className="border-t border-[#E8EAEF] bg-white px-4 py-4 text-center dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
+          <p className="text-xs text-[#64748B]">
+            ¿Quieres usar Dilo para operar flows en tu propia empresa?{' '}
+            <button
+              type="button"
+              disabled={busy}
+              className="font-medium text-[#7C3AED] underline disabled:opacity-50"
+              onClick={() => {
+                void (async () => {
+                  setBusy(true)
+                  try {
+                    const res = await fetch('/api/workspace/bootstrap', { method: 'POST' })
+                    const r = await readApiResult(res)
+                    if (!r.ok) throw new Error(r.message)
+                    window.location.href = '/onboarding'
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : 'No se pudo crear el workspace')
+                  } finally {
+                    setBusy(false)
+                  }
+                })()
+              }}
+            >
+              Crear mi workspace
+            </button>
+          </p>
+        </footer>
+      ) : null}
     </div>
   )
 }

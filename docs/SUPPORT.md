@@ -109,7 +109,12 @@ Agrupación por **empresa** (`client_company`). Filtro opcional por una empresa.
 
 ## Portal de cliente (`/portal`)
 
-Contactos del cliente **no** entran al workspace Mordecai. Se invitan desde **Clientes → editar cliente → Portal de soporte**.
+Contactos del cliente gestionan casos en `/portal` sin entrar al workspace Mordecai del partner. Alta desde **Clientes → editar cliente → Portal de soporte**:
+
+| Acción | Uso |
+|--------|-----|
+| **Dar acceso** | Alta directa por correo (+ email con enlace a `/portal`). Primer login vincula la cuenta Clerk. |
+| **Invitar por enlace** | Email con `/portal-invite/{token}` para quien aún no tiene cuenta. |
 
 | Rol | Permisos en portal |
 |-----|-------------------|
@@ -117,8 +122,9 @@ Contactos del cliente **no** entran al workspace Mordecai. Se invitan desde **Cl
 | `coordinator` | Ver + notas visibles al equipo |
 | `manager` | Ver + cambiar **prioridad operativa** + notas |
 
-- Invitación: `/portal-invite/{token}` (mismo Clerk, distinto de `/invite/{token}` del equipo).
+- Registro/login desde portal **no** pasa por onboarding de partner (`/onboarding`).
+- Misma cuenta Clerk puede tener portal y, después, workspace propio (`Crear mi workspace` en `/portal`).
 - Casos filtrados por `client_id`; UI Dilo con logo del cliente o del workspace.
 - **Urgencia reportada** (`reported_priority`): congelada desde el flow. **Prioridad operativa** (`priority`): la ordena gerente o tu equipo.
 
-Migración: `db/migrations/0022_client_portal.sql` → `npm run db:push`
+Migraciones: `0022_client_portal.sql`, `0023_client_members_pending.sql` → `npm run db:push`

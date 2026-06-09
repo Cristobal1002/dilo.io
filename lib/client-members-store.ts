@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
 import { clientMembers } from '@/db/schema'
 import type { ClientPortalRole } from '@/lib/client-portal-roles'
@@ -11,6 +11,28 @@ export async function addClientMember(args: {
   name: string | null
   role: ClientPortalRole
 }) {
+  const normalizedEmail = args.email.trim().toLowerCase()
+
+  const pendingByEmail = await db.query.clientMembers.findFirst({
+    where: and(
+      eq(clientMembers.clientId, args.clientId),
+      eq(clientMembers.email, normalizedEmail),
+      isNull(clientMembers.clerkId),
+    ),
+  })
+  if (pendingByEmail) {
+    const [linked] = await db
+      .update(clientMembers)
+      .set({
+        clerkId: args.clerkId,
+        name: args.name ?? pendingByEmail.name,
+        role: args.role,
+      })
+      .where(eq(clientMembers.id, pendingByEmail.id))
+      .returning()
+    return linked!
+  }
+
   const existing = await db.query.clientMembers.findFirst({
     where: and(
       eq(clientMembers.clientId, args.clientId),
@@ -33,7 +55,7 @@ export async function addClientMember(args: {
       organizationId: args.organizationId,
       clientId: args.clientId,
       clerkId: args.clerkId,
-      email: args.email.trim().toLowerCase(),
+      email: normalizedEmail,
       name: args.name,
       role: args.role,
     })

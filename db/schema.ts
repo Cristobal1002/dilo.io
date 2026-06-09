@@ -434,13 +434,15 @@ import {
     clientId:       uuid('client_id')
       .notNull()
       .references(() => clients.id, { onDelete: 'cascade' }),
-    clerkId:        text('clerk_id').notNull(),
+    /** Null hasta el primer inicio de sesión (alta directa por el partner). */
+    clerkId:        text('clerk_id'),
     email:          text('email').notNull(),
     name:           text('name'),
     role:           text('role').notNull(),
     createdAt:      timestamp('created_at').notNull().defaultNow(),
   }, (t) => [
     uniqueIndex('client_members_client_clerk_uidx').on(t.clientId, t.clerkId),
+    uniqueIndex('client_members_client_email_uidx').on(t.clientId, t.email),
     index('client_members_clerk_idx').on(t.clerkId),
   ])
 
