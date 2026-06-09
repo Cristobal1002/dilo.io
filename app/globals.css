@@ -533,6 +533,12 @@ button[aria-disabled='true'],
 }
 
 /* Portal executive dashboard */
+.portal-dash-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 .portal-dash-loading {
   min-height: 100vh;
   display: flex;
@@ -566,6 +572,10 @@ button[aria-disabled='true'],
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+.portal-dash-header {
+  flex-shrink: 0;
+  width: 100%;
 }
 .portal-dash-header-brand {
   display: flex;
@@ -646,9 +656,16 @@ button[aria-disabled='true'],
   background: transparent;
 }
 .portal-dash-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 28px 20px 48px;
+  padding: 28px 20px 32px;
+}
+.portal-dash-overview {
+  flex: 1;
 }
 .portal-dash-kpi-grid {
   display: grid;
@@ -854,9 +871,24 @@ button[aria-disabled='true'],
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
+  flex: 1;
+  align-items: stretch;
+  min-height: 360px;
 }
 @media (min-width: 1024px) {
   .portal-dash-cases-grid { grid-template-columns: 1fr 380px; }
+}
+.portal-dash-cases-grid .portal-dash-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.portal-dash-case-detail .portal-dash-empty,
+.portal-dash-cases-grid .portal-dash-panel > .portal-dash-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .portal-dash-cases-head {
   display: flex;
@@ -902,7 +934,7 @@ button[aria-disabled='true'],
   gap: 4px;
   flex-shrink: 0;
 }
-.portal-dash-detail-body { display: grid; gap: 16px; }
+.portal-dash-detail-body { display: grid; gap: 16px; flex: 1; }
 .portal-dash-detail-title { font-size: 17px; font-weight: 700; margin: 4px 0 0; }
 .portal-dash-detail-desc { font-size: 13px; line-height: 1.6; }
 .portal-dash-detail-dl {
@@ -950,11 +982,19 @@ button[aria-disabled='true'],
 }
 .portal-dash-error { font-size: 13px; margin-bottom: 12px; }
 .portal-dash-footer {
+  width: 100%;
+  margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(124, 58, 237, 0.12);
+}
+.portal-dash-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 20px;
+  padding: 20px 20px;
   flex-wrap: wrap;
 }
 

@@ -306,14 +306,16 @@ export function PortalDashboardFooter() {
     <footer
       className="portal-dash-footer"
       style={{
-        borderTop: `1px solid ${t.footerBorder}`,
+        borderTopColor: t.footerBorder,
         background: t.footerBg,
       }}
     >
-      <DiloBrandLockup imageHeight={28} logoForDarkBackground />
-      <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 12 }}>
-        Portal de soporte · Powered by Dilo
-      </p>
+      <div className="portal-dash-footer-inner">
+        <DiloBrandLockup imageHeight={28} logoForDarkBackground />
+        <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 12, margin: 0 }}>
+          Portal de soporte · Powered by Dilo
+        </p>
+      </div>
     </footer>
   )
 }

@@ -177,7 +177,7 @@ export default function PortalPageClient() {
   return (
     <PortalThemeContext.Provider value={{ isDark }}>
       <div
-        className="portal-dash-root min-h-screen"
+        className="portal-dash-root"
         style={{
           background: isDark ? '#0D0720' : '#F4F1FF',
           color: isDark ? '#fff' : '#111827',
