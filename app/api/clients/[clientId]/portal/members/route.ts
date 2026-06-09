@@ -13,7 +13,7 @@ import {
   listPendingClientInvitations,
   revokeClientPortalInvitation,
 } from '@/lib/client-invitations'
-import { ClientPortalInviteEmailError } from '@/lib/email/send-client-portal-invite'
+import { PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
 import { listClientMembersForClient } from '@/lib/client-members'
 import { removeClientMember } from '@/lib/client-members-store'
 import {
@@ -93,7 +93,7 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
           message: err.message,
         })
       }
-      if (err instanceof ClientPortalInviteEmailError) {
+      if (err instanceof PortalLoginCodeEmailError) {
         throw new ValidationError(err.message)
       }
       throw err
@@ -121,11 +121,12 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
       return apiSuccess({
         invitation: err.invitation,
         inviteUrl: err.inviteUrl,
+        portalUrl: err.inviteUrl,
         linkOnly: true,
         message: err.message,
       })
     }
-    if (err instanceof ClientPortalInviteEmailError) {
+    if (err instanceof PortalLoginCodeEmailError) {
       throw new ValidationError(err.message)
     }
     throw err

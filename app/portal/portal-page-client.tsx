@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { SignOutButton, useAuth, UserButton } from '@clerk/nextjs'
-import { PortalAuthPrompt } from '@/components/portal/portal-auth-prompt'
+import { useRouter } from 'next/navigation'
 import { readApiResult } from '@/lib/read-api-result'
 import {
   CLIENT_PORTAL_ROLE_LABEL,
@@ -19,7 +18,6 @@ import {
   type SupportPriority,
   type SupportStatus,
 } from '@/lib/support'
-import { portalSignInUrl } from '@/lib/auth-redirect'
 import { PORTAL_CLIENT_COOKIE } from '@/lib/portal-constants'
 import { cn } from '@/lib/utils'
 
@@ -46,7 +44,6 @@ type PortalMe = {
   memberships: { clientId: string; clientName: string; role: ClientPortalRole }[]
   branding: { clientName: string; providerName: string; logoUrl: string | null }
   user: { email: string; name: string | null }
-  canBootstrapWorkspace?: boolean
 }
 
 function formatDate(iso: string | null) {
@@ -63,7 +60,7 @@ function setClientCookie(clientId: string) {
 }
 
 export default function PortalPageClient() {
-  const { isSignedIn, isLoaded } = useAuth()
+  const router = useRouter()
   const [me, setMe] = useState<PortalMe | null>(null)
   const [cases, setCases] = useState<PortalCase[]>([])
   const [role, setRole] = useState<ClientPortalRole>('viewer')
@@ -98,22 +95,26 @@ export default function PortalPageClient() {
       const profile = await loadMe()
       await loadCases(profile.activeClientId, filter)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al cargar')
+      const message = e instanceof Error ? e.message : 'Error al cargar'
+      if (message.toLowerCase().includes('inicia sesión') || message.toLowerCase().includes('acceso')) {
+        router.replace('/portal/entrar')
+        return
+      }
+      setErr(message)
     } finally {
       setLoading(false)
     }
-  }, [filter, loadCases, loadMe])
+  }, [filter, loadCases, loadMe, router])
 
   useEffect(() => {
-    if (!isLoaded) return
-    if (!isSignedIn) {
-      setLoading(false)
-      setErr(null)
-      setMe(null)
-      return
-    }
     void refresh()
-  }, [isLoaded, isSignedIn, refresh])
+  }, [refresh])
+
+  const logout = async () => {
+    await fetch('/api/portal/auth/logout', { method: 'POST' })
+    router.replace('/portal/entrar')
+    router.refresh()
+  }
 
   const selected = useMemo(
     () => cases.find((c) => c.id === selectedId) ?? null,
@@ -150,7 +151,7 @@ export default function PortalPageClient() {
     }
   }
 
-  if (!isLoaded || (loading && isSignedIn && !me)) {
+  if (loading && !me) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-12 text-center text-sm text-[#64748B]">
         Cargando portal…
@@ -158,29 +159,17 @@ export default function PortalPageClient() {
     )
   }
 
-  if (!isSignedIn || (err && !me)) {
+  if (err && !me) {
     return (
       <main className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-lg font-semibold text-[#111827] dark:text-[#F8F9FB]">Portal de soporte</h1>
-        {err && isSignedIn ? (
-          <p className="mt-2 text-sm text-[#64748B]">{err}</p>
-        ) : (
-          <p className="mt-2 text-sm text-[#64748B]">
-            Inicia sesión con el correo al que te dieron acceso para ver los casos de tu empresa.
-          </p>
-        )}
-        {err && isSignedIn ? (
-          <SignOutButton redirectUrl={portalSignInUrl('/portal')}>
-            <button
-              type="button"
-              className="mt-6 rounded-xl bg-[#9C77F5] px-4 py-3 text-sm font-semibold text-white"
-            >
-              Cerrar sesión e iniciar con mi correo de acceso
-            </button>
-          </SignOutButton>
-        ) : (
-          <PortalAuthPrompt returnPath="/portal" />
-        )}
+        <p className="text-sm text-red-600">{err}</p>
+        <button
+          type="button"
+          onClick={() => router.replace('/portal/entrar')}
+          className="mt-4 text-sm text-[#7C3AED] underline"
+        >
+          Volver a entrar
+        </button>
       </main>
     )
   }
@@ -222,7 +211,14 @@ export default function PortalPageClient() {
             <span className="hidden text-xs text-[#64748B] sm:inline">
               {CLIENT_PORTAL_ROLE_LABEL[role]}
             </span>
-            <UserButton />
+            <span className="hidden text-xs text-[#64748B] md:inline">{me?.user.email}</span>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="rounded-lg border border-[#E8EAEF] px-2 py-1 text-xs text-[#64748B] dark:border-[#2A2F3F]"
+            >
+              Salir
+            </button>
           </div>
         </div>
       </header>
@@ -385,35 +381,6 @@ export default function PortalPageClient() {
         </aside>
       </main>
 
-      {me?.canBootstrapWorkspace ? (
-        <footer className="border-t border-[#E8EAEF] bg-white px-4 py-4 text-center dark:border-[#2A2F3F] dark:bg-[#1A1D29]">
-          <p className="text-xs text-[#64748B]">
-            ¿Quieres usar Dilo para operar flows en tu propia empresa?{' '}
-            <button
-              type="button"
-              disabled={busy}
-              className="font-medium text-[#7C3AED] underline disabled:opacity-50"
-              onClick={() => {
-                void (async () => {
-                  setBusy(true)
-                  try {
-                    const res = await fetch('/api/workspace/bootstrap', { method: 'POST' })
-                    const r = await readApiResult(res)
-                    if (!r.ok) throw new Error(r.message)
-                    window.location.href = '/onboarding'
-                  } catch (e) {
-                    setErr(e instanceof Error ? e.message : 'No se pudo crear el workspace')
-                  } finally {
-                    setBusy(false)
-                  }
-                })()
-              }}
-            >
-              Crear mi workspace
-            </button>
-          </p>
-        </footer>
-      ) : null}
     </div>
   )
 }

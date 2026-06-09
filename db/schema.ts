@@ -446,6 +446,18 @@ import {
     index('client_members_clerk_idx').on(t.clerkId),
   ])
 
+  /** Códigos OTP para entrar al portal de cliente (sin Clerk). */
+  export const clientPortalLoginCodes = pgTable('client_portal_login_codes', {
+    id:          uuid('id').primaryKey().defaultRandom(),
+    email:       text('email').notNull(),
+    codeHash:    text('code_hash').notNull(),
+    inviteToken: text('invite_token'),
+    expiresAt:   timestamp('expires_at').notNull(),
+    createdAt:   timestamp('created_at').notNull().defaultNow(),
+  }, (t) => [
+    index('client_portal_login_codes_email_idx').on(t.email, t.expiresAt),
+  ])
+
   /** Artículos de base de conocimiento (deflexión antes de soporte). */
   export const knowledgeArticles = pgTable(
     'knowledge_articles',

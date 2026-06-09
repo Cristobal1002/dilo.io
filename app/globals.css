@@ -458,6 +458,38 @@ button[aria-disabled='true'],
   z-index: 0;
 }
 
+/* Portal marketing page */
+.portal-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 48px;
+  align-items: start;
+}
+.portal-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+.portal-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+@media (max-width: 900px) {
+  .portal-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .portal-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+  .portal-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
 @media (max-width: 767px) {
   /* Reduce section padding on mobile */
   .landing-section-padding { padding-top: 72px !important; padding-bottom: 72px !important; }

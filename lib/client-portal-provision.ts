@@ -1,13 +1,10 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
 import { clientMembers, clients, organizations } from '@/db/schema'
-import {
-  sendClientPortalAccessEmail,
-  ClientPortalInviteEmailError,
-} from '@/lib/email/send-client-portal-invite'
+import { PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
+import { issuePortalLoginCode, portalEntrarUrl } from '@/lib/portal-login-codes'
 import { isClientPortalRole, type ClientPortalRole } from '@/lib/client-portal-roles'
-import { publicAppBaseUrl } from '@/lib/outreach'
-import { ConflictError } from '@/lib/errors'
+import { ConflictError, ValidationError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('client-portal-provision')
@@ -28,9 +25,6 @@ export class ClientPortalAccessLinkOnlyError extends Error {
   }
 }
 
-function portalUrl(): string {
-  return `${publicAppBaseUrl()}/portal`
-}
 
 export async function linkPendingClientMembersByEmail(
   clerkId: string,
@@ -108,10 +102,6 @@ export async function provisionClientPortalMember(args: {
   })
   if (!member) throw new Error('MEMBER_NOT_FOUND')
 
-  if (!args.sendEmail) {
-    return { member, portalUrl: portalUrl(), emailed: false as const }
-  }
-
   const client = await db.query.clients.findFirst({
     where: eq(clients.id, args.clientId),
     columns: { name: true },
@@ -121,21 +111,24 @@ export async function provisionClientPortalMember(args: {
     columns: { name: true },
   })
 
-  const accessUrl = portalUrl()
+  const accessUrl = portalEntrarUrl({ email: normalizedEmail })
+
+  if (!args.sendEmail) {
+    return { member, portalUrl: accessUrl, emailed: false as const }
+  }
+
   try {
-    await sendClientPortalAccessEmail({
-      organizationId: args.organizationId,
-      to: normalizedEmail,
+    await issuePortalLoginCode({
+      email: normalizedEmail,
       clientName: client?.name ?? 'Cliente',
       providerName: org?.name ?? 'Dilo',
-      role: args.role,
-      portalUrl: accessUrl,
     })
   } catch (err) {
-    if (err instanceof ClientPortalInviteEmailError) {
+    if (err instanceof PortalLoginCodeEmailError || err instanceof ValidationError) {
       throw new ClientPortalAccessLinkOnlyError(
-        err.message ||
-          'No se pudo enviar el correo. Comparte el enlace al portal con la persona.',
+        err instanceof Error
+          ? err.message
+          : 'No se pudo enviar el correo. Comparte el enlace al portal con la persona.',
         accessUrl,
         { id: member.id, email: normalizedEmail, role: args.role },
       )

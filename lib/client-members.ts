@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { clientMembers, clients, organizations } from '@/db/schema'
 import type { ClientPortalRole } from '@/lib/client-portal-roles'
@@ -13,6 +13,41 @@ export type ClientMembership = {
   clientLogoUrl: string | null
   role: ClientPortalRole
   email: string
+  name: string | null
+}
+
+export async function listClientMembershipsForEmail(email: string): Promise<ClientMembership[]> {
+  const normalizedEmail = email.trim().toLowerCase()
+  const rows = await db
+    .select({
+      id: clientMembers.id,
+      clientId: clientMembers.clientId,
+      clientName: clients.name,
+      organizationId: clientMembers.organizationId,
+      organizationName: organizations.name,
+      organizationLogoUrl: organizations.logoUrl,
+      clientLogoUrl: clients.logoUrl,
+      role: clientMembers.role,
+      email: clientMembers.email,
+      name: clientMembers.name,
+    })
+    .from(clientMembers)
+    .innerJoin(clients, eq(clients.id, clientMembers.clientId))
+    .innerJoin(organizations, eq(organizations.id, clientMembers.organizationId))
+    .where(eq(clientMembers.email, normalizedEmail))
+
+  return rows.map((r) => ({
+    id: r.id,
+    clientId: r.clientId,
+    clientName: r.clientName,
+    organizationId: r.organizationId,
+    organizationName: r.organizationName,
+    organizationLogoUrl: r.organizationLogoUrl,
+    clientLogoUrl: r.clientLogoUrl,
+    role: r.role as ClientPortalRole,
+    email: r.email,
+    name: r.name,
+  }))
 }
 
 export async function listClientMembershipsForClerk(clerkId: string): Promise<ClientMembership[]> {
@@ -27,6 +62,7 @@ export async function listClientMembershipsForClerk(clerkId: string): Promise<Cl
       clientLogoUrl: clients.logoUrl,
       role: clientMembers.role,
       email: clientMembers.email,
+      name: clientMembers.name,
     })
     .from(clientMembers)
     .innerJoin(clients, eq(clients.id, clientMembers.clientId))
@@ -44,6 +80,14 @@ export async function getClientMembership(args: {
   clientId: string
 }): Promise<ClientMembership | null> {
   const rows = await listClientMembershipsForClerk(args.clerkId)
+  return rows.find((m) => m.clientId === args.clientId) ?? null
+}
+
+export async function getClientMembershipByEmail(args: {
+  email: string
+  clientId: string
+}): Promise<ClientMembership | null> {
+  const rows = await listClientMembershipsForEmail(args.email)
   return rows.find((m) => m.clientId === args.clientId) ?? null
 }
 

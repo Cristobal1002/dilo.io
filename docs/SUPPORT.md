@@ -113,8 +113,10 @@ Contactos del cliente gestionan casos en `/portal` sin entrar al workspace Morde
 
 | Acción | Uso |
 |--------|-----|
-| **Dar acceso** | Alta directa por correo (+ email con enlace a `/portal`). Primer login vincula la cuenta Clerk. |
-| **Invitar por enlace** | Email con `/portal-invite/{token}` para quien aún no tiene cuenta. |
+| **Dar acceso** | Alta directa por correo + código OTP a `/portal/entrar`. |
+| **Invitar por enlace** | Email con código y enlace `/portal-invite/{token}` → `/portal/entrar`. |
+
+Autenticación del portal: **código por email** (sin contraseña ni Clerk). Dilo partner sigue en Clerk aparte.
 
 | Rol | Permisos en portal |
 |-----|-------------------|
@@ -127,4 +129,4 @@ Contactos del cliente gestionan casos en `/portal` sin entrar al workspace Morde
 - Casos filtrados por `client_id`; UI Dilo con logo del cliente o del workspace.
 - **Urgencia reportada** (`reported_priority`): congelada desde el flow. **Prioridad operativa** (`priority`): la ordena gerente o tu equipo.
 
-Migraciones: `0022_client_portal.sql`, `0023_client_members_pending.sql` → `npm run db:push`
+Migraciones: `0022`–`0024` (`client_portal_login_codes`) → `npm run db:push`

@@ -1,21 +1,21 @@
 import { cookies } from 'next/headers'
-import { currentUser } from '@clerk/nextjs/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { users } from '@/db/schema'
 import {
-  getClientMembership,
+  getClientMembershipByEmail,
   listClientMembershipsForClerk,
+  listClientMembershipsForEmail,
   type ClientMembership,
 } from '@/lib/client-members'
 import { UnauthorizedError, ValidationError } from '@/lib/errors'
 import { PORTAL_CLIENT_COOKIE } from '@/lib/portal-constants'
+import { getPortalSessionEmail } from '@/lib/portal-session'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('portal-auth')
 
 export type PortalAuthContext = {
-  clerkUserId: string
   email: string
   name: string | null
   memberships: ClientMembership[]
@@ -64,19 +64,10 @@ async function readActiveClientId(
 }
 
 export async function getPortalAuthContext(preferredClientId?: string | null): Promise<PortalAuthContext> {
-  const clerkUser = await currentUser()
-  if (!clerkUser?.id) throw new UnauthorizedError()
+  const email = await getPortalSessionEmail()
+  if (!email) throw new UnauthorizedError('Inicia sesión en el portal')
 
-  const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? ''
-  const name =
-    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null
-
-  const { linkPendingClientMembersByEmail } = await import('@/lib/client-portal-provision')
-  if (email) {
-    await linkPendingClientMembersByEmail(clerkUser.id, email, name)
-  }
-
-  const memberships = await listClientMembershipsForClerk(clerkUser.id)
+  const memberships = await listClientMembershipsForEmail(email)
   if (memberships.length === 0) {
     throw new UnauthorizedError('No tienes acceso al portal de cliente')
   }
@@ -85,22 +76,28 @@ export async function getPortalAuthContext(preferredClientId?: string | null): P
   const active = memberships.find((m) => m.clientId === activeClientId)
   if (!active) throw new ValidationError('Cliente no válido')
 
-  log.debug({ clerkUserId: clerkUser.id, clientId: active.clientId }, 'Portal auth resolved')
+  log.debug({ email, clientId: active.clientId }, 'Portal auth resolved')
 
   return {
-    clerkUserId: clerkUser.id,
     email,
-    name,
+    name: active.name,
     memberships,
     active,
   }
 }
 
 export async function requirePortalMembership(args: {
-  clerkId: string
+  email: string
   clientId: string
 }): Promise<ClientMembership> {
-  const membership = await getClientMembership(args)
+  const membership = await getClientMembershipByEmail(args)
   if (!membership) throw new UnauthorizedError()
   return membership
+}
+
+/** Vincula membresías de portal cuando alguien crea cuenta Clerk con el mismo email. */
+export async function linkPortalMembershipsToClerk(clerkUserId: string, email: string, name: string | null) {
+  const normalizedEmail = email.trim().toLowerCase()
+  const { linkPendingClientMembersByEmail } = await import('@/lib/client-portal-provision')
+  await linkPendingClientMembersByEmail(clerkUserId, normalizedEmail, name)
 }

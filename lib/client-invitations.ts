@@ -1,8 +1,9 @@
 import { randomBytes } from 'crypto'
 import { and, eq, isNull, gt } from 'drizzle-orm'
 import { db } from '@/db'
-import { clientInvitations, clients, organizations } from '@/db/schema'
-import { sendClientPortalInviteEmail, ClientPortalInviteEmailError } from '@/lib/email/send-client-portal-invite'
+import { clientInvitations, clientMembers, clients, organizations } from '@/db/schema'
+import { PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
+import { portalEntrarUrl } from '@/lib/portal-login-codes'
 import { isClientPortalRole, type ClientPortalRole } from '@/lib/client-portal-roles'
 import { addClientMember } from '@/lib/client-members-store'
 import { isMissingRelation, rethrowUnlessMissingRelation } from '@/lib/pg-relation-errors'
@@ -48,7 +49,7 @@ function toInviteLinkFallback(
   url: string,
   invitation: { id: string; email: string; role: ClientPortalRole },
 ): ClientPortalInviteLinkOnlyError | null {
-  if (err instanceof ClientPortalInviteEmailError) {
+  if (err instanceof PortalLoginCodeEmailError) {
     return new ClientPortalInviteLinkOnlyError(
       err.message ||
         'No se pudo enviar el correo. Copia el enlace y compártelo con la persona invitada.',
@@ -76,14 +77,12 @@ async function sendInviteEmailForRow(
   clientName: string,
   providerName: string,
 ) {
-  const role = row.role as ClientPortalRole
-  await sendClientPortalInviteEmail({
-    organizationId: row.organizationId,
-    to: row.email,
+  const { issuePortalLoginCode } = await import('@/lib/portal-login-codes')
+  await issuePortalLoginCode({
+    email: row.email,
+    inviteToken: row.token,
     clientName,
     providerName,
-    role,
-    inviteUrl: inviteUrl(row.token),
   })
 }
 
@@ -157,7 +156,7 @@ export async function createClientPortalInvitation(args: {
     try {
       await sendInviteEmailForRow(updated, client.name, providerName)
     } catch (err) {
-      const linkOnly = toInviteLinkFallback(err, inviteUrl(pending.token), {
+      const linkOnly = toInviteLinkFallback(err, portalEntrarUrl({ email: normalizedEmail, invite: pending.token }), {
         id: pending.id,
         email: normalizedEmail,
         role: args.role,
@@ -192,7 +191,7 @@ export async function createClientPortalInvitation(args: {
   try {
     await sendInviteEmailForRow(row, client.name, providerName)
   } catch (err) {
-    const linkOnly = toInviteLinkFallback(err, inviteUrl(row.token), {
+    const linkOnly = toInviteLinkFallback(err, portalEntrarUrl({ email: normalizedEmail, invite: row.token }), {
       id: row.id,
       email: normalizedEmail,
       role: args.role,
@@ -264,6 +263,57 @@ export async function acceptPendingClientInvitesForEmail(
       .where(eq(clientInvitations.id, inv.id))
     log.info({ clientId: inv.clientId, email: normalizedEmail }, 'Client portal invitation accepted on login')
   }
+}
+
+async function ensureClientMemberFromInvitation(
+  inv: typeof clientInvitations.$inferSelect,
+  email: string,
+  name: string | null,
+) {
+  const existing = await db.query.clientMembers.findFirst({
+    where: and(
+      eq(clientMembers.clientId, inv.clientId),
+      eq(clientMembers.email, email),
+    ),
+  })
+  if (!existing && isClientPortalRole(inv.role)) {
+    await db.insert(clientMembers).values({
+      organizationId: inv.organizationId,
+      clientId: inv.clientId,
+      clerkId: null,
+      email,
+      name,
+      role: inv.role,
+    })
+  }
+}
+
+export async function acceptClientInvitationByTokenForEmail(
+  token: string,
+  email: string,
+): Promise<{ clientId: string; clientName: string } | null> {
+  const inv = await db.query.clientInvitations.findFirst({
+    where: eq(clientInvitations.token, token),
+  })
+  if (!inv || !isPending(inv)) return null
+
+  const normalizedEmail = email.trim().toLowerCase()
+  if (inv.email !== normalizedEmail) throw new Error('EMAIL_MISMATCH')
+  if (!isClientPortalRole(inv.role)) return null
+
+  const client = await db.query.clients.findFirst({
+    where: eq(clients.id, inv.clientId),
+    columns: { name: true },
+  })
+
+  await ensureClientMemberFromInvitation(inv, normalizedEmail, null)
+
+  await db
+    .update(clientInvitations)
+    .set({ acceptedAt: new Date() })
+    .where(eq(clientInvitations.id, inv.id))
+
+  return { clientId: inv.clientId, clientName: client?.name ?? 'Cliente' }
 }
 
 export async function acceptClientInvitationByToken(

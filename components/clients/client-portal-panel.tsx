@@ -176,8 +176,8 @@ export function ClientPortalPanel({ clientId, clientName }: { clientId: string; 
           </button>
         </div>
         <p className="text-[11px] text-[#94A3B8]">
-          <strong>Dar acceso:</strong> alta directa + correo para entrar en /portal.{' '}
-          <strong>Invitar:</strong> enlace de aceptación (útil si aún no tiene cuenta).
+          <strong>Dar acceso:</strong> alta + correo con código de 6 dígitos.{' '}
+          <strong>Invitar:</strong> mismo flujo con enlace a /portal/entrar (sin cuenta Dilo).
         </p>
       </div>
 
