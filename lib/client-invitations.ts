@@ -2,10 +2,11 @@ import { randomBytes } from 'crypto'
 import { and, eq, isNull, gt } from 'drizzle-orm'
 import { db } from '@/db'
 import { clientInvitations, clients, organizations } from '@/db/schema'
-import { sendClientPortalInviteEmail } from '@/lib/email/send-client-portal-invite'
+import { sendClientPortalInviteEmail, ClientPortalInviteEmailError } from '@/lib/email/send-client-portal-invite'
 import { isClientPortalRole, type ClientPortalRole } from '@/lib/client-portal-roles'
 import { addClientMember } from '@/lib/client-members-store'
-import { isMissingRelation } from '@/lib/pg-relation-errors'
+import { isMissingRelation, rethrowUnlessMissingRelation } from '@/lib/pg-relation-errors'
+import { publicAppBaseUrl } from '@/lib/outreach'
 import { createLogger } from '@/lib/logger'
 import { isResendTestRecipientOnlyError } from '@/lib/email/resend-errors'
 
@@ -39,23 +40,35 @@ function isPending(inv: typeof clientInvitations.$inferSelect): boolean {
 }
 
 function inviteUrl(token: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  return `${appUrl}/portal-invite/${token}`
+  return `${publicAppBaseUrl()}/portal-invite/${token}`
 }
 
-function toLinkOnlyIfDevTestMode(
+function toInviteLinkFallback(
   err: unknown,
   url: string,
   invitation: { id: string; email: string; role: ClientPortalRole },
 ): ClientPortalInviteLinkOnlyError | null {
-  if (process.env.NODE_ENV !== 'development') return null
-  const msg = err instanceof Error ? err.message : ''
-  if (!isResendTestRecipientOnlyError(msg)) return null
-  return new ClientPortalInviteLinkOnlyError(
-    'Resend en modo prueba solo envía a tu propio correo. Copia el enlace y compártelo con la persona invitada.',
-    url,
-    invitation,
-  )
+  if (err instanceof ClientPortalInviteEmailError) {
+    return new ClientPortalInviteLinkOnlyError(
+      err.message ||
+        'No se pudo enviar el correo. Copia el enlace y compártelo con la persona invitada.',
+      url,
+      invitation,
+    )
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    const msg = err instanceof Error ? err.message : ''
+    if (isResendTestRecipientOnlyError(msg)) {
+      return new ClientPortalInviteLinkOnlyError(
+        'Resend en modo prueba solo envía a tu propio correo. Copia el enlace y compártelo con la persona invitada.',
+        url,
+        invitation,
+      )
+    }
+  }
+
+  return null
 }
 
 async function sendInviteEmailForRow(
@@ -74,21 +87,25 @@ async function sendInviteEmailForRow(
 }
 
 export async function listPendingClientInvitations(clientId: string) {
-  const rows = await db.query.clientInvitations.findMany({
-    where: and(
-      eq(clientInvitations.clientId, clientId),
-      isNull(clientInvitations.acceptedAt),
-      isNull(clientInvitations.revokedAt),
-      gt(clientInvitations.expiresAt, new Date()),
-    ),
-    orderBy: (t, { desc }) => [desc(t.createdAt)],
-  })
-  return rows.map((inv) => ({
-    id: inv.id,
-    email: inv.email,
-    role: inv.role as ClientPortalRole,
-    createdAt: inv.createdAt.getTime(),
-  }))
+  try {
+    const rows = await db.query.clientInvitations.findMany({
+      where: and(
+        eq(clientInvitations.clientId, clientId),
+        isNull(clientInvitations.acceptedAt),
+        isNull(clientInvitations.revokedAt),
+        gt(clientInvitations.expiresAt, new Date()),
+      ),
+      orderBy: (t, { desc }) => [desc(t.createdAt)],
+    })
+    return rows.map((inv) => ({
+      id: inv.id,
+      email: inv.email,
+      role: inv.role as ClientPortalRole,
+      createdAt: inv.createdAt.getTime(),
+    }))
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, 'client_invitations')
+  }
 }
 
 export async function createClientPortalInvitation(args: {
@@ -113,15 +130,20 @@ export async function createClientPortalInvitation(args: {
   })
   const providerName = org?.name ?? 'Dilo'
 
-  const pending = await db.query.clientInvitations.findFirst({
-    where: and(
-      eq(clientInvitations.clientId, args.clientId),
-      eq(clientInvitations.email, normalizedEmail),
-      isNull(clientInvitations.acceptedAt),
-      isNull(clientInvitations.revokedAt),
-      gt(clientInvitations.expiresAt, new Date()),
-    ),
-  })
+  let pending: typeof clientInvitations.$inferSelect | undefined
+  try {
+    pending = await db.query.clientInvitations.findFirst({
+      where: and(
+        eq(clientInvitations.clientId, args.clientId),
+        eq(clientInvitations.email, normalizedEmail),
+        isNull(clientInvitations.acceptedAt),
+        isNull(clientInvitations.revokedAt),
+        gt(clientInvitations.expiresAt, new Date()),
+      ),
+    })
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, 'client_invitations')
+  }
 
   if (pending) {
     const updated = { ...pending, role: args.role }
@@ -134,7 +156,7 @@ export async function createClientPortalInvitation(args: {
     try {
       await sendInviteEmailForRow(updated, client.name, providerName)
     } catch (err) {
-      const linkOnly = toLinkOnlyIfDevTestMode(err, inviteUrl(pending.token), {
+      const linkOnly = toInviteLinkFallback(err, inviteUrl(pending.token), {
         id: pending.id,
         email: normalizedEmail,
         role: args.role,
@@ -147,34 +169,39 @@ export async function createClientPortalInvitation(args: {
 
   const token = inviteToken()
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
-  const [row] = await db
-    .insert(clientInvitations)
-    .values({
-      organizationId: args.organizationId,
-      clientId: args.clientId,
-      email: normalizedEmail,
-      role: args.role,
-      token,
-      invitedByUserId: args.invitedByUserId,
-      expiresAt,
-    })
-    .returning()
+  let row: typeof clientInvitations.$inferSelect
+  try {
+    const inserted = await db
+      .insert(clientInvitations)
+      .values({
+        organizationId: args.organizationId,
+        clientId: args.clientId,
+        email: normalizedEmail,
+        role: args.role,
+        token,
+        invitedByUserId: args.invitedByUserId,
+        expiresAt,
+      })
+      .returning()
+    row = inserted[0]!
+  } catch (err) {
+    rethrowUnlessMissingRelation(err, 'client_invitations')
+  }
 
   try {
-    await sendInviteEmailForRow(row!, client.name, providerName)
+    await sendInviteEmailForRow(row, client.name, providerName)
   } catch (err) {
-    const linkOnly = toLinkOnlyIfDevTestMode(err, inviteUrl(row!.token), {
-      id: row!.id,
+    const linkOnly = toInviteLinkFallback(err, inviteUrl(row.token), {
+      id: row.id,
       email: normalizedEmail,
       role: args.role,
     })
     if (linkOnly) throw linkOnly
-    await db.delete(clientInvitations).where(eq(clientInvitations.id, row!.id))
     throw err
   }
 
   log.info({ clientId: args.clientId, email: normalizedEmail, role: args.role }, 'Client portal invitation created')
-  return row!
+  return row
 }
 
 export async function revokeClientPortalInvitation(

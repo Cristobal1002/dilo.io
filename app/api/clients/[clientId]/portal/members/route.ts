@@ -13,6 +13,7 @@ import {
   listPendingClientInvitations,
   revokeClientPortalInvitation,
 } from '@/lib/client-invitations'
+import { ClientPortalInviteEmailError } from '@/lib/email/send-client-portal-invite'
 import { listClientMembersForClient } from '@/lib/client-members'
 import { removeClientMember } from '@/lib/client-members-store'
 import { CLIENT_PORTAL_ROLES, isClientPortalRole } from '@/lib/client-portal-roles'
@@ -76,6 +77,9 @@ export const POST = withApiHandler(async (req: NextRequest, { auth, params }) =>
         linkOnly: true,
         message: err.message,
       })
+    }
+    if (err instanceof ClientPortalInviteEmailError) {
+      throw new ValidationError(err.message)
     }
     throw err
   }
