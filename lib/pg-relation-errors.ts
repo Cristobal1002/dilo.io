@@ -42,8 +42,31 @@ function isMissingRelationMessage(blob: string, relation: string): boolean {
 export function rethrowUnlessMissingRelation(err: unknown, relation: string): never {
   if (isMissingRelation(err, relation)) {
     throw new SchemaOutdatedError(
-      `Falta la tabla «${relation}» en la base de datos. En producción ejecuta «npm run db:push» (con el DATABASE_URL de Vercel) o aplica la migración db/migrations/0004_org_integration_credentials.sql.`,
+      `Falta la tabla «${relation}» en la base de datos. En producción ejecuta «npm run db:push» (con el DATABASE_URL de Vercel).`,
     )
   }
+  throw err
+}
+
+/** Errores de Postgres típicos del portal de cliente (migraciones 0022–0024). */
+export function rethrowPortalDbError(err: unknown): never {
+  if (isMissingRelation(err, 'client_portal_login_codes')) {
+    throw new SchemaOutdatedError(
+      'Falta la tabla client_portal_login_codes. Ejecuta «npm run db:push» contra el DATABASE_URL de producción (migración 0024).',
+    )
+  }
+  if (isMissingRelation(err, 'client_invitations')) {
+    throw new SchemaOutdatedError(
+      'Falta la tabla client_invitations. Ejecuta «npm run db:push» (migración 0022).',
+    )
+  }
+
+  const blob = collectErrorText(err)
+  if (/clerk_id/i.test(blob) && /not-null|null value in column/i.test(blob)) {
+    throw new SchemaOutdatedError(
+      'client_members.clerk_id debe permitir NULL para el portal OTP. Aplica la migración 0023 con «npm run db:push».',
+    )
+  }
+
   throw err
 }

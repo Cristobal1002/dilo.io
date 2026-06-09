@@ -58,15 +58,13 @@ function toInviteLinkFallback(
     )
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    const msg = err instanceof Error ? err.message : ''
-    if (isResendTestRecipientOnlyError(msg)) {
-      return new ClientPortalInviteLinkOnlyError(
-        'Resend en modo prueba solo envía a tu propio correo. Copia el enlace y compártelo con la persona invitada.',
-        url,
-        invitation,
-      )
-    }
+  const msg = err instanceof Error ? err.message : ''
+  if (isResendTestRecipientOnlyError(msg)) {
+    return new ClientPortalInviteLinkOnlyError(
+      'Resend en modo prueba solo envía a tu propio correo. Copia el enlace y compártelo con la persona invitada.',
+      url,
+      invitation,
+    )
   }
 
   return null

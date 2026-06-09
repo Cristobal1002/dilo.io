@@ -2,7 +2,7 @@ import { createHash, randomInt } from 'crypto'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { db } from '@/db'
 import { clientInvitations, clientMembers, clientPortalLoginCodes } from '@/db/schema'
-import { sendPortalLoginCodeEmail, PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
+import { sendPortalLoginCodeEmail } from '@/lib/email/send-portal-code'
 import { acceptClientInvitationByTokenForEmail } from '@/lib/client-invitations'
 import { getClientInvitationPreview } from '@/lib/client-invitations'
 import { env } from '@/lib/env'
@@ -10,7 +10,9 @@ import {
   PORTAL_CODE_RESEND_SECONDS,
   PORTAL_CODE_TTL_MINUTES,
 } from '@/lib/portal-constants'
-import { ValidationError } from '@/lib/errors'
+import { ValidationError, isAppError } from '@/lib/errors'
+import { rethrowPortalDbError } from '@/lib/pg-relation-errors'
+import { PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
 import { publicAppBaseUrl } from '@/lib/outreach'
 import { createLogger } from '@/lib/logger'
 
@@ -69,48 +71,48 @@ export async function issuePortalLoginCode(args: {
   clientName?: string
   providerName?: string
 }): Promise<{ sent: boolean; entrarUrl: string }> {
-  const email = normalizeEmail(args.email)
-  if (!email) throw new ValidationError('Correo inválido')
-
-  if (args.inviteToken) {
-    const preview = await getClientInvitationPreview(args.inviteToken)
-    if (!preview) throw new ValidationError('Invitación no válida o expirada')
-    if (preview.email !== email) {
-      throw new ValidationError('Usa el correo de la invitación')
-    }
-  } else if (!(await emailHasPortalAccess(email))) {
-    throw new ValidationError('No hay acceso al portal con ese correo')
-  }
-
-  const recent = await db.query.clientPortalLoginCodes.findFirst({
-    where: and(
-      eq(clientPortalLoginCodes.email, email),
-      gt(clientPortalLoginCodes.createdAt, new Date(Date.now() - PORTAL_CODE_RESEND_SECONDS * 1000)),
-    ),
-    orderBy: [desc(clientPortalLoginCodes.createdAt)],
-  })
-  if (recent) {
-    throw new ValidationError(`Espera ${PORTAL_CODE_RESEND_SECONDS} segundos antes de pedir otro código`)
-  }
-
-  const organizationId = await pickOrganizationIdForEmail(email, args.inviteToken)
-  if (!organizationId) {
-    throw new ValidationError('No se pudo resolver la configuración de correo del portal')
-  }
-
-  const code = generateCode()
-  const expiresAt = new Date(Date.now() + PORTAL_CODE_TTL_MINUTES * 60 * 1000)
-  await db.insert(clientPortalLoginCodes).values({
-    email,
-    codeHash: hashCode(email, code),
-    inviteToken: args.inviteToken ?? null,
-    expiresAt,
-  })
-
-  const entrarUrl = portalEntrarUrl({ email, invite: args.inviteToken ?? undefined })
-  const preview = args.inviteToken ? await getClientInvitationPreview(args.inviteToken) : null
-
   try {
+    const email = normalizeEmail(args.email)
+    if (!email) throw new ValidationError('Correo inválido')
+
+    if (args.inviteToken) {
+      const preview = await getClientInvitationPreview(args.inviteToken)
+      if (!preview) throw new ValidationError('Invitación no válida o expirada')
+      if (preview.email !== email) {
+        throw new ValidationError('Usa el correo de la invitación')
+      }
+    } else if (!(await emailHasPortalAccess(email))) {
+      throw new ValidationError('No hay acceso al portal con ese correo')
+    }
+
+    const recent = await db.query.clientPortalLoginCodes.findFirst({
+      where: and(
+        eq(clientPortalLoginCodes.email, email),
+        gt(clientPortalLoginCodes.createdAt, new Date(Date.now() - PORTAL_CODE_RESEND_SECONDS * 1000)),
+      ),
+      orderBy: [desc(clientPortalLoginCodes.createdAt)],
+    })
+    if (recent) {
+      throw new ValidationError(`Espera ${PORTAL_CODE_RESEND_SECONDS} segundos antes de pedir otro código`)
+    }
+
+    const organizationId = await pickOrganizationIdForEmail(email, args.inviteToken)
+    if (!organizationId) {
+      throw new ValidationError('No se pudo resolver la configuración de correo del portal')
+    }
+
+    const code = generateCode()
+    const expiresAt = new Date(Date.now() + PORTAL_CODE_TTL_MINUTES * 60 * 1000)
+    await db.insert(clientPortalLoginCodes).values({
+      email,
+      codeHash: hashCode(email, code),
+      inviteToken: args.inviteToken ?? null,
+      expiresAt,
+    })
+
+    const entrarUrl = portalEntrarUrl({ email, invite: args.inviteToken ?? undefined })
+    const preview = args.inviteToken ? await getClientInvitationPreview(args.inviteToken) : null
+
     await sendPortalLoginCodeEmail({
       organizationId,
       to: email,
@@ -119,13 +121,13 @@ export async function issuePortalLoginCode(args: {
       clientName: args.clientName ?? preview?.clientName ?? 'tu empresa',
       providerName: args.providerName ?? preview?.providerName ?? 'Dilo',
     })
-  } catch (err) {
-    if (err instanceof PortalLoginCodeEmailError) throw new ValidationError(err.message)
-    throw err
-  }
 
-  log.info({ email, invite: Boolean(args.inviteToken) }, 'Portal login code issued')
-  return { sent: true, entrarUrl }
+    log.info({ email, invite: Boolean(args.inviteToken) }, 'Portal login code issued')
+    return { sent: true, entrarUrl }
+  } catch (err) {
+    if (isAppError(err) || err instanceof PortalLoginCodeEmailError) throw err
+    rethrowPortalDbError(err)
+  }
 }
 
 export async function verifyPortalLoginCode(args: {
@@ -133,32 +135,37 @@ export async function verifyPortalLoginCode(args: {
   code: string
   inviteToken?: string | null
 }): Promise<{ email: string }> {
-  const email = normalizeEmail(args.email)
-  const code = args.code.trim()
-  if (!email || !/^\d{6}$/.test(code)) {
-    throw new ValidationError('Correo o código inválido')
+  try {
+    const email = normalizeEmail(args.email)
+    const code = args.code.trim()
+    if (!email || !/^\d{6}$/.test(code)) {
+      throw new ValidationError('Correo o código inválido')
+    }
+
+    const row = await db.query.clientPortalLoginCodes.findFirst({
+      where: and(
+        eq(clientPortalLoginCodes.email, email),
+        eq(clientPortalLoginCodes.codeHash, hashCode(email, code)),
+        gt(clientPortalLoginCodes.expiresAt, new Date()),
+      ),
+      orderBy: [desc(clientPortalLoginCodes.createdAt)],
+    })
+
+    if (!row) throw new ValidationError('Código incorrecto o expirado')
+
+    const inviteToken = args.inviteToken ?? row.inviteToken
+    if (inviteToken) {
+      const accepted = await acceptClientInvitationByTokenForEmail(inviteToken, email)
+      if (!accepted) throw new ValidationError('Invitación no válida o expirada')
+    } else if (!(await emailHasPortalAccess(email))) {
+      throw new ValidationError('No hay acceso al portal con ese correo')
+    }
+
+    await db.delete(clientPortalLoginCodes).where(eq(clientPortalLoginCodes.id, row.id))
+
+    return { email }
+  } catch (err) {
+    if (isAppError(err)) throw err
+    rethrowPortalDbError(err)
   }
-
-  const row = await db.query.clientPortalLoginCodes.findFirst({
-    where: and(
-      eq(clientPortalLoginCodes.email, email),
-      eq(clientPortalLoginCodes.codeHash, hashCode(email, code)),
-      gt(clientPortalLoginCodes.expiresAt, new Date()),
-    ),
-    orderBy: [desc(clientPortalLoginCodes.createdAt)],
-  })
-
-  if (!row) throw new ValidationError('Código incorrecto o expirado')
-
-  const inviteToken = args.inviteToken ?? row.inviteToken
-  if (inviteToken) {
-    const accepted = await acceptClientInvitationByTokenForEmail(inviteToken, email)
-    if (!accepted) throw new ValidationError('Invitación no válida o expirada')
-  } else if (!(await emailHasPortalAccess(email))) {
-    throw new ValidationError('No hay acceso al portal con ese correo')
-  }
-
-  await db.delete(clientPortalLoginCodes).where(eq(clientPortalLoginCodes.id, row.id))
-
-  return { email }
 }

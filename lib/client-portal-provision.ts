@@ -5,6 +5,7 @@ import { PortalLoginCodeEmailError } from '@/lib/email/send-portal-code'
 import { issuePortalLoginCode, portalEntrarUrl } from '@/lib/portal-login-codes'
 import { isClientPortalRole, type ClientPortalRole } from '@/lib/client-portal-roles'
 import { ConflictError, ValidationError } from '@/lib/errors'
+import { rethrowPortalDbError } from '@/lib/pg-relation-errors'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('client-portal-provision')
@@ -69,72 +70,84 @@ export async function provisionClientPortalMember(args: {
   role: ClientPortalRole
   sendEmail: boolean
 }) {
-  const normalizedEmail = args.email.trim().toLowerCase()
-  if (!isClientPortalRole(args.role)) throw new Error('INVALID_ROLE')
-
-  const existing = await db.query.clientMembers.findFirst({
-    where: and(eq(clientMembers.clientId, args.clientId), eq(clientMembers.email, normalizedEmail)),
-  })
-  if (existing) {
-    if (existing.clerkId) {
-      throw new ConflictError('Ese correo ya tiene acceso activo al portal de este cliente')
-    }
-    await db
-      .update(clientMembers)
-      .set({
-        role: args.role,
-        name: args.name?.trim() || existing.name,
-      })
-      .where(eq(clientMembers.id, existing.id))
-  } else {
-    await db.insert(clientMembers).values({
-      organizationId: args.organizationId,
-      clientId: args.clientId,
-      clerkId: null,
-      email: normalizedEmail,
-      name: args.name?.trim() || null,
-      role: args.role,
-    })
-  }
-
-  const member = await db.query.clientMembers.findFirst({
-    where: and(eq(clientMembers.clientId, args.clientId), eq(clientMembers.email, normalizedEmail)),
-  })
-  if (!member) throw new Error('MEMBER_NOT_FOUND')
-
-  const client = await db.query.clients.findFirst({
-    where: eq(clients.id, args.clientId),
-    columns: { name: true },
-  })
-  const org = await db.query.organizations.findFirst({
-    where: eq(organizations.id, args.organizationId),
-    columns: { name: true },
-  })
-
-  const accessUrl = portalEntrarUrl({ email: normalizedEmail })
-
-  if (!args.sendEmail) {
-    return { member, portalUrl: accessUrl, emailed: false as const }
-  }
-
   try {
-    await issuePortalLoginCode({
-      email: normalizedEmail,
-      clientName: client?.name ?? 'Cliente',
-      providerName: org?.name ?? 'Dilo',
-    })
-  } catch (err) {
-    if (err instanceof PortalLoginCodeEmailError || err instanceof ValidationError) {
-      throw new ClientPortalAccessLinkOnlyError(
-        err instanceof Error
-          ? err.message
-          : 'No se pudo enviar el correo. Comparte el enlace al portal con la persona.',
-        accessUrl,
-        { id: member.id, email: normalizedEmail, role: args.role },
-      )
-    }
-    throw err
-  }
+    const normalizedEmail = args.email.trim().toLowerCase()
+    if (!isClientPortalRole(args.role)) throw new Error('INVALID_ROLE')
 
-  return { member, portalUrl: accessUrl, emailed: true as const }
+    const existing = await db.query.clientMembers.findFirst({
+      where: and(eq(clientMembers.clientId, args.clientId), eq(clientMembers.email, normalizedEmail)),
+    })
+    if (existing) {
+      if (existing.clerkId) {
+        throw new ConflictError('Ese correo ya tiene acceso activo al portal de este cliente')
+      }
+      await db
+        .update(clientMembers)
+        .set({
+          role: args.role,
+          name: args.name?.trim() || existing.name,
+        })
+        .where(eq(clientMembers.id, existing.id))
+    } else {
+      await db.insert(clientMembers).values({
+        organizationId: args.organizationId,
+        clientId: args.clientId,
+        clerkId: null,
+        email: normalizedEmail,
+        name: args.name?.trim() || null,
+        role: args.role,
+      })
+    }
+
+    const member = await db.query.clientMembers.findFirst({
+      where: and(eq(clientMembers.clientId, args.clientId), eq(clientMembers.email, normalizedEmail)),
+    })
+    if (!member) throw new Error('MEMBER_NOT_FOUND')
+
+    const client = await db.query.clients.findFirst({
+      where: eq(clients.id, args.clientId),
+      columns: { name: true },
+    })
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, args.organizationId),
+      columns: { name: true },
+    })
+
+    const accessUrl = portalEntrarUrl({ email: normalizedEmail })
+
+    if (!args.sendEmail) {
+      return { member, portalUrl: accessUrl, emailed: false as const }
+    }
+
+    try {
+      await issuePortalLoginCode({
+        email: normalizedEmail,
+        clientName: client?.name ?? 'Cliente',
+        providerName: org?.name ?? 'Dilo',
+      })
+    } catch (err) {
+      if (err instanceof PortalLoginCodeEmailError || err instanceof ValidationError) {
+        throw new ClientPortalAccessLinkOnlyError(
+          err instanceof Error
+            ? err.message
+            : 'No se pudo enviar el correo. Comparte el enlace al portal con la persona.',
+          accessUrl,
+          { id: member.id, email: normalizedEmail, role: args.role },
+        )
+      }
+      throw err
+    }
+
+    return { member, portalUrl: accessUrl, emailed: true as const }
+  } catch (err) {
+    if (
+      err instanceof ConflictError ||
+      err instanceof ClientPortalAccessLinkOnlyError ||
+      err instanceof PortalLoginCodeEmailError ||
+      err instanceof ValidationError
+    ) {
+      throw err
+    }
+    rethrowPortalDbError(err)
+  }
 }

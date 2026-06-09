@@ -15,7 +15,8 @@
  */
 import { NextResponse } from 'next/server'
 import { upstreamErrorFromAiSdk, configurationErrorFromUnknown } from './ai-api-errors'
-import { AppError, isAppError, InternalError } from './errors'
+import { AppError, isAppError, InternalError, ValidationError } from './errors'
+import { PortalLoginCodeEmailError } from './email/send-portal-code'
 import { validationErrorFromStripe } from './stripe-errors'
 import { createLogger } from './logger'
 
@@ -55,6 +56,11 @@ export function apiError(error: AppError): NextResponse {
  * Log unexpected errors with full context for debugging.
  */
 export function handleApiError(err: unknown, context?: string): NextResponse {
+  if (err instanceof PortalLoginCodeEmailError) {
+    log.warn({ context }, err.message)
+    return apiError(new ValidationError(err.message))
+  }
+
   if (isAppError(err)) {
     // Known errors: log at warn level (no stack trace needed)
     if (err.statusCode >= 500) {

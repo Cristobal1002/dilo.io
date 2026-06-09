@@ -15,7 +15,7 @@ const isPublicRoute = createRouteMatcher([
   '/portal',
   '/portal/entrar',
   '/portal-invite/(.*)',
-  '/api/portal/auth/(.*)',
+  '/api/portal/(.*)',
   '/api/portal-invitations/(.*)',
   '/api/invitations/(.*)',
   '/support/review/(.*)',
