@@ -30,6 +30,7 @@ async function sendInviteEmailForRow(
   organizationName: string,
 ) {
   await sendTeamInviteEmail({
+    organizationId: row.organizationId,
     to: row.email,
     organizationName,
     inviteUrl: inviteUrl(row.token),

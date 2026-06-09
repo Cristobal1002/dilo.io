@@ -1,10 +1,13 @@
 import { Resend } from 'resend'
-import { resolveServerResendFrom } from '@/lib/email/resend-from'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { isResendDomainNotVerifiedError } from '@/lib/email/resend-errors'
 import { CLIENT_PORTAL_ROLE_LABEL, type ClientPortalRole } from '@/lib/client-portal-roles'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/client-portal-invite')
+
+const RESEND_NOT_CONFIGURED_MSG =
+  'Configura Integraciones → Resend en el workspace (API key y remitente) o RESEND_API_KEY + RESEND_FROM_EMAIL en el servidor.'
 
 export class ClientPortalInviteEmailError extends Error {
   constructor(message: string) {
@@ -14,23 +17,21 @@ export class ClientPortalInviteEmailError extends Error {
 }
 
 export async function sendClientPortalInviteEmail(params: {
+  organizationId: string
   to: string
   clientName: string
   providerName: string
   role: ClientPortalRole
   inviteUrl: string
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  const from = resolveServerResendFrom()
-
-  if (!apiKey || !from) {
-    throw new ClientPortalInviteEmailError(
-      'Falta configurar RESEND_API_KEY y RESEND_FROM_EMAIL en el servidor para enviar invitaciones.',
-    )
+  const cfg = await resolveResendSendConfig(params.organizationId)
+  if (!cfg) {
+    throw new ClientPortalInviteEmailError(RESEND_NOT_CONFIGURED_MSG)
   }
 
   const roleLabel = CLIENT_PORTAL_ROLE_LABEL[params.role]
-  const resend = new Resend(apiKey)
+  const from = `${params.providerName} <${cfg.from}>`
+  const resend = new Resend(cfg.apiKey)
   const { error } = await resend.emails.send({
     from,
     to: params.to,
@@ -44,11 +45,11 @@ export async function sendClientPortalInviteEmail(params: {
   })
 
   if (error) {
-    log.error({ error, to: params.to, from }, 'Client portal invite email failed')
+    log.error({ error, to: params.to, from, source: cfg.source }, 'Client portal invite email failed')
     const msg = error.message ?? 'Resend rechazó el envío'
     if (isResendDomainNotVerifiedError(msg)) {
       throw new ClientPortalInviteEmailError(
-        'Verifica el dominio en resend.com/domains y usa un remitente @tudominio en RESEND_FROM_EMAIL.',
+        'Verifica el dominio en resend.com/domains y usa un remitente @tudominio en Integraciones → Resend.',
       )
     }
     throw new ClientPortalInviteEmailError(msg)

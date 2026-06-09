@@ -78,6 +78,7 @@ async function sendInviteEmailForRow(
 ) {
   const role = row.role as ClientPortalRole
   await sendClientPortalInviteEmail({
+    organizationId: row.organizationId,
     to: row.email,
     clientName,
     providerName,

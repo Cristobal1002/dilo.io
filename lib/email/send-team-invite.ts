@@ -1,9 +1,12 @@
 import { Resend } from 'resend'
-import { resolveServerResendFrom } from '@/lib/email/resend-from'
+import { resolveResendSendConfig } from '@/lib/email/org-resend'
 import { isResendDomainNotVerifiedError } from '@/lib/email/resend-errors'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('email/team-invite')
+
+const RESEND_NOT_CONFIGURED_MSG =
+  'Configura Integraciones → Resend en el workspace (API key y remitente) o RESEND_API_KEY + RESEND_FROM_EMAIL en el servidor.'
 
 export class TeamInviteEmailError extends Error {
   constructor(message: string) {
@@ -13,20 +16,18 @@ export class TeamInviteEmailError extends Error {
 }
 
 export async function sendTeamInviteEmail(params: {
+  organizationId: string
   to: string
   organizationName: string
   inviteUrl: string
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  const from = resolveServerResendFrom()
-
-  if (!apiKey || !from) {
-    throw new TeamInviteEmailError(
-      'Falta configurar RESEND_API_KEY y RESEND_FROM_EMAIL en el servidor para enviar invitaciones.',
-    )
+  const cfg = await resolveResendSendConfig(params.organizationId)
+  if (!cfg) {
+    throw new TeamInviteEmailError(RESEND_NOT_CONFIGURED_MSG)
   }
 
-  const resend = new Resend(apiKey)
+  const from = `${params.organizationName} <${cfg.from}>`
+  const resend = new Resend(cfg.apiKey)
   const { error } = await resend.emails.send({
     from,
     to: params.to,
@@ -39,12 +40,12 @@ export async function sendTeamInviteEmail(params: {
   })
 
   if (error) {
-    log.error({ error, to: params.to, from }, 'Team invite email failed')
+    log.error({ error, to: params.to, from, source: cfg.source }, 'Team invite email failed')
     const msg = error.message ?? 'Resend rechazó el envío'
 
     if (isResendDomainNotVerifiedError(msg)) {
       throw new TeamInviteEmailError(
-        'Verifica el dominio en resend.com/domains y usa un remitente @tudominio en RESEND_FROM_EMAIL.',
+        'Verifica el dominio en resend.com/domains y usa un remitente @tudominio en Integraciones → Resend.',
       )
     }
 
