@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { readApiResult } from '@/lib/read-api-result'
 import {
+  CLIENT_SUPPORT_PLAN_LABEL,
+  CLIENT_SUPPORT_PLAN_TIERS,
+  type ClientSupportPlanTier,
+} from '@/lib/client-support-plans'
+import {
   CLIENT_PORTAL_ROLE_LABEL,
   CLIENT_PORTAL_ROLES,
   type ClientPortalRole,
@@ -30,6 +35,24 @@ export function ClientPortalPanel({ clientId, clientName }: { clientId: string; 
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [accessLink, setAccessLink] = useState<string | null>(null)
+  const [supportPlanTier, setSupportPlanTier] = useState<ClientSupportPlanTier>('business')
+  const [supportHoursNote, setSupportHoursNote] = useState('')
+  const [planBusy, setPlanBusy] = useState(false)
+  const [planMsg, setPlanMsg] = useState<string | null>(null)
+
+  const loadClientPlan = useCallback(async () => {
+    const res = await fetch(`/api/clients/${clientId}`)
+    const r = await readApiResult<{
+      client: { supportPlanTier?: string | null; supportHoursNote?: string | null }
+    }>(res)
+    if (r.ok) {
+      const tier = r.data.client.supportPlanTier
+      if (tier && CLIENT_SUPPORT_PLAN_TIERS.includes(tier as ClientSupportPlanTier)) {
+        setSupportPlanTier(tier as ClientSupportPlanTier)
+      }
+      setSupportHoursNote(r.data.client.supportHoursNote ?? '')
+    }
+  }, [clientId])
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/clients/${clientId}/portal/members`)
@@ -42,7 +65,31 @@ export function ClientPortalPanel({ clientId, clientName }: { clientId: string; 
 
   useEffect(() => {
     void load()
-  }, [load])
+    void loadClientPlan()
+  }, [load, loadClientPlan])
+
+  const savePlan = async () => {
+    setPlanBusy(true)
+    setPlanMsg(null)
+    try {
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supportPlanTier,
+          supportHoursNote: supportHoursNote.trim() || null,
+        }),
+      })
+      const r = await readApiResult(res)
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      setPlanMsg('Plan de soporte actualizado para el portal.')
+    } finally {
+      setPlanBusy(false)
+    }
+  }
 
   const submit = async (mode: 'invite' | 'direct') => {
     setBusy(true)
@@ -115,6 +162,54 @@ export function ClientPortalPanel({ clientId, clientName }: { clientId: string; 
         <code className="text-[11px]">/portal</code>. No entran a tu workspace de Dilo salvo que después
         creen el suyo.
       </p>
+
+      <div className="mt-4 rounded-xl border border-[#E8EAEF] bg-[#FAFBFC] p-4 dark:border-[#2A2F3F] dark:bg-[#161821]/60">
+        <p className="text-xs font-semibold text-[#111827] dark:text-[#F8F9FB]">
+          Plan visible en el portal
+        </p>
+        <p className="mt-1 text-[11px] text-[#64748B]">
+          El gerente verá horario de atención y SLA según este plan.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="sm:w-44">
+            <label className="mb-1 block text-xs font-medium text-[#374151] dark:text-[#D1D5DB]">
+              Plan
+            </label>
+            <select
+              value={supportPlanTier}
+              onChange={(e) => setSupportPlanTier(e.target.value as ClientSupportPlanTier)}
+              className={selectField}
+            >
+              {CLIENT_SUPPORT_PLAN_TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {CLIENT_SUPPORT_PLAN_LABEL[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-xs font-medium text-[#374151] dark:text-[#D1D5DB]">
+              Horario personalizado (opcional)
+            </label>
+            <input
+              type="text"
+              value={supportHoursNote}
+              onChange={(e) => setSupportHoursNote(e.target.value)}
+              placeholder="Ej. Lun–Vie 8:00–17:00 (hora Colombia)"
+              className={inputField}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={planBusy}
+            onClick={() => void savePlan()}
+            className={btnSecondary}
+          >
+            {planBusy ? 'Guardando…' : 'Guardar plan'}
+          </button>
+        </div>
+        {planMsg ? <p className={cn('mt-2', alertSuccess)}>{planMsg}</p> : null}
+      </div>
 
       <div className="mt-4 flex flex-col gap-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">

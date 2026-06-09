@@ -49,6 +49,8 @@ export type ClientRecord = {
   postalCode: string | null
   countryCode: string | null
   notes: string | null
+  supportPlanTier?: string | null
+  supportHoursNote?: string | null
   status: string
   embedAllowedDomains: unknown
   createdAt: Date
@@ -71,6 +73,8 @@ export type ClientInput = {
   postalCode?: string | null
   countryCode?: string | null
   notes?: string | null
+  supportPlanTier?: import('@/lib/client-support-plans').ClientSupportPlanTier | null
+  supportHoursNote?: string | null
   status?: ClientStatus
   embedAllowedDomains?: string[]
 }
@@ -113,6 +117,8 @@ export function clientToApi(row: ClientRecord) {
     postalCode: row.postalCode,
     countryCode: row.countryCode,
     notes: row.notes,
+    supportPlanTier: row.supportPlanTier ?? 'business',
+    supportHoursNote: row.supportHoursNote ?? null,
     status: row.status,
     embedAllowedDomains: Array.isArray(row.embedAllowedDomains)
       ? (row.embedAllowedDomains as string[])

@@ -10,6 +10,7 @@ import {
   normalizeTaxIdType,
   normalizeWebsite,
 } from '@/lib/client-fields'
+import { isClientSupportPlanTier } from '@/lib/client-support-plans'
 
 function slugifyClientName(name: string): string {
   return name
@@ -62,6 +63,11 @@ function mapInputToValues(input: ClientInput) {
     postalCode: normalizeOptionalText(input.postalCode, 32),
     countryCode: normalizeCountryCode(input.countryCode),
     notes: normalizeOptionalText(input.notes, 4000),
+    supportPlanTier:
+      input.supportPlanTier && isClientSupportPlanTier(input.supportPlanTier)
+        ? input.supportPlanTier
+        : 'business',
+    supportHoursNote: normalizeOptionalText(input.supportHoursNote, 500),
     status: input.status === 'inactive' ? 'inactive' : 'active',
     embedAllowedDomains: Array.isArray(input.embedAllowedDomains)
       ? input.embedAllowedDomains.map((d) => d.trim()).filter(Boolean).slice(0, 20)
@@ -146,6 +152,15 @@ export async function updateClientRecord(args: {
   if (args.input.postalCode !== undefined) patch.postalCode = normalizeOptionalText(args.input.postalCode, 32)
   if (args.input.countryCode !== undefined) patch.countryCode = normalizeCountryCode(args.input.countryCode)
   if (args.input.notes !== undefined) patch.notes = normalizeOptionalText(args.input.notes, 4000)
+  if (args.input.supportPlanTier !== undefined) {
+    patch.supportPlanTier =
+      args.input.supportPlanTier && isClientSupportPlanTier(args.input.supportPlanTier)
+        ? args.input.supportPlanTier
+        : 'business'
+  }
+  if (args.input.supportHoursNote !== undefined) {
+    patch.supportHoursNote = normalizeOptionalText(args.input.supportHoursNote, 500)
+  }
   if (args.input.status !== undefined) patch.status = args.input.status === 'inactive' ? 'inactive' : 'active'
   if (args.input.embedAllowedDomains !== undefined) {
     patch.embedAllowedDomains = args.input.embedAllowedDomains.map((d) => d.trim()).filter(Boolean).slice(0, 20)

@@ -388,6 +388,10 @@ import {
       status:         text('status').notNull().default('active'),
       /** Logo opcional en portal (si null, usa logo del workspace). */
       logoUrl:        text('logo_url'),
+      /** essential | business | enterprise — visible en portal de cliente. */
+      supportPlanTier: text('support_plan_tier').default('business'),
+      /** Override de horario mostrado en portal (opcional). */
+      supportHoursNote: text('support_hours_note'),
       embedAllowedDomains: jsonb('embed_allowed_domains').notNull().default([]),
       createdAt:      timestamp('created_at').notNull().defaultNow(),
       updatedAt:      timestamp('updated_at').notNull().defaultNow(),

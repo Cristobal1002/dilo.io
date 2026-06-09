@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import {
+  CLIENT_SUPPORT_PLAN_TIERS,
+  isClientSupportPlanTier,
+} from '@/lib/client-support-plans'
+import {
   CLIENT_STATUSES,
   CLIENT_TAX_ID_TYPES,
   normalizeCountryCode,
@@ -39,6 +43,11 @@ export const ClientBodySchema = z.object({
     .optional()
     .transform((v) => (v === undefined ? undefined : normalizeCountryCode(v))),
   notes: optionalText(4000),
+  supportPlanTier: z
+    .union([z.enum(CLIENT_SUPPORT_PLAN_TIERS), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v && isClientSupportPlanTier(v) ? v : 'business')),
+  supportHoursNote: optionalText(500),
   status: z.enum(CLIENT_STATUSES).optional(),
   embedAllowedDomains: z.array(z.string().max(200)).max(20).optional(),
 })
